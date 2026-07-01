@@ -1,0 +1,31 @@
+# Optional tag-driven publish of @alacrity-ai/kbrelaymcp to npm (v0.13.0).
+# Manual publish is the default (`cd packages/mcp && npm publish --access public`);
+# this workflow is the CI alternative. Push a tag like `mcp-v0.1.0` to trigger it.
+# Requires a repo secret NPM_TOKEN (an npm automation token). Gated behind the
+# `npm-publish` environment so a human approves the release.
+name: Publish MCP
+
+on:
+  push:
+    tags:
+      - 'mcp-v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm --filter @alacrity-ai/kbrelaymcp run build
+      - run: npm publish --access public
+        working-directory: packages/mcp
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

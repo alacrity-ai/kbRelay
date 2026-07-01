@@ -1,0 +1,45 @@
+{
+  "name": "@alacrity-ai/kbrelaymcp",
+  "version": "0.3.1",
+  "description": "MCP server for kbRelay — give an agent kanban powers (projects, cards, timeline, mentions) over the kbRelay API.",
+  "type": "module",
+  "license": "MIT",
+  "private": false,
+  "bin": {
+    "kbrelaymcp": "./bin/kbrelaymcp.mjs"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "kbrelay",
+    "kanban",
+    "agents"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.3",
+    "vitest": "^2.1.0"
+  }
+}

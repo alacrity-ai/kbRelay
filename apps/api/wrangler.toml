@@ -1,0 +1,64 @@
+name = "kbrelay-api"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[observability]
+enabled = true
+head_sampling_rate = 1.0
+
+# ──────────────────────────────────────────────────────────────
+# Two explicit environments: `prod` and `dev`. Every deploy /
+# `d1 migrations apply` / `secret put` MUST pass `--env prod|dev`.
+# A bare `wrangler deploy` is intentionally not viable (top-level
+# config has no bindings/routes).
+#
+# Local dev: `wrangler dev --env dev` runs Miniflare with a LOCAL D1
+# (the dev d1 binding is NOT marked remote), so the local loop needs
+# no remote resources beyond the DB having been created once.
+# ──────────────────────────────────────────────────────────────
+
+# ── prod ──────────────────────────────────────────────────────
+[env.prod]
+name = "kbrelay-api"
+workers_dev = false
+preview_urls = false
+
+[env.prod.vars]
+ALLOWED_ORIGINS = "https://kbrelay.lalalimited.com"
+PUBLIC_BASE_URL = "https://kbrelay.lalalimited.com"
+
+[[env.prod.routes]]
+pattern = "kbrelay.lalalimited.com/api/*"
+zone_name = "lalalimited.com"
+
+[[env.prod.d1_databases]]
+binding = "DB"
+database_name = "kbrelay"
+database_id = "d64d1ce5-7803-4fc8-96ba-8122d2d9e700"
+migrations_dir = "migrations"
+
+# ── dev ───────────────────────────────────────────────────────
+# Provision once before the first dev deploy:
+#   wrangler d1 create kbrelay-dev     → paste id below
+#   wrangler pages project create kbrelay-dev --production-branch main
+[env.dev]
+name = "kbrelay-api-dev"
+workers_dev = false
+preview_urls = false
+
+[env.dev.vars]
+ALLOWED_ORIGINS = "https://dev.kbrelay.lalalimited.com,http://localhost:5173"
+PUBLIC_BASE_URL = "https://dev.kbrelay.lalalimited.com"
+
+[[env.dev.routes]]
+pattern = "dev.kbrelay.lalalimited.com/api/*"
+zone_name = "lalalimited.com"
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "kbrelay-dev"
+database_id = "34ba981f-0655-4067-b649-131e827ca94c"
+migrations_dir = "migrations"

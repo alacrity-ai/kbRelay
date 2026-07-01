@@ -1,0 +1,52 @@
+# ── Secrets — NEVER commit ──────────────────────────────────────
+DO_NOT_COMMIT.md
+.dev.vars
+.dev.vars.*
+*.local
+.env
+.env.*
+!.env.example
+!.env.*.example
+infrastructure/docker/.env.selfhost
+
+# ── Dependencies ────────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+
+# ── Build output ────────────────────────────────────────────────
+dist/
+apps/web/dist/
+apps/api/dist-node/        # self-host bundle
+packages/*/dist/
+*.tsbuildinfo
+
+# ── Wrangler / Cloudflare ───────────────────────────────────────
+.wrangler/
+apps/api/.wrangler/
+
+# ── Test / coverage ─────────────────────────────────────────────
+coverage/
+test-results/
+playwright-report/
+.playwright/
+
+# ── Packaging artifacts ─────────────────────────────────────────
+*.tgz
+
+# ── Logs & caches ───────────────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+.cache/
+.turbo/
+
+# ── Editor / OS ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/

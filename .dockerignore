@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+apps/*/node_modules
+packages/*/node_modules
+apps/web/dist
+apps/api/dist-node
+apps/api/.wrangler
+.wrangler
+coverage
+test-results
+playwright-report
+.git
+DO_NOT_COMMIT.md
+**/.dev.vars
+**/.env.selfhost
+*.log
+.DS_Store

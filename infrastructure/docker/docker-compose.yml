@@ -1,0 +1,26 @@
+# kbRelay self-host stack (v0.12.0). ONE service — the app serves API + SPA and
+# embeds SQLite in a named volume. No database/redis/other containers. Bring it
+# up on any Docker host with: `make selfhost-up` (from the repo root).
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    image: kbrelay-selfhost
+    container_name: kbrelay
+    ports:
+      - "${PORT:-8080}:8080"
+    env_file:
+      - .env.selfhost
+    volumes:
+      - kbrelay-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/api/health').then(r=>{process.exit(r.ok?0:1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  kbrelay-data:

@@ -1,0 +1,99 @@
+import type { Env } from '../env';
+import type { AuthContext } from '@kbrelay/shared';
+import { HttpError } from '../http';
+
+/**
+ * Project RBAC enforcement (v0.11.0). Binary access: an admin sees everything;
+ * a member sees only projects with a `project_access` row. No-access resolves
+ * to **404** (not 403) so we never leak that a project/card/column exists.
+ *
+ * The dispatcher calls `enforceProjectAccess` for every project-scoped route,
+ * driven by the route's declarative `access` scope. A coverage test iterates
+ * the router so a new project route that forgets to declare a scope fails CI.
+ */
+
+/** How to find the project id a route operates on, from its path params. */
+export type AccessScope =
+  | { kind: 'project'; param: string } // params[param] is the project id
+  | { kind: 'card'; param: string } // params[param] is a card id → resolve project
+  | { kind: 'column'; param: string }; // params[param] is a column id → resolve project
+
+/** Resolve the owning project id for a scoped route, or null if it doesn't exist. */
+export async function resolveProjectId(
+  env: Env,
+  tenantId: string,
+  scope: AccessScope,
+  params: Record<string, string>,
+): Promise<string | null> {
+  const id = params[scope.param];
+  if (!id) return null;
+  if (scope.kind === 'project') return id;
+  const table = scope.kind === 'card' ? 'cards' : 'columns';
+  const row = await env.db.prepare(`SELECT project_id FROM ${table} WHERE id = ? AND tenant_id = ?`)
+    .bind(id, tenantId)
+    .first<{ project_id: string }>();
+  return row?.project_id ?? null;
+}
+
+/** Does the CALLER have access to this project? Admin ⇒ any existing project. */
+export async function callerHasProjectAccess(
+  env: Env,
+  auth: AuthContext,
+  projectId: string,
+): Promise<boolean> {
+  if (auth.role === 'admin') {
+    const p = await env.db.prepare('SELECT 1 AS ok FROM projects WHERE id = ? AND tenant_id = ?')
+      .bind(projectId, auth.tenantId)
+      .first<{ ok: number }>();
+    return Boolean(p);
+  }
+  const row = await env.db.prepare(
+    'SELECT 1 AS ok FROM project_access WHERE project_id = ? AND user_id = ? AND tenant_id = ?',
+  )
+    .bind(projectId, auth.userId, auth.tenantId)
+    .first<{ ok: number }>();
+  return Boolean(row);
+}
+
+/** Enforce caller access for a scoped route; throws 404 on missing OR no-access. */
+export async function enforceProjectAccess(
+  env: Env,
+  auth: AuthContext,
+  scope: AccessScope,
+  params: Record<string, string>,
+): Promise<void> {
+  const projectId = await resolveProjectId(env, auth.tenantId, scope, params);
+  if (!projectId) throw new HttpError(404, 'Not found');
+  if (!(await callerHasProjectAccess(env, auth, projectId))) throw new HttpError(404, 'Not found');
+}
+
+/** Is an ARBITRARY tenant user an admin? (for assignee/mention access checks). */
+async function userIsAdmin(env: Env, tenantId: string, userId: string): Promise<boolean> {
+  const m = await env.db.prepare('SELECT role FROM memberships WHERE tenant_id = ? AND user_id = ?')
+    .bind(tenantId, userId)
+    .first<{ role: string }>();
+  return m?.role === 'admin';
+}
+
+/** Can an arbitrary tenant user access this project? (admin ⇒ yes). */
+export async function userHasProjectAccess(
+  env: Env,
+  tenantId: string,
+  projectId: string,
+  userId: string,
+): Promise<boolean> {
+  if (await userIsAdmin(env, tenantId, userId)) return true;
+  const row = await env.db.prepare(
+    'SELECT 1 AS ok FROM project_access WHERE project_id = ? AND user_id = ?',
+  )
+    .bind(projectId, userId)
+    .first<{ ok: number }>();
+  return Boolean(row);
+}
+
+/** Require the caller to be a tenant admin; throws 403 otherwise. */
+export function requireAdmin(auth: AuthContext | null): AuthContext {
+  if (!auth) throw new HttpError(401, 'Authentication required');
+  if (auth.role !== 'admin') throw new HttpError(403, 'Admin access required');
+  return auth;
+}
