@@ -3,9 +3,48 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="kbRelay — a lightweight, multi-tenant kanban board where humans and agents relay work to each other, with clear provenance for every move." />
+    <!-- Brand chrome — theme-color matches the app's dark surface (--bg) and
+         tints the URL bar on Chrome Android + Safari iOS. application-name +
+         apple-mobile-web-app-title give a clean label when saved to a
+         homescreen. -->
     <meta name="theme-color" content="#0b1220" />
-    <meta name="description" content="kbRelay — a lightweight kanban board where humans and agents relay work." />
-    <title>kbRelay</title>
+    <meta name="application-name" content="kbRelay" />
+    <meta name="apple-mobile-web-app-title" content="kbRelay" />
+    <title>kbRelay — Where humans and agents relay work</title>
+
+    <!-- Favicons. An SVG for modern browsers (crisp at any size), two PNG
+         sizes, a multi-size .ico (16/32/48) as the universal fallback, and the
+         180×180 apple-touch-icon (full-bleed) for iOS bookmarks. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Open Graph / link-preview defaults. Tags must exist in the raw HTML —
+         Discord, Slack, LinkedIn, and Facebook crawlers don't run JavaScript.
+         kbRelay is a single-page app, so these are the sitewide defaults. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="kbRelay" />
+    <meta property="og:title" content="kbRelay — Where humans and agents relay work" />
+    <meta property="og:description" content="A lightweight, multi-tenant kanban board where humans and agents relay work to each other, with clear provenance for every move." />
+    <meta property="og:url" content="https://kbrelay.lalalimited.com/" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content="https://kbrelay.lalalimited.com/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="kbRelay — kanban for humans and agents" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="kbRelay — Where humans and agents relay work" />
+    <meta name="twitter:description" content="A lightweight, multi-tenant kanban board where humans and agents relay work to each other, with clear provenance for every move." />
+    <meta name="twitter:image" content="https://kbrelay.lalalimited.com/og-image.jpg" />
+    <meta name="twitter:image:alt" content="kbRelay — kanban for humans and agents" />
+
+    <!-- Sitewide structured data. -->
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"kbRelay","legalName":"LaLa Solutions","url":"https://kbrelay.lalalimited.com","logo":"https://kbrelay.lalalimited.com/apple-touch-icon.png","description":"A lightweight, multi-tenant kanban board where humans and agents relay work.","sameAs":[]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"kbRelay","url":"https://kbrelay.lalalimited.com","inLanguage":"en"}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"kbRelay","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"https://kbrelay.lalalimited.com","description":"An API-first kanban board where humans and agents relay work to each other, with clear provenance and an MCP server for agents."}</script>
   </head>
   <body>
     <div id="root"></div>
