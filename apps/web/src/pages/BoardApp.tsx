@@ -57,6 +57,16 @@ function Pulse() {
   );
 }
 
+function Kebab() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <circle cx="12" cy="5" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="12" cy="19" r="1.8" />
+    </svg>
+  );
+}
+
 function Inbox() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -126,6 +136,9 @@ export default function BoardApp({
   const [profileOpen, setProfileOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   const [mentionCount, setMentionCount] = useState(0);
+  // "Needs me" total for the My Work badge (KBR-70 follow-up): queue + reviews.
+  // Mentions are added at render time so a mark-read updates the badge instantly.
+  const [queueCount, setQueueCount] = useState(0);
   const [nav, setNav] = useState<BoardNav | null>(null);
   // My Work (default landing, KBR-64) vs board vs Activity feed (KBR-67).
   // A card jump always returns to the board.
@@ -147,18 +160,22 @@ export default function BoardApp({
   const applyFilter = useCallback((f: BoardFilter) => { setFilter(f); setFilterOpen(false); }, []);
   const clearFilter = useCallback(() => { setFilter(EMPTY_FILTER); setFilterOpen(false); }, []);
 
-  // Poll unread-mention count for the bell badge on the same 20s cadence as the
-  // board, plus on mount and when the tab regains focus.
+  // Poll unread-mention count (bell badge) + queue/review counts (My Work
+  // badge) on the same 20s cadence as the board, plus on mount and focus.
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState !== 'visible') return;
       void api.getMentions('unread').then((r) => setMentionCount(r.unreadCount)).catch(() => {});
+      void api.getMyQueue().then((q) => setQueueCount(q.work.length + q.review.length)).catch(() => {});
     };
     refresh();
     const interval = window.setInterval(refresh, 20_000);
     window.addEventListener('focus', refresh);
     return () => { window.clearInterval(interval); window.removeEventListener('focus', refresh); };
   }, []);
+
+  // Everything that needs me: queue + reviews + unread mentions.
+  const needsMe = queueCount + mentionCount;
 
   // Jump to a mention: switch to its project (if needed), then hand the card +
   // location to the Board to open and flash.
@@ -277,12 +294,13 @@ export default function BoardApp({
         <span className="brand"><BrandMark /> <span className="brand-name">kbRelay</span></span>
 
         <button
-          className={`icon-btn subtle mywork-btn ${view === 'mywork' ? 'active' : ''}`}
+          className={`icon-btn subtle topbar-tool mywork-btn ${view === 'mywork' ? 'active' : ''}`}
           onClick={() => setView('mywork')}
-          aria-label="My Work"
+          aria-label={`My Work${needsMe > 0 ? ` (${needsMe} items)` : ''}`}
           title="My Work — your queue, reviews, and mentions"
         >
           <Inbox />
+          {needsMe > 0 && <span className="notif-badge">{needsMe > 99 ? '99+' : needsMe}</span>}
         </button>
 
         {projects.length > 0 && (
@@ -296,14 +314,14 @@ export default function BoardApp({
         )}
 
         {selected && view !== 'mywork' && (
-          <button className="icon-btn subtle project-settings-btn" onClick={() => setSettingsOpen(true)} aria-label="Project settings" title="Project settings">
+          <button className="icon-btn subtle topbar-tool project-settings-btn" onClick={() => setSettingsOpen(true)} aria-label="Project settings" title="Project settings">
             <Gear />
           </button>
         )}
 
         {selected && view !== 'mywork' && (
           <button
-            className={`icon-btn subtle filter-btn ${isFilterActive(filter) ? 'active' : ''}`}
+            className={`icon-btn subtle topbar-tool filter-btn ${isFilterActive(filter) ? 'active' : ''}`}
             onClick={() => setFilterOpen(true)}
             aria-label="Filter cards"
             title="Filter cards"
@@ -315,7 +333,7 @@ export default function BoardApp({
 
         {selected && view !== 'mywork' && (
           <button
-            className={`icon-btn subtle activity-btn ${view === 'activity' ? 'active' : ''}`}
+            className={`icon-btn subtle topbar-tool activity-btn ${view === 'activity' ? 'active' : ''}`}
             onClick={() => setView((v) => (v === 'activity' ? 'board' : 'activity'))}
             aria-label={view === 'activity' ? 'Show board' : 'Show activity'}
             title={view === 'activity' ? 'Show board' : 'Project activity'}
@@ -325,13 +343,50 @@ export default function BoardApp({
         )}
 
         <button
-          className="icon-btn subtle quickfind-btn"
+          className="icon-btn subtle topbar-tool quickfind-btn"
           onClick={() => setFindOpen(true)}
           aria-label="Quick find"
           title="Quick find (⌘K / Ctrl+K)"
         >
           <Magnifier />
         </button>
+
+        {/* Mobile (≤640px, KBR-70): the five tools collapse into one menu so the
+            project switcher keeps its space. Hidden on desktop via CSS. */}
+        <Dropdown
+          className="topbar-tools-menu"
+          triggerClassName="icon-btn subtle"
+          label="Tools menu"
+          trigger={
+            <>
+              <Kebab />
+              {needsMe > 0 && <span className="notif-badge">{needsMe > 99 ? '99+' : needsMe}</span>}
+            </>
+          }
+        >
+          <div className="menu-list">
+            <button className="menu-item" onClick={() => setView('mywork')}>
+              <Inbox /> My Work{needsMe > 0 ? ` (${needsMe})` : ''}
+            </button>
+            <button className="menu-item" onClick={() => setFindOpen(true)}>
+              <Magnifier /> Quick find
+            </button>
+            {selected && view !== 'mywork' && (
+              <>
+                <div className="menu-divider" />
+                <button className="menu-item" onClick={() => setSettingsOpen(true)}>
+                  <Gear /> Project settings
+                </button>
+                <button className="menu-item" onClick={() => setFilterOpen(true)}>
+                  <Funnel /> Filter cards{isFilterActive(filter) ? ` (${filterCount(filter)})` : ''}
+                </button>
+                <button className="menu-item" onClick={() => setView((v) => (v === 'activity' ? 'board' : 'activity'))}>
+                  <Pulse /> {view === 'activity' ? 'Show board' : 'Project activity'}
+                </button>
+              </>
+            )}
+          </div>
+        </Dropdown>
 
         <div className="spacer" />
 

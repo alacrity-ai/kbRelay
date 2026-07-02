@@ -955,6 +955,9 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   .user-name { display: none; }
   .project-switcher { flex: 1; min-width: 0; }
   .project-trigger { max-width: none; width: 100%; }
+  /* Collapse the tool buttons into the kebab menu (KBR-70). */
+  .topbar .topbar-tool { display: none; }
+  .topbar-tools-menu { display: block; }
 
   /* Board: one column fills the screen; horizontal snap between columns */
   .board {
@@ -1049,6 +1052,21 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   color: var(--muted, #94a3b8);
   white-space: nowrap;
 }
+
+/* Mobile tools menu (KBR-70): desktop shows the individual topbar buttons,
+   ≤640px collapses them into one kebab dropdown so the switcher keeps space. */
+.topbar-tools-menu { display: none; }
+.topbar-tools-menu .dropdown-trigger {
+  /* Only ever visible ≤640px, where icon buttons are 40px touch targets. */
+  width: 40px; height: 40px; padding: 0;
+  display: inline-grid; place-items: center;
+  background: transparent; border: 0;
+  position: relative; /* anchors the needs-me badge */
+}
+.topbar-tools-menu .dropdown-panel { min-width: 220px; }
+
+/* "Needs me" badge anchor on the My Work button (badge itself = .notif-badge). */
+.mywork-btn { position: relative; }
 
 /* Interactive checklists (v0.17.0, KBR-59). */
 .task-chip {
