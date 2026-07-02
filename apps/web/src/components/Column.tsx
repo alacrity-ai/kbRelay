@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { CardDto, ColumnDto, ColumnRole, UserDto } from '@kbrelay/shared';
@@ -66,15 +67,7 @@ export default function Column({
               <option key={r} value={r}>{ROLE_META[r].label}</option>
             ))}
           </select>
-          <details className="role-help">
-            <summary aria-label="How this role behaves" title="How this role behaves">?</summary>
-            <div className="role-popover">
-              {role && (
-                <span className="flowdemo-role" style={{ color: role.color, borderColor: role.color }}>{role.label}</span>
-              )}
-              <p>{roleHelp}</p>
-            </div>
-          </details>
+          <RoleHelp role={role} roleHelp={roleHelp} />
         </div>
       </div>
 
@@ -87,6 +80,54 @@ export default function Column({
       </SortableContext>
 
       <button className="add-card" onClick={() => onAddCard(column.id)}>+ Add card</button>
+    </div>
+  );
+}
+
+/**
+ * The (?) role-help popover. A click-opened popover, so it must dismiss the way
+ * users expect one to — on outside click or Escape — rather than lingering until
+ * you click the toggle again (KBR-39). (A timeout would hide it mid-read, so we
+ * dismiss on interaction instead, which is the tooltip/popover best practice.)
+ */
+function RoleHelp({ role, roleHelp }: { role: (typeof ROLE_META)[ColumnRole] | null; roleHelp: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="role-help" ref={ref}>
+      <button
+        type="button"
+        className="role-help-toggle"
+        aria-label="How this role behaves"
+        title="How this role behaves"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        ?
+      </button>
+      {open && (
+        <div className="role-popover" role="tooltip">
+          {role && (
+            <span className="flowdemo-role" style={{ color: role.color, borderColor: role.color }}>{role.label}</span>
+          )}
+          <p>{roleHelp}</p>
+        </div>
+      )}
     </div>
   );
 }

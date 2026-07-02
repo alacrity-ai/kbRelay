@@ -235,14 +235,14 @@ export default function ProjectSettings({
                 </div>
               </div>
 
-              <div className="field">
-                <label className="toggle-row">
+              <div className="field notify-field">
+                <label className="notify-toggle">
                   <input
                     type="checkbox"
                     checked={agentEvents}
                     onChange={(e) => setAgentEvents(e.target.checked)}
                   />
-                  <span>Notify agents of activity on this board</span>
+                  <span className="notify-toggle-text">Notify agents of activity on this board</span>
                 </label>
                 <p className="muted-note">
                   When on, assigning a card into a <strong>Ready</strong> lane (or @-mentioning an agent) can
