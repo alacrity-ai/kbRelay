@@ -6,5 +6,6 @@ export * from './board.ts';
 export * from './colors.ts';
 export * from './events.ts';
 export * from './mentions.ts';
+export * from './search.ts';
 export * from './team.ts';
 export * from './webhooks.ts';

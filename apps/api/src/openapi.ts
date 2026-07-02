@@ -595,6 +595,21 @@ export const OPENAPI_SPEC = {
       },
       delete: { summary: 'Delete a card', responses: { 200: { description: 'ok' } } },
     },
+    '/api/v1/search': {
+      get: {
+        summary: 'Global quick-find — cards by key/summary, projects by name/code',
+        description:
+          'Tenant-wide, RBAC-filtered to your accessible projects. Ranks an exact ' +
+          'ticket key ("KBR-3") above key prefixes, then project name/code hits, ' +
+          'then card-summary substrings. v1 does NOT search descriptions/comments. ' +
+          '`q` min 2 chars (400 below); `limit` default 20, max 50.',
+        parameters: [
+          { name: 'q', in: 'query', required: true, schema: { type: 'string', minLength: 2 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 20, maximum: 50 } },
+        ],
+        responses: { 200: { description: 'ok' }, 400: { description: 'q too short' } },
+      },
+    },
     '/api/v1/projects/{id}/events': {
       get: {
         summary: 'Project activity feed — newest-first card events across the board',

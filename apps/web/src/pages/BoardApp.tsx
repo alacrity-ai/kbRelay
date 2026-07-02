@@ -6,6 +6,7 @@ import { CardLinksContext, type CardLinks } from '../lib/cardLinks';
 import { recordProjectView, orderByRecency } from '../lib/recentProjects';
 import Board, { type BoardNav } from '../components/Board';
 import ActivityFeed from '../components/ActivityFeed';
+import QuickFind from '../components/QuickFind';
 import Dropdown from '../components/Dropdown';
 import ProjectSwitcher from '../components/ProjectSwitcher';
 import BrowseProjectsModal from '../components/BrowseProjectsModal';
@@ -51,6 +52,16 @@ function Pulse() {
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </svg>
+  );
+}
+
+function Magnifier() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.35-4.35" />
     </svg>
   );
 }
@@ -107,6 +118,19 @@ export default function BoardApp({
   const [nav, setNav] = useState<BoardNav | null>(null);
   // Board vs Activity feed (v0.17.0, KBR-67). A card jump always returns to the board.
   const [view, setView] = useState<'board' | 'activity'>('board');
+  // Global quick-find palette (v0.17.0, KBR-68) — Cmd/Ctrl+K or the topbar button.
+  const [findOpen, setFindOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setFindOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const applyFilter = useCallback((f: BoardFilter) => { setFilter(f); setFilterOpen(false); }, []);
   const clearFilter = useCallback(() => { setFilter(EMPTY_FILTER); setFilterOpen(false); }, []);
@@ -279,6 +303,15 @@ export default function BoardApp({
           </button>
         )}
 
+        <button
+          className="icon-btn subtle quickfind-btn"
+          onClick={() => setFindOpen(true)}
+          aria-label="Quick find"
+          title="Quick find (⌘K / Ctrl+K)"
+        >
+          <Magnifier />
+        </button>
+
         <div className="spacer" />
 
         <NotificationBell
@@ -399,6 +432,18 @@ export default function BoardApp({
           onPick={selectProject}
           onDelete={deleteProjectById}
           onClose={() => setBrowseOpen(false)}
+        />
+      )}
+      {findOpen && (
+        <QuickFind
+          recentProjects={orderedProjects}
+          onPickProject={(id) => { selectProject(id); setView('board'); }}
+          onPickCard={({ projectId, cardId }) => {
+            selectProject(projectId);
+            setNav({ cardId });
+            setView('board');
+          }}
+          onClose={() => setFindOpen(false)}
         />
       )}
       {apiKeysOpen && <ApiKeysModal onClose={() => setApiKeysOpen(false)} />}

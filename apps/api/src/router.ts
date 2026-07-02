@@ -11,6 +11,7 @@ import {
   handleDeleteProject,
   handleListProjectEvents,
 } from './routes/projects';
+import { handleSearch } from './routes/search';
 import {
   handleListColumns,
   handleCreateColumn,
@@ -156,6 +157,9 @@ export const routes: Route[] = [
   { method: 'POST', pattern: '/api/v1/webhooks', handler: handleCreateWebhook },
   { method: 'PATCH', pattern: '/api/v1/webhooks/:id', handler: handlePatchWebhook },
   { method: 'DELETE', pattern: '/api/v1/webhooks/:id', handler: handleDeleteWebhook },
+
+  // ── Global quick-find (v0.17.0) ── RBAC is applied inside the query.
+  { method: 'GET', pattern: '/api/v1/search', handler: handleSearch },
 
   // ── Projects ── (list filters in-handler; create auto-grants the creator)
   { method: 'GET', pattern: '/api/v1/projects', handler: handleListProjects },

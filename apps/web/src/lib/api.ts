@@ -11,6 +11,7 @@ import type {
   MentionsResponse,
   MentionsStatus,
   ProjectEventsResponse,
+  SearchResponse,
   AuthMeResponse,
   RegisterInput,
   LoginInput,
@@ -166,6 +167,13 @@ export const getCard = (id: string) => request<{ card: CardDto }>('GET', `/v1/ca
 export const patchCard = (id: string, body: CardInput) =>
   request<{ card: CardDto }>('PATCH', `/v1/cards/${id}`, body);
 export const deleteCard = (id: string) => request<{ ok: true }>('DELETE', `/v1/cards/${id}`);
+
+// ── Global quick-find (v0.17.0) ──
+export const search = (q: string, limit?: number) =>
+  request<SearchResponse>(
+    'GET',
+    `/v1/search?q=${encodeURIComponent(q)}${limit != null ? `&limit=${limit}` : ''}`,
+  );
 
 // ── Project activity feed (v0.17.0) ──
 export const listProjectEvents = (

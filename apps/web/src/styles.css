@@ -1050,6 +1050,69 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   white-space: nowrap;
 }
 
+/* ── Global quick-find (v0.17.0, KBR-68) ───────────────────── */
+
+.qf-backdrop { align-items: flex-start; padding-top: 12vh; }
+.qf-palette {
+  width: min(620px, 92vw);
+  background: var(--surface, #0f172a);
+  border: 1px solid var(--border-strong, #334155);
+  border-radius: var(--r-md, 10px);
+  box-shadow: 0 24px 60px #000a;
+  overflow: hidden;
+}
+.qf-input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  font-size: 1rem;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border, #1e293b);
+  outline: none;
+  color: inherit;
+}
+.qf-results { max-height: 46vh; overflow-y: auto; padding: 0.3rem; }
+.qf-section-label {
+  padding: 0.45rem 0.7rem 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted, #94a3b8);
+}
+.qf-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-sm, 6px);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.qf-row.active { background: #3b82f622; }
+.qf-code {
+  flex: 0 0 auto;
+  min-width: 3.6em;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--muted, #94a3b8);
+}
+.qf-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qf-hint { flex: 0 0 auto; font-size: 0.72rem; color: var(--muted, #94a3b8); }
+.qf-empty { padding: 1.1rem 0.8rem; color: var(--muted, #94a3b8); }
+.qf-footer {
+  display: flex;
+  gap: 1rem;
+  padding: 0.45rem 0.9rem;
+  border-top: 1px solid var(--border, #1e293b);
+  font-size: 0.72rem;
+  color: var(--muted, #94a3b8);
+}
+
 /* ── Project activity feed (v0.17.0, KBR-67) ───────────────── */
 
 .activity-wrap {
