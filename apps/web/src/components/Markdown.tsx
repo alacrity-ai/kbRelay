@@ -13,7 +13,9 @@ const components: Components = {
     if (href && href.startsWith('#mention-')) {
       return <span className="mention-chip">{children}</span>;
     }
-    return <a href={href} {...props} target="_blank" rel="noopener noreferrer" />;
+    // `children` MUST be rendered — omitting it emits an empty <a>, which erases
+    // the link text (a bare autolinked URL then vanishes entirely).
+    return <a href={href} {...props} target="_blank" rel="noopener noreferrer">{children}</a>;
   },
 };
 
