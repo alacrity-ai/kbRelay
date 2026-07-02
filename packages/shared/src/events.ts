@@ -10,7 +10,8 @@ import { z } from 'zod';
  */
 
 export type CardEventKind = 'system' | 'note' | 'handoff';
-export type SystemEventType = 'created' | 'moved' | 'assigned' | 'edited';
+/** `reviewer` (v0.17.0): the reviewer pointer changed — meta {from, to}. */
+export type SystemEventType = 'created' | 'moved' | 'assigned' | 'edited' | 'reviewer';
 
 /** Wire shape of a timeline entry (GET /cards/:id/timeline). */
 export interface CardEventDto {

@@ -119,6 +119,7 @@ export const allTools: Tool[] = [
       acceptanceCriteria: z.string().nullish(),
       columnId: z.string().optional(),
       assigneeUserId: z.string().nullish(),
+      reviewerUserId: z.string().nullish(),
     }),
     handler: (a, c) => {
       const { projectId, ...body } = a;
@@ -127,7 +128,7 @@ export const allTools: Tool[] = [
   }),
   defineTool({
     name: 'update_card',
-    description: 'Edit a card and/or move it (status = column). Move by role: pickup → in_progress, finish → review, done only when told, stuck → blocked. Log progress via add_comment, not the description.',
+    description: 'Edit and/or move a card (status = column). Pickup → in_progress; finish → review + set reviewerUserId (default: card creator); done only when told; stuck → blocked. Log via add_comment.',
     inputSchema: z.object({
       cardId: z.string(),
       summary: z.string().optional(),
@@ -135,6 +136,7 @@ export const allTools: Tool[] = [
       acceptanceCriteria: z.string().nullish(),
       columnId: z.string().optional(),
       assigneeUserId: z.string().nullish(),
+      reviewerUserId: z.string().nullish(),
       position: z.number().optional(),
     }),
     handler: (a, c) => {
@@ -265,7 +267,7 @@ export const allTools: Tool[] = [
   defineTool({
     name: 'list_my_queue',
     description:
-      'Your queue: cards assigned to you in a `ready`-role column (optional projectId). Work these first. Pick up → in_progress, finish → review + handoff, done only when told.',
+      'Your queue, two sections: work = assigned to you in a ready column (do these); review = you are the reviewer in a review column (verify these). Pickup → in_progress; finish → review + handoff.',
     inputSchema: z.object({ projectId: z.string().optional() }),
     handler: (a, c) => c.request('GET', `/v1/me/queue${qs({ projectId: a.projectId })}`),
   }),

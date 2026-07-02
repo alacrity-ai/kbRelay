@@ -72,6 +72,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
   const [acceptance, setAcceptance] = useState(card?.acceptanceCriteria ?? '');
   const [columnId, setColumnId] = useState(card?.columnId ?? createInColumnId ?? columns[0]?.id ?? '');
   const [assignee, setAssignee] = useState(card?.assigneeUserId ?? '');
+  const [reviewer, setReviewer] = useState(card?.reviewerUserId ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -159,6 +160,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
         acceptanceCriteria: acceptance || null,
         columnId,
         assigneeUserId: assignee || null,
+        reviewerUserId: reviewer || null,
       });
       return saved.id;
     } catch (err) {
@@ -180,6 +182,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
     setAcceptance(card?.acceptanceCriteria ?? '');
     setColumnId(card?.columnId ?? columns[0]?.id ?? '');
     setAssignee(card?.assigneeUserId ?? '');
+    setReviewer(card?.reviewerUserId ?? '');
     setError(null);
     setEditing(true);
   }
@@ -204,6 +207,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
         acceptanceCriteria: acceptance || null,
         columnId,
         assigneeUserId: assignee || null,
+        reviewerUserId: reviewer || null,
       });
       // Board adopts the saved card (new or existing) into the modal, so drop to
       // view rather than closing — you see what you just created/edited.
@@ -315,6 +319,13 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
                     {users.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.kind})</option>)}
                   </select>
                 </div>
+                <div className="field">
+                  <label>Reviewer</label>
+                  <select value={reviewer} onChange={(e) => setReviewer(e.target.value)}>
+                    <option value="">No reviewer</option>
+                    {users.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.kind})</option>)}
+                  </select>
+                </div>
               </div>
               <p className="muted-note" style={{ fontSize: '0.8rem' }}>
                 The card takes on its assignee's color.
@@ -346,6 +357,20 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
                     ) : 'Unassigned'}
                   </span>
                 </div>
+                {card!.reviewerUserId && (
+                  <div className="view-section">
+                    <span className="view-label">Reviewer</span>
+                    <span className="pill">
+                      <span className="dot" style={{ background: userColor(card!.reviewerUserId) }} />
+                      {userName(card!.reviewerUserId)}
+                      {userKind(card!.reviewerUserId) && (
+                        <span className={`kind-badge ${userKind(card!.reviewerUserId)}`}>
+                          {userKind(card!.reviewerUserId)}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="view-section">

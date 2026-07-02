@@ -26,19 +26,20 @@ export async function handleMe(ctx: RouteContext): Promise<Response> {
 }
 
 /**
- * GET /api/v1/me/queue?projectId= — the caller's actionable work: cards
- * assigned to them that sit in a `ready`-role column (v0.15.0). RBAC-scoped;
- * optionally narrowed to one project. This is the agent's "what do I work now?"
- * front door — see docs/v0.15.0/2-HUMAN_AGENT_FLOWS_DESIGN.md §4.2.
+ * GET /api/v1/me/queue?projectId= — the caller's actionable work (v0.15.0),
+ * two typed sections since v0.17.0 (KBR-61): `work` (assigned to me, `ready`
+ * column) and `review` (I'm the reviewer, `review` column). RBAC-scoped;
+ * optionally narrowed to one project. This is the "what needs me now?" front
+ * door for agents AND humans — see docs/v0.15.0/2-HUMAN_AGENT_FLOWS_DESIGN.md §4.2.
  */
 export async function handleMyQueue(ctx: RouteContext): Promise<Response> {
   const { tenantId, userId } = tenantScope(ctx.auth);
   const projectId = ctx.url.searchParams.get('projectId') ?? undefined;
-  const cards = await listMyQueue(ctx.env, tenantId, userId, {
+  const queue = await listMyQueue(ctx.env, tenantId, userId, {
     isAdmin: ctx.auth?.role === 'admin',
     projectId,
   });
-  return jsonResponse(200, { cards }, ctx.cors);
+  return jsonResponse(200, queue, ctx.cors);
 }
 
 /**

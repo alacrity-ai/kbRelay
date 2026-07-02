@@ -309,6 +309,10 @@ export function systemPhrase(e: CardEventDto, userName: (id: string | null) => s
       const to = (meta.to as string | null | undefined) ?? null;
       return to ? `assigned this to ${userName(to)}` : 'unassigned this card';
     }
+    case 'reviewer': {
+      const to = (meta.to as string | null | undefined) ?? null;
+      return to ? `requested review from ${userName(to)}` : 'cleared the reviewer';
+    }
     case 'edited': {
       const fields = asStrings(meta.fields);
       return fields.length ? `edited the ${fields.join(', ')}` : 'edited this card';

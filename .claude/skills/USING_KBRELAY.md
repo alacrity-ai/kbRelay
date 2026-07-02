@@ -124,10 +124,12 @@ loop*: they meter the work, they see you working, and nothing completes without
 them. Resolve every target column **by role** (from `get_project` /
 `GET /projects/{id}` → each column's `role`), never by name.
 
-1. **Find work.** `GET /v1/me/queue` (MCP `list_my_queue`) — cards assigned to
-   you that sit in a **`ready`**-role column, across every project you can access
-   (optional `?projectId=`). This is your actionable set; work these. *You never
-   grab cards that aren't assigned to you, and never cards outside `ready`.*
+1. **Find work.** `GET /v1/me/queue` (MCP `list_my_queue`) — since v0.17.0 it
+   returns **two typed sections**: `work` = cards assigned to you in a
+   **`ready`**-role column (do these), and `review` = cards where **you are the
+   reviewer** in a `review`-role column (verify these). Across every project you
+   can access (optional `?projectId=`). *You never grab cards that aren't
+   assigned to you, and never cards outside `ready`.*
 2. **Take it.** Move the card to the **`in_progress`**-role column **and** post a
    one-line note ("On it — <plan>."). Do this *immediately* on pickup so the
    human sees it's being worked — don't work a card silently.
@@ -135,9 +137,11 @@ them. Resolve every target column **by role** (from `get_project` /
 4. **If blocked:** move the card to the **`blocked`**-role column and post a
    comment explaining the blocker + what you need, `@`-mentioning the requester.
    Then stop — don't guess past a blocker.
-5. **Finish → hand back.** Move the card to the **`review`**-role column and post
-   a **`handoff`** comment (summary / evidence / verify / spunOff), `@`-mentioning
-   the requester so they're notified. **Stop here by default.**
+5. **Finish → hand back.** Move the card to the **`review`**-role column, **set
+   `reviewerUserId` to the requester** (default: the card's `createdBy` — v0.17.0,
+   KBR-61; this puts the card in *their* `review` queue), and post a **`handoff`**
+   comment (summary / evidence / verify / spunOff), `@`-mentioning the requester
+   so they're notified. **Stop here by default.**
 6. **Close only when told.** Move the card to the **`done`**-role column *only*
    when the human explicitly says so ("LGTM", "move to done", "@you close this").
    Closing is the human's call; nothing you do auto-completes.
@@ -177,7 +181,7 @@ All require the bearer token unless marked public.
 | `POST /api/v1/cards/{id}/attachments` | upload a file (multipart `file`, ≤25 MB) → attachment DTO (v0.16.0) |
 | `GET /api/v1/attachments/{id}` · `GET …/{id}/blob` | attachment metadata · the bytes (same-origin stream; `?download=1` forces download) |
 | `DELETE /api/v1/attachments/{id}` | delete an attachment (uploader or admin) |
-| `GET /api/v1/me/queue?projectId=` | **your actionable queue** — cards assigned to you in a `ready`-role column (v0.15.0). Work these first |
+| `GET /api/v1/me/queue?projectId=` | **your actionable queue** — `{ work, review }` (v0.17.0): assigned-to-you cards in `ready` + awaiting-your-review cards in `review`. Work these first |
 | `GET /api/v1/me/mentions?status=unread\|read\|all` | **your** @-mentions (default unread). Side-effect-free |
 | `POST /api/v1/me/mentions/read` | acknowledge mentions: `{ "mentionIds": [...] }` or `{ "all": true }` |
 | `PATCH /api/v1/me` | set **your own** color (`{ "color": "#rrggbb" }`) |
@@ -191,7 +195,7 @@ Human-only auth endpoints (public; cookie-based — agents don't need these): `P
 
 > **Prefer the MCP (§1.5).** Every row above that has an MCP tool should be driven through it; the curl surface is the fallback. Prefer a key minted for an **agent user** (§1) so the MCP's work is attributed to the agent. See `packages/mcp/README.md`.
 
-Card create/patch body fields (all optional except `summary` on create): `summary, description, acceptanceCriteria, columnId, assigneeUserId, position`. The ticket **`key`/`seq` are auto-assigned — never sent.** (Card **color** is no longer settable — a card shows in its **assignee's** color; set yours with `PATCH /me`.) The `?q=` list filter matches **`summary`** (+ description).
+Card create/patch body fields (all optional except `summary` on create): `summary, description, acceptanceCriteria, columnId, assigneeUserId, reviewerUserId, position`. The ticket **`key`/`seq` are auto-assigned — never sent.** (Card **color** is no longer settable — a card shows in its **assignee's** color; set yours with `PATCH /me`.) The `?q=` list filter matches **`summary`** (+ description).
 
 Project create/patch body: `name` (required on create), **`code`** (required on create; 2–6 alphanumerics, uppercased, unique per tenant), `description`, `color`, `status`.
 

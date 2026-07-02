@@ -157,6 +157,7 @@ export interface CardInput {
   acceptanceCriteria?: string | null;
   columnId?: string;
   assigneeUserId?: string | null;
+  reviewerUserId?: string | null;
   position?: number;
 }
 export const createCard = (projectId: string, body: CardInput) =>

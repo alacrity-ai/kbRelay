@@ -80,6 +80,10 @@ export const OPENAPI_SPEC = {
           color: { type: ['string', 'null'] },
           position: { type: 'number' },
           assigneeUserId: { type: ['string', 'null'] },
+          reviewerUserId: {
+            type: ['string', 'null'],
+            description: 'Who a review-lane card is waiting on (v0.17.0). Set on handback; a pointer, not an approval workflow.',
+          },
           createdBy: { type: 'string' },
           updatedBy: { type: 'string' },
           createdAt: { type: 'integer' },
@@ -488,7 +492,11 @@ export const OPENAPI_SPEC = {
     },
     '/api/v1/me/queue': {
       get: {
-        summary: 'Your actionable queue — cards assigned to you in a `ready`-role column',
+        summary: 'Your actionable queue — { work, review } (v0.17.0 shape)',
+        description:
+          'Two typed sections: `work` = cards assigned to you in a `ready`-role column ' +
+          '(do these); `review` = cards where you are the reviewer in a `review`-role ' +
+          'column (verify these). Both RBAC-scoped, newest-updated first.',
         parameters: [
           { name: 'projectId', in: 'query', schema: { type: 'string' }, description: 'Narrow to one project.' },
         ],

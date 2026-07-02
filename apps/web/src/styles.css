@@ -1036,6 +1036,20 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   text-decoration: underline;
 }
 
+/* Reviewer chip on a board card (v0.17.0, KBR-61) — outlined + eye glyph,
+   visually distinct from the solid assignee chip. */
+.reviewer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28em;
+  padding: 0.05em 0.45em;
+  border: 1px solid var(--border-strong, #334155);
+  border-radius: var(--r-pill);
+  font-size: 0.72rem;
+  color: var(--muted, #94a3b8);
+  white-space: nowrap;
+}
+
 /* ── Project activity feed (v0.17.0, KBR-67) ───────────────── */
 
 .activity-wrap {
