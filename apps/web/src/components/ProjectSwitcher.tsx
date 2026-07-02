@@ -53,6 +53,10 @@ export default function ProjectSwitcher({
 
   const pick = (id: string) => { setOpen(false); onSelect(id); };
 
+  // How many projects don't fit in the dropdown — surfaced on the Browse entry
+  // so it's clear there are more (KBR-33).
+  const moreCount = Math.max(0, projects.length - MAX);
+
   return (
     <div className="dropdown project-switcher" ref={ref}>
       <button
@@ -97,7 +101,13 @@ export default function ProjectSwitcher({
               ))
             )}
             <div className="menu-divider" />
-            <button className="menu-item" onClick={() => { setOpen(false); onBrowse(); }}>Browse projects…</button>
+            <button className="menu-item" onClick={() => { setOpen(false); onBrowse(); }}>
+              {moreCount > 0 ? (
+                <><span className="count-badge more-count">{moreCount}</span> More projects…</>
+              ) : (
+                'Browse projects…'
+              )}
+            </button>
             <button className="menu-item" onClick={() => { setOpen(false); onNew(); }}>+ New project</button>
           </div>
         </div>
