@@ -1018,6 +1018,24 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   white-space: nowrap;
 }
 
+/* Ticket-key autolink in rendered markdown (v0.17.0, KBR-65): KBR-12 → opens
+   that card in place. Same chip shape as a mention, violet, clickable. */
+.card-link {
+  display: inline;
+  padding: 0.02em 0.32em;
+  border-radius: var(--r-pill);
+  background: #8b5cf61f;
+  color: #c4b5fd;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+.card-link:hover {
+  background: #8b5cf636;
+  text-decoration: underline;
+}
+
 /* @-autocomplete over a textarea. */
 .mention-wrap { position: relative; }
 .mention-wrap > textarea { width: 100%; }

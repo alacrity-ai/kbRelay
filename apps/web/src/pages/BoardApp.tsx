@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MeResponse, ProjectDto, UserDto, MentionDto } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { clearToken } from '../lib/auth';
+import { CardLinksContext, type CardLinks } from '../lib/cardLinks';
 import { recordProjectView, orderByRecency } from '../lib/recentProjects';
 import Board, { type BoardNav } from '../components/Board';
 import Dropdown from '../components/Dropdown';
@@ -118,6 +119,7 @@ export default function BoardApp({
     setNav({ cardId: m.cardId, source: m.source });
   }, []);
 
+
   async function loadProjects(selectId?: string) {
     const [{ projects: ps }, { users: us }] = await Promise.all([
       api.listProjects('active'),
@@ -158,6 +160,32 @@ export default function BoardApp({
     setSelected(id);
   }, []);
 
+  // Ticket-key autolinks (KBR-65): resolve `CODE-seq` → card, then reuse the
+  // mention-jump plumbing. Resolution is client-side (no by-key endpoint): the
+  // accessible projects list gives code → project; one cards fetch gives
+  // seq → card. Unresolvable keys (deleted card, stale text) are a silent no-op —
+  // the rendered text is still there, nothing to break.
+  const openCardByKey = useCallback(async (key: string) => {
+    const code = key.split('-')[0];
+    const project = projects.find((p) => p.code === code);
+    if (!project) return;
+    try {
+      const { cards } = await api.listCards(project.id);
+      const card = cards.find((c) => c.key === key);
+      if (!card) return;
+      selectProject(project.id);
+      setNav({ cardId: card.id });
+    } catch {
+      /* lost access mid-session or transient failure — leave the text alone */
+    }
+  }, [projects, selectProject]);
+
+  const cardLinks = useMemo<CardLinks>(() => ({
+    // A project may pre-date codes (code: null) — it can't have ticket keys.
+    codes: new Set(projects.map((p) => p.code).filter((c): c is string => c != null)),
+    openCard: (key) => void openCardByKey(key),
+  }), [projects, openCardByKey]);
+
   /** Admin-only: delete a project, then re-pick a valid active board. */
   async function deleteProjectById(id: string) {
     await api.deleteProject(id);
@@ -194,7 +222,7 @@ export default function BoardApp({
   }
 
   return (
-    <>
+    <CardLinksContext.Provider value={cardLinks}>
       <header className="topbar">
         <span className="brand"><BrandMark /> <span className="brand-name">kbRelay</span></span>
 
@@ -352,6 +380,6 @@ export default function BoardApp({
       {teamOpen && (
         <TenantSettings meId={me.user.id} projects={projects} onClose={() => setTeamOpen(false)} />
       )}
-    </>
+    </CardLinksContext.Provider>
   );
 }

@@ -24,7 +24,8 @@ import { EMPTY_FILTER, cardMatchesFilter, type BoardFilter } from './FilterModal
 
 export interface BoardNav {
   cardId: string;
-  source: CardScrollTarget;
+  /** Where to scroll/flash inside the modal (mention jumps). Omitted = just open. */
+  source?: CardScrollTarget;
 }
 
 const STEP = 1000;
