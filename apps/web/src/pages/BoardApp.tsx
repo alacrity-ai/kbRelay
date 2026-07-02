@@ -57,17 +57,12 @@ function Pulse() {
   );
 }
 
-/** Horizontal sliders — reads as "tools/controls" for the mobile menu (KBR-70). */
-function Sliders() {
+function Kebab() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <line x1="4" y1="6" x2="20" y2="6" />
-      <line x1="4" y1="12" x2="20" y2="12" />
-      <line x1="4" y1="18" x2="20" y2="18" />
-      <circle cx="9" cy="6" r="2.2" fill="var(--bg, #0b1220)" />
-      <circle cx="15" cy="12" r="2.2" fill="var(--bg, #0b1220)" />
-      <circle cx="7" cy="18" r="2.2" fill="var(--bg, #0b1220)" />
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <circle cx="12" cy="5" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="12" cy="19" r="1.8" />
     </svg>
   );
 }
@@ -364,7 +359,7 @@ export default function BoardApp({
           label="Tools menu"
           trigger={
             <>
-              <Sliders />
+              <Kebab />
               {needsMe > 0 && <span className="notif-badge">{needsMe > 99 ? '99+' : needsMe}</span>}
             </>
           }

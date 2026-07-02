@@ -1060,10 +1060,12 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
    ≤640px collapses them into one kebab dropdown so the switcher keeps space. */
 .topbar-tools-menu { display: none; }
 .topbar-tools-menu .dropdown-trigger {
-  /* Only ever visible ≤640px, where icon buttons are 40px touch targets. */
+  /* Match the sibling icon buttons: geometry here; background + border come
+     from the `icon-btn subtle` classes on the trigger (don't override them).
+     Only ever visible ≤640px, where icon buttons are 40px touch targets. */
   width: 40px; height: 40px; padding: 0;
   display: inline-grid; place-items: center;
-  background: transparent; border: 0;
+  border-radius: var(--r-sm);
   position: relative; /* anchors the needs-me badge */
 }
 .topbar-tools-menu .dropdown-panel { min-width: 220px; }
