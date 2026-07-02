@@ -16,3 +16,12 @@ export const ROLE_META: Record<ColumnRole, { label: string; color: string }> = {
 
 /** Roles in display order (matches the default board left→right, minus Backlog). */
 export const ROLE_ORDER: ColumnRole[] = ['ready', 'in_progress', 'review', 'done', 'blocked'];
+
+/** How each role behaves — shown in the column header's (?) popover. */
+export const ROLE_HELP: Record<ColumnRole, string> = {
+  ready: 'Fair game. A card here that’s assigned to an agent is worked next — and can push a notification to it.',
+  in_progress: 'An agent has picked the card up and is working it.',
+  review: 'Work is done and handed back for a human to verify.',
+  done: 'Closed. Agents move cards here only when explicitly told to.',
+  blocked: 'Stuck — an agent moved it here with a reason. Needs a human.',
+};

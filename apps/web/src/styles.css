@@ -280,20 +280,44 @@ select {
   max-height: 100%;
   box-shadow: var(--shadow-1);
 }
+/* Two-row header (KBR-19): identity row + role row. Fixed row heights keep every
+   column header the same height so the lanes line up. */
 .column-header {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.7rem 0.8rem;
+  display: flex; flex-direction: column; gap: 0.4rem;
+  padding: 0.6rem 0.7rem;
   border-bottom: 1px solid var(--border);
   font-weight: 600;
 }
+.column-header-top { display: flex; align-items: center; gap: 0.5rem; min-height: 1.9rem; }
+.column-header-bottom { display: flex; align-items: center; gap: 0.4rem; min-height: 1.7rem; }
 .column-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 0 0 3px rgba(255,255,255,0.04); }
-.column-name { cursor: pointer; }
+/* flex:1 + min-width:0 lets the name ellipsize instead of wrapping to two lines. */
+.column-name { cursor: pointer; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .column-count {
-  color: var(--text-dim); font-weight: 600; font-size: 0.72rem;
+  color: var(--text-dim); font-weight: 600; font-size: 0.72rem; flex: none;
   background: var(--surface-2); border-radius: var(--r-pill);
   padding: 0.05rem 0.5rem; min-width: 1.4rem; text-align: center;
 }
-.column-actions { display: flex; gap: 0.15rem; }
+/* Tight, evenly-spaced actions pinned to the right edge (matches the left padding). */
+.column-actions { display: flex; gap: 0.1rem; flex: none; }
+/* (?) role-help popover — native <details> so it toggles with no JS. */
+.role-help { position: relative; flex: none; }
+.role-help > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  width: 1.15rem; height: 1.15rem; border-radius: 50%;
+  display: grid; place-items: center; font-size: 0.72rem; font-weight: 700;
+  color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border);
+}
+.role-help > summary::-webkit-details-marker { display: none; }
+.role-help[open] > summary { color: var(--text); border-color: var(--border-strong); }
+.role-popover {
+  position: absolute; top: 1.5rem; left: 0; z-index: 20; width: 15rem;
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  border-radius: var(--r-md); padding: 0.6rem 0.7rem; box-shadow: var(--shadow-1, 0 6px 20px rgba(0,0,0,0.35));
+  display: flex; flex-direction: column; gap: 0.4rem; font-weight: 400;
+}
+.role-popover p { margin: 0; font-size: 0.8rem; line-height: 1.45; color: var(--text); }
+.role-popover .flowdemo-role { align-self: flex-start; }
 /* Semantic role chip on a column header (v0.15.0). Tinted via inline color. */
 .column-role-badge {
   font-size: 0.62rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
