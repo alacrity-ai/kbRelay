@@ -587,6 +587,18 @@ export const OPENAPI_SPEC = {
       },
       delete: { summary: 'Delete a card', responses: { 200: { description: 'ok' } } },
     },
+    '/api/v1/projects/{id}/events': {
+      get: {
+        summary: 'Project activity feed — newest-first card events across the board',
+        description:
+          'Paginated union of the project\'s card timelines (system events + comments), ' +
+          'each enriched with cardKey + cardSummary. `?since=<unix ms>` lower-bounds, ' +
+          '`?limit=` caps the page (default 50, max 200), `?cursor=` (from nextCursor) ' +
+          'pages older. Redacted comments appear as tombstones. Use it to catch up on ' +
+          '"what happened on this board" without opening cards one by one.',
+        responses: { 200: { description: 'ok' } },
+      },
+    },
     '/api/v1/cards/{id}/timeline': {
       get: {
         summary: 'Card timeline — system events + comments, chronological',

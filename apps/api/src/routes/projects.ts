@@ -13,6 +13,7 @@ import {
   deleteProject,
 } from '../db/repos/projects';
 import { listColumns } from '../db/repos/columns';
+import { listProjectEvents } from '../db/repos/card_events';
 import { purgeBlobs } from '../db/repos/attachments';
 
 export async function handleListProjects(ctx: RouteContext): Promise<Response> {
@@ -50,6 +51,29 @@ export async function handlePatchProject(ctx: RouteContext): Promise<Response> {
   const input = await parseJson(ctx.request, patchProjectInput);
   const project = await patchProject(ctx.env, tenantId, ctx.params.id!, input);
   return jsonResponse(200, { project }, ctx.cors);
+}
+
+/** Project activity feed (v0.17.0, KBR-67): newest-first card events across the
+ *  board, cursor-paginated. Access is enforced by the route's `access` scope. */
+export async function handleListProjectEvents(ctx: RouteContext): Promise<Response> {
+  const { tenantId } = tenantScope(ctx.auth);
+  const project = await getProject(ctx.env, tenantId, ctx.params.id!);
+  if (!project) throw new HttpError(404, 'Project not found');
+  const q = ctx.url.searchParams;
+  const since = q.get('since') != null ? Number(q.get('since')) : undefined;
+  const limit = q.get('limit') != null ? Number(q.get('limit')) : undefined;
+  if (since !== undefined && !Number.isFinite(since)) {
+    throw new HttpError(400, 'since must be a unix-ms timestamp');
+  }
+  if (limit !== undefined && !Number.isFinite(limit)) {
+    throw new HttpError(400, 'limit must be a number');
+  }
+  const page = await listProjectEvents(ctx.env, tenantId, project.id, {
+    since,
+    limit,
+    cursor: q.get('cursor') ?? undefined,
+  });
+  return jsonResponse(200, page, ctx.cors);
 }
 
 export async function handleDeleteProject(ctx: RouteContext): Promise<Response> {

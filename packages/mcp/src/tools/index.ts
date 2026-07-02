@@ -130,6 +130,27 @@ export const allTools: Tool[] = [
     handler: (a, c) => c.request('DELETE', `/v1/cards/${enc(a.cardId)}`),
   }),
 
+  defineTool({
+    name: 'get_project_activity',
+    description:
+      'Project activity feed: newest-first card events across the board (creates/moves/assigns/comments) with cardKey + cardSummary. Catch up on "what happened while I was away"; nextCursor pages older.',
+    inputSchema: z.object({
+      projectId: z.string(),
+      since: z.number().optional(),
+      limit: z.number().optional(),
+      cursor: z.string().optional(),
+    }),
+    handler: (a, c) =>
+      c.request(
+        'GET',
+        `/v1/projects/${enc(a.projectId)}/events${qs({
+          since: a.since != null ? String(a.since) : undefined,
+          limit: a.limit != null ? String(a.limit) : undefined,
+          cursor: a.cursor,
+        })}`,
+      ),
+  }),
+
   // ── Timeline ──
   defineTool({
     name: 'get_timeline',

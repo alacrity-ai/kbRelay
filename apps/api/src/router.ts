@@ -9,6 +9,7 @@ import {
   handleGetProject,
   handlePatchProject,
   handleDeleteProject,
+  handleListProjectEvents,
 } from './routes/projects';
 import {
   handleListColumns,
@@ -162,6 +163,8 @@ export const routes: Route[] = [
   { method: 'GET', pattern: '/api/v1/projects/:id', access: { kind: 'project', param: 'id' }, handler: handleGetProject },
   { method: 'PATCH', pattern: '/api/v1/projects/:id', access: { kind: 'project', param: 'id' }, handler: handlePatchProject },
   { method: 'DELETE', pattern: '/api/v1/projects/:id', access: { kind: 'project', param: 'id' }, handler: handleDeleteProject },
+  // Activity feed (v0.17.0): a read-only projection of the board's card events.
+  { method: 'GET', pattern: '/api/v1/projects/:id/events', access: { kind: 'project', param: 'id' }, handler: handleListProjectEvents },
 
   // ── Columns ──
   { method: 'GET', pattern: '/api/v1/projects/:id/columns', access: { kind: 'project', param: 'id' }, handler: handleListColumns },

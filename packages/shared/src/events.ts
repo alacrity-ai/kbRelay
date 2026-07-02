@@ -32,6 +32,23 @@ export interface CardEventDto {
 }
 
 /**
+ * Project activity feed (v0.17.0, KBR-67): a card event enriched with its
+ * card's key + summary, so a feed row is readable without a follow-up lookup.
+ * GET /projects/:id/events — newest-first, cursor-paginated.
+ */
+export interface ProjectEventDto extends CardEventDto {
+  /** Human ticket key (e.g. "KBR-12"); null if the project pre-dates codes. */
+  cardKey: string | null;
+  cardSummary: string;
+}
+
+export interface ProjectEventsResponse {
+  events: ProjectEventDto[];
+  /** Pass back as ?cursor= to fetch the next (older) page. Null = end. */
+  nextCursor: string | null;
+}
+
+/**
  * Pure guard for comment redaction (v0.9.0). Redaction is append-only-safe:
  * only a comment's own author may redact it, system events are the immutable
  * audit spine, and redacting an already-redacted comment is an idempotent no-op.

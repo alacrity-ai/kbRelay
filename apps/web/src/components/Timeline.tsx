@@ -14,8 +14,8 @@ function initials(name: string): string {
   return chars.toUpperCase();
 }
 
-/** "3m ago" / "2h ago" / a date for older entries. */
-function relTime(ms: number, now: number): string {
+/** "3m ago" / "2h ago" / a date for older entries. (Shared with ActivityFeed.) */
+export function relTime(ms: number, now: number): string {
   const s = Math.max(0, Math.round((now - ms) / 1000));
   if (s < 60) return 'just now';
   const m = Math.round(s / 60);
@@ -293,7 +293,9 @@ function SlotText({ text }: { text: string }) {
   return <>{parts}</>;
 }
 
-function systemPhrase(e: CardEventDto, userName: (id: string | null) => string): string {
+/** Human phrase for a system event ("moved this Ready → In Progress").
+ *  (Shared with ActivityFeed.) */
+export function systemPhrase(e: CardEventDto, userName: (id: string | null) => string): string {
   const meta = e.meta ?? {};
   switch (e.eventType) {
     case 'created':

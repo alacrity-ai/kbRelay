@@ -10,6 +10,7 @@ import type {
   ProjectStatus,
   MentionsResponse,
   MentionsStatus,
+  ProjectEventsResponse,
   AuthMeResponse,
   RegisterInput,
   LoginInput,
@@ -164,6 +165,19 @@ export const getCard = (id: string) => request<{ card: CardDto }>('GET', `/v1/ca
 export const patchCard = (id: string, body: CardInput) =>
   request<{ card: CardDto }>('PATCH', `/v1/cards/${id}`, body);
 export const deleteCard = (id: string) => request<{ ok: true }>('DELETE', `/v1/cards/${id}`);
+
+// ── Project activity feed (v0.17.0) ──
+export const listProjectEvents = (
+  projectId: string,
+  opts: { since?: number; limit?: number; cursor?: string } = {},
+) => {
+  const q = new URLSearchParams();
+  if (opts.since != null) q.set('since', String(opts.since));
+  if (opts.limit != null) q.set('limit', String(opts.limit));
+  if (opts.cursor) q.set('cursor', opts.cursor);
+  const qs = q.toString();
+  return request<ProjectEventsResponse>('GET', `/v1/projects/${projectId}/events${qs ? `?${qs}` : ''}`);
+};
 
 // ── Card timeline (v0.3.0) ──
 export const getTimeline = (cardId: string) =>

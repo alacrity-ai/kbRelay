@@ -5,6 +5,7 @@ import { clearToken } from '../lib/auth';
 import { CardLinksContext, type CardLinks } from '../lib/cardLinks';
 import { recordProjectView, orderByRecency } from '../lib/recentProjects';
 import Board, { type BoardNav } from '../components/Board';
+import ActivityFeed from '../components/ActivityFeed';
 import Dropdown from '../components/Dropdown';
 import ProjectSwitcher from '../components/ProjectSwitcher';
 import BrowseProjectsModal from '../components/BrowseProjectsModal';
@@ -41,6 +42,15 @@ function Funnel() {
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+    </svg>
+  );
+}
+
+function Pulse() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
     </svg>
   );
 }
@@ -95,6 +105,8 @@ export default function BoardApp({
   const [teamOpen, setTeamOpen] = useState(false);
   const [mentionCount, setMentionCount] = useState(0);
   const [nav, setNav] = useState<BoardNav | null>(null);
+  // Board vs Activity feed (v0.17.0, KBR-67). A card jump always returns to the board.
+  const [view, setView] = useState<'board' | 'activity'>('board');
 
   const applyFilter = useCallback((f: BoardFilter) => { setFilter(f); setFilterOpen(false); }, []);
   const clearFilter = useCallback(() => { setFilter(EMPTY_FILTER); setFilterOpen(false); }, []);
@@ -117,6 +129,7 @@ export default function BoardApp({
   const navigateToMention = useCallback((m: MentionDto) => {
     setSelected((cur) => (m.projectId !== cur ? m.projectId : cur));
     setNav({ cardId: m.cardId, source: m.source });
+    setView('board');
   }, []);
 
 
@@ -175,6 +188,7 @@ export default function BoardApp({
       if (!card) return;
       selectProject(project.id);
       setNav({ cardId: card.id });
+      setView('board');
     } catch {
       /* lost access mid-session or transient failure — leave the text alone */
     }
@@ -254,6 +268,17 @@ export default function BoardApp({
           </button>
         )}
 
+        {selected && (
+          <button
+            className={`icon-btn subtle activity-btn ${view === 'activity' ? 'active' : ''}`}
+            onClick={() => setView((v) => (v === 'activity' ? 'board' : 'activity'))}
+            aria-label={view === 'activity' ? 'Show board' : 'Show activity'}
+            title={view === 'activity' ? 'Show board' : 'Project activity'}
+          >
+            <Pulse />
+          </button>
+        )}
+
         <div className="spacer" />
 
         <NotificationBell
@@ -320,6 +345,8 @@ export default function BoardApp({
 
       {loading ? (
         <div className="loading-wrap"><div className="spinner" /></div>
+      ) : selected && view === 'activity' ? (
+        <ActivityFeed key={selected} projectId={selected} users={projectUsers} />
       ) : selected ? (
         <Board
           key={selected}

@@ -1036,6 +1036,52 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   text-decoration: underline;
 }
 
+/* ── Project activity feed (v0.17.0, KBR-67) ───────────────── */
+
+.activity-wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 1rem 1rem 3rem;
+}
+.activity-day-label {
+  margin: 1.1rem 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted, #94a3b8);
+}
+.activity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.45rem 0.3rem;
+  border-bottom: 1px solid var(--border, #1e293b);
+}
+.activity-row.redacted { opacity: 0.6; }
+.activity-main { flex: 1; min-width: 0; }
+.activity-line { line-height: 1.45; overflow-wrap: anywhere; }
+.activity-summary { color: var(--muted, #94a3b8); }
+.activity-excerpt {
+  margin-top: 0.15rem;
+  font-size: 0.88rem;
+  color: var(--muted, #94a3b8);
+  overflow-wrap: anywhere;
+}
+.activity-empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--muted, #94a3b8);
+}
+.activity-more {
+  display: block;
+  margin: 1rem auto 0;
+}
+@media (max-width: 560px) {
+  .activity-wrap { padding: 0.6rem 0.6rem 2rem; }
+  .activity-row .tl-time { display: none; }
+}
+
 /* @-autocomplete over a textarea. */
 .mention-wrap { position: relative; }
 .mention-wrap > textarea { width: 100%; }
