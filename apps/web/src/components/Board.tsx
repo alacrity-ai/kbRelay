@@ -210,14 +210,19 @@ export default function Board({ projectId, users, meId, reloadNonce = 0, filter 
       // and reconcile the board behind it. Modal stays open (returns to view).
       const { card } = await api.patchCard(modal.card.id, input);
       setModal({ mode: 'view', card });
-      await load();
+      // SILENT reload: a non-silent load() flips `loading`, and Board's
+      // `if (loading) return <spinner>` would unmount the open modal (and the
+      // in-flight attach that adopted this card) — remounting it fresh in view
+      // mode, dropping the upload's description embed + list (KBR-38).
+      await load({ silent: true });
       return card;
     }
-    // Create: persist, then ADOPT the new card into the modal (view mode) so it
-    // can carry attachments / further edits — instead of forcing a close+reopen.
+    // Create: persist, then ADOPT the new card into the modal so it can carry
+    // attachments / further edits — instead of forcing a close+reopen. Reload
+    // SILENTLY so the board spinner can't unmount the modal mid-attach (KBR-38).
     const { card } = await api.createCard(projectId, input);
     setModal({ mode: 'view', card });
-    await load();
+    await load({ silent: true });
     return card;
   }
 
