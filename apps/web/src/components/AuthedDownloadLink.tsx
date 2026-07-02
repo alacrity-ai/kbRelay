@@ -16,9 +16,10 @@ export default function AuthedDownloadLink({
   children: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
+  const [removed, setRemoved] = useState(false);
   async function onClick(e: MouseEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || removed) return;
     setBusy(true);
     try {
       const obj = await fetchBlobObjectUrl(href);
@@ -29,12 +30,14 @@ export default function AuthedDownloadLink({
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(obj), 10_000);
-    } catch {
-      /* swallow — the link stays; a retry click re-fetches */
+    } catch (err) {
+      // 404 ⇒ the attachment was deleted; reflect it inline (KBR-34).
+      if ((err as { status?: number }).status === 404) setRemoved(true);
     } finally {
       setBusy(false);
     }
   }
+  if (removed) return <span className={className} title="This attachment was removed">🗑 Attachment removed</span>;
   return (
     <a href={href} className={className} onClick={onClick} aria-busy={busy}>
       {children}

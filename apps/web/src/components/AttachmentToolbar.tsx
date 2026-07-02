@@ -81,7 +81,7 @@ export default function AttachmentToolbar({
         {uploading ? 'Uploading…' : '+ Attach'}
       </button>
       <input ref={inputRef} type="file" multiple hidden onChange={(e) => void handleFiles(e.target.files)} />
-      <span className="attach-hint">{dragging ? 'Drop to upload' : hint ?? 'or drop files here'}</span>
+      <span className="attach-hint">{dragging ? 'Drop to upload' : hint ?? 'or drop files here · 25 MB max'}</span>
       {error && <span className="error-text attach-error">{error}</span>}
     </div>
   );

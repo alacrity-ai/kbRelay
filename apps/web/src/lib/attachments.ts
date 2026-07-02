@@ -21,3 +21,15 @@ export const KIND_LABEL: Record<AttachmentKind, string> = {
   archive: 'archive',
   misc: 'file',
 };
+
+/**
+ * Remove an attachment's markdown reference (`![…](…/attachments/ID/blob)` or
+ * `[…](…/attachments/ID/blob)`) from a text field when the attachment is
+ * deleted, replacing it with a small marker so the description doesn't keep a
+ * dangling image/link (KBR-34).
+ */
+export function stripAttachmentMarkdown(text: string | null | undefined, attachmentId: string): string {
+  if (!text) return text ?? '';
+  const re = new RegExp(`!?\\[[^\\]]*\\]\\(/api/v1/attachments/${attachmentId}/blob\\)`, 'g');
+  return text.replace(re, '_🗑 attachment removed_');
+}

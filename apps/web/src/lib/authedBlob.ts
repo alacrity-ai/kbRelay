@@ -15,7 +15,11 @@ export async function fetchBlobObjectUrl(url: string): Promise<string> {
     credentials: 'include',
     headers: token ? { authorization: `Bearer ${token}` } : {},
   });
-  if (!res.ok) throw new Error(`Failed to load (${res.status})`);
+  if (!res.ok) {
+    const err = new Error(`Failed to load (${res.status})`) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
   return URL.createObjectURL(await res.blob());
 }
 
@@ -23,6 +27,8 @@ interface BlobUrlState {
   objectUrl?: string;
   loading: boolean;
   error: boolean;
+  /** HTTP status of a failed fetch (404 ⇒ the attachment was removed). */
+  status?: number;
 }
 
 /** Fetch `url` (authenticated) into an object URL, revoking it on unmount/change. */
@@ -45,8 +51,8 @@ export function useAuthedObjectUrl(url?: string): BlobUrlState {
         created = obj;
         setState({ objectUrl: obj, loading: false, error: false });
       })
-      .catch(() => {
-        if (alive) setState({ loading: false, error: true });
+      .catch((e: Error & { status?: number }) => {
+        if (alive) setState({ loading: false, error: true, status: e?.status });
       });
     return () => {
       alive = false;

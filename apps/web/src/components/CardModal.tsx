@@ -3,7 +3,7 @@ import type { CardDto, ColumnDto, UserDto, MentionSourceKind, AttachmentDto } fr
 import { UNASSIGNED_COLOR } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
-import { attachmentMarkdown } from '../lib/attachments';
+import { attachmentMarkdown, stripAttachmentMarkdown } from '../lib/attachments';
 import Timeline from './Timeline';
 import Markdown from './Markdown';
 import MentionTextArea from './MentionTextArea';
@@ -92,9 +92,26 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
   }, [card, refreshAttachments]);
 
   async function removeAttachment(a: AttachmentDto) {
+    const ok = await dialog.confirm({
+      title: 'Remove this attachment?',
+      message: `“${a.filename}” will be permanently deleted from the card and storage. This can't be undone.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.deleteAttachment(a.id);
       setAttachments((list) => list.filter((x) => x.id !== a.id));
+      // Unwind a description reference so it doesn't dangle. (Note/handoff refs
+      // are append-only history; those render "🗑 Attachment removed" on reload.)
+      if (a.eventId == null && card) {
+        const current = card.description ?? '';
+        const stripped = stripAttachmentMarkdown(current, a.id);
+        if (stripped !== current) {
+          setDescription(stripped);
+          await onSave({ description: stripped || null });
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove attachment');
     }

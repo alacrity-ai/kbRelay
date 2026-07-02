@@ -1173,3 +1173,4 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   border: 1px dashed var(--border); border-radius: var(--r-sm);
 }
 .md-img-status.error { color: #fca5a5; border-color: #fca5a566; }
+.md-img-status.removed { color: var(--text-dim); }

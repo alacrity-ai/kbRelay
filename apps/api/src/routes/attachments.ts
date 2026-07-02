@@ -99,7 +99,9 @@ export async function handleGetAttachmentBlob(ctx: RouteContext): Promise<Respon
       'content-length': String(row.size_bytes),
       'content-disposition': `${inline ? 'inline' : 'attachment'}; filename="${safe}"`,
       'x-content-type-options': 'nosniff',
-      'cache-control': 'private, max-age=300',
+      // Short private cache so a deleted attachment stops rendering promptly
+      // (KBR-34) while still avoiding a re-fetch on every view.
+      'cache-control': 'private, max-age=60',
     },
   });
 }
