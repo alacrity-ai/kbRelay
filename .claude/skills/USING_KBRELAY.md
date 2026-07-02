@@ -80,7 +80,7 @@ tenant ── has many ── users (kind: "human" | "agent")   ← Leif, Joe (h
   was called `title` before v0.7.0).
 
 Key shapes:
-- **Card:** `{ id, projectId, columnId, key, seq, summary, description, acceptanceCriteria, color, position, assigneeUserId, createdBy, updatedBy, createdAt, updatedAt }` — `key` (e.g. `"OBL-1"`) and `seq` are auto; `summary` is the text.
+- **Card:** `{ id, projectId, columnId, key, seq, summary, description, acceptanceCriteria, color, position, assigneeUserId, createdBy, updatedBy, createdAt, updatedAt }` — `key` (e.g. `"OBL-1"`) and `seq` are auto; `summary` is the text. **Attachments (v0.16.0):** single-card GET also returns `attachments[]` (each `{ id, kind, filename, sizeBytes, url }`); the board list returns `attachmentCounts`. Upload via `POST /cards/:id/attachments` (multipart `file`), fetch bytes at `GET /attachments/:id/blob`, delete via `DELETE /attachments/:id`; link an upload to a note/handoff by passing its id in the comment's `attachmentIds`.
 - **Column:** `{ id, projectId, name, color, position }`
 - **Project:** `{ id, name, code, description, color, status, createdBy, cardCount? }` — `code` drives ticket keys; `cardCount` (total tickets) is present on the list endpoint only.
 - **User:** `{ id, name, kind, role, color, handle }` — `handle` (e.g. `"leif"`) is what you `@`-mention.
