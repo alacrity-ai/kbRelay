@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import BrandMark from './BrandMark';
 
 interface Props { children: ReactNode }
 interface State { error: Error | null }
@@ -25,7 +26,7 @@ export default class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="center">
           <div className="gate">
-            <div className="brand"><span className="brand-mark">kb</span> kbRelay</div>
+            <div className="brand"><BrandMark /> kbRelay</div>
             <h1 style={{ margin: 0, fontSize: '1.2rem' }}>Something went wrong</h1>
             <p className="muted-note">{this.state.error.message}</p>
             <button className="primary" onClick={() => window.location.reload()}>

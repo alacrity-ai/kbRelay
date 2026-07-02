@@ -15,6 +15,7 @@ import ApiKeysModal from '../components/ApiKeysModal';
 import ClaudeCodeGuide from '../components/ClaudeCodeGuide';
 import ProfileSettings from '../components/ProfileSettings';
 import TenantSettings from '../components/TenantSettings';
+import BrandMark from '../components/BrandMark';
 
 const PROJECT_KEY = 'kbrelay.selectedProject';
 
@@ -195,7 +196,7 @@ export default function BoardApp({
   return (
     <>
       <header className="topbar">
-        <span className="brand"><span className="brand-mark">kb</span> <span className="brand-name">kbRelay</span></span>
+        <span className="brand"><BrandMark /> <span className="brand-name">kbRelay</span></span>
 
         {projects.length > 0 && (
           <ProjectSwitcher
@@ -305,7 +306,7 @@ export default function BoardApp({
       ) : (
         <div className="center">
           <div className="gate">
-            <div className="brand"><span className="brand-mark">kb</span> kbRelay</div>
+            <div className="brand"><BrandMark /> kbRelay</div>
             <h1 style={{ margin: 0, fontSize: '1.2rem' }}>No projects yet</h1>
             <p className="muted-note">Create your first board to get going.</p>
             <button className="primary" onClick={() => setNewProjectOpen(true)}>+ New project</button>

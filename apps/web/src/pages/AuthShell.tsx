@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import * as api from '../lib/api';
 import { setToken, clearToken } from '../lib/auth';
+import BrandMark from '../components/BrandMark';
 
 type Mode = 'sign-in' | 'register' | 'forgot' | 'reset' | 'token' | 'accept-invite';
 
@@ -118,7 +119,7 @@ export default function AuthShell({
   return (
     <div className="center">
       <div className="gate auth-shell">
-        <div className="brand"><span className="brand-mark">kb</span> kbRelay</div>
+        <div className="brand"><BrandMark /> kbRelay</div>
 
         {mode !== 'reset' && mode !== 'token' && mode !== 'accept-invite' && (
           <div className="auth-tabs">

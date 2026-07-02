@@ -192,6 +192,9 @@ select {
   background: linear-gradient(135deg, var(--accent), #7c3aed);
   color: #fff; font-size: 0.9rem; font-weight: 800; box-shadow: var(--shadow-1);
 }
+/* KBR-20: the real kanban-tiles logo (matches favicon/OG). Artwork is rounded;
+   border-radius here just shapes the shadow to match. */
+.brand-logo { width: 28px; height: 28px; flex: none; display: block; border-radius: 24%; box-shadow: var(--shadow-1); }
 .topbar .spacer { flex: 1; }
 .kind-badge {
   font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;
@@ -732,6 +735,7 @@ select {
 }
 .gate .brand { font-size: 1.6rem; }
 .gate .brand-mark { width: 36px; height: 36px; font-size: 1.1rem; }
+.gate .brand-logo { width: 40px; height: 40px; }
 .error-text { color: #fca5a5; font-size: 0.85rem; }
 .notice-text { color: var(--accent); font-size: 0.85rem; }
 .muted-note { color: var(--muted); margin: 0; font-size: 0.9rem; }
