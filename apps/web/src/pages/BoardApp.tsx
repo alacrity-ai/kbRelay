@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MeResponse, ProjectDto, UserDto, MentionDto } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { clearToken } from '../lib/auth';
-import { CardLinksContext, type CardLinks } from '../lib/cardLinks';
+import { CardLinksContext, parseCardDeepLink, type CardLinks } from '../lib/cardLinks';
+import { useDialog } from '../components/Dialog';
 import { recordProjectView, orderByRecency } from '../lib/recentProjects';
 import Board, { type BoardNav } from '../components/Board';
 import ActivityFeed from '../components/ActivityFeed';
@@ -231,19 +232,21 @@ export default function BoardApp({
   // accessible projects list gives code → project; one cards fetch gives
   // seq → card. Unresolvable keys (deleted card, stale text) are a silent no-op —
   // the rendered text is still there, nothing to break.
-  const openCardByKey = useCallback(async (key: string) => {
+  const openCardByKey = useCallback(async (key: string): Promise<boolean> => {
     const code = key.split('-')[0];
     const project = projects.find((p) => p.code === code);
-    if (!project) return;
+    if (!project) return false;
     try {
       const { cards } = await api.listCards(project.id);
       const card = cards.find((c) => c.key === key);
-      if (!card) return;
+      if (!card) return false;
       selectProject(project.id);
       setNav({ cardId: card.id });
       setView('board');
+      return true;
     } catch {
       /* lost access mid-session or transient failure — leave the text alone */
+      return false;
     }
   }, [projects, selectProject]);
 
@@ -252,6 +255,28 @@ export default function BoardApp({
     codes: new Set(projects.map((p) => p.code).filter((c): c is string => c != null)),
     openCard: (key) => void openCardByKey(key),
   }), [projects, openCardByKey]);
+
+  // External card links (KBR-71): consume a /c/<KEY> deep link once projects
+  // are known. The URL is cleaned first so a failed open doesn't loop; an
+  // unresolvable key (no such card, or no access to its project) gets an
+  // explicit error instead of the autolinks' silent no-op.
+  const dialog = useDialog();
+  useEffect(() => {
+    if (loading) return;
+    const key = parseCardDeepLink(window.location.pathname);
+    if (!key) return;
+    window.history.replaceState(null, '', '/');
+    void openCardByKey(key).then((ok) => {
+      if (!ok) {
+        void dialog.alert({
+          title: 'Card not available',
+          message: `${key} doesn't exist, or you don't have access to its project.`,
+        });
+      }
+    });
+    // Run once, when the first projects load completes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   /** Admin-only: delete a project, then re-pick a valid active board. */
   async function deleteProjectById(id: string) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { linkifyTicketKeys } from './cardLinks';
+import { linkifyTicketKeys, parseCardDeepLink } from './cardLinks';
 
 const CODES = new Set(['KBR', 'OBL']);
 
@@ -52,5 +52,22 @@ describe('linkifyTicketKeys', () => {
   it('no-ops with an empty code set or empty text', () => {
     expect(linkifyTicketKeys('KBR-12', new Set())).toBe('KBR-12');
     expect(linkifyTicketKeys('', CODES)).toBe('');
+  });
+});
+
+/** External card links (KBR-71): the /c/<KEY> deep-link parser. */
+describe('parseCardDeepLink', () => {
+  it('parses and uppercases a valid path (trailing slash ok)', () => {
+    expect(parseCardDeepLink('/c/KBR-12')).toBe('KBR-12');
+    expect(parseCardDeepLink('/c/kbr-12/')).toBe('KBR-12');
+  });
+
+  it('rejects non-card paths and malformed keys', () => {
+    expect(parseCardDeepLink('/')).toBeNull();
+    expect(parseCardDeepLink('/c/')).toBeNull();
+    expect(parseCardDeepLink('/c/KBR')).toBeNull();
+    expect(parseCardDeepLink('/c/KBR-12/extra')).toBeNull();
+    expect(parseCardDeepLink('/auth/reset/tok')).toBeNull();
+    expect(parseCardDeepLink('/c/TOOLONGCODE-1')).toBeNull();
   });
 });

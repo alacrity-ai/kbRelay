@@ -5,6 +5,7 @@ import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
 import { attachmentMarkdown, stripAttachmentMarkdown } from '../lib/attachments';
 import { dueInputValue, dueAtFromInput, dueClass } from '../lib/due';
+import { cardUrl } from '../lib/cardLinks';
 import Timeline from './Timeline';
 import Markdown from './Markdown';
 import MentionTextArea from './MentionTextArea';
@@ -28,6 +29,16 @@ interface Props {
   onSave: (input: CardInput) => Promise<CardDto>;
   onDelete?: () => Promise<void>;
   onClose: () => void;
+}
+
+function Chain() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
 }
 
 function Pencil() {
@@ -76,6 +87,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
   const [reviewer, setReviewer] = useState(card?.reviewerUserId ?? '');
   const [due, setDue] = useState(dueInputValue(card?.dueAt ?? null));
   const [now] = useState(() => Date.now()); // render-stable clock for due urgency
+  const [linkCopied, setLinkCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -244,6 +256,19 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
     }
   }
 
+  // Copy a shareable link (KBR-71): /c/<KEY> — pasteable into Slack/SMS.
+  // Anyone without access to the card's project gets an error, not the card.
+  async function copyLink() {
+    if (!card?.key) return;
+    try {
+      await navigator.clipboard.writeText(cardUrl(card.key));
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1500);
+    } catch {
+      /* clipboard blocked — nothing sensible to do */
+    }
+  }
+
   // Inline due-date change from view mode (KBR-63) — saves immediately.
   async function setDueAt(next: number | null) {
     if (!card || busy || next === card.dueAt) return;
@@ -302,6 +327,11 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
             </div>
           )}
           <div className="modal-header-actions">
+            {!editing && card!.key && (
+              <button className="subtle" onClick={() => void copyLink()} aria-label="Copy link to this card" title={`Copy ${cardUrl(card!.key)}`}>
+                <Chain /> {linkCopied ? 'Copied' : 'Link'}
+              </button>
+            )}
             {!editing && (
               <button className="subtle" onClick={startEdit} aria-label="Edit card">
                 <Pencil /> Edit

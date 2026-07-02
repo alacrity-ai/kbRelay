@@ -36,6 +36,22 @@ export function linkifyTicketKeys(text: string, codes: ReadonlySet<string>): str
     .join('');
 }
 
+/**
+ * External card links (v0.17.0, KBR-71): a shareable URL per card. The path
+ * form `/c/<KEY>` rides the existing SPA fallback (same mechanism as the
+ * /auth/* deep links); access control is untouched — an outsider gets the
+ * login screen, and a signed-in user without project access gets an error.
+ */
+export function cardUrl(key: string): string {
+  return `${window.location.origin}/c/${key}`;
+}
+
+/** Parse a /c/<KEY> deep link. Returns the uppercased key, or null. */
+export function parseCardDeepLink(pathname: string): string | null {
+  const m = /^\/c\/([A-Za-z0-9]{2,6}-\d{1,7})\/?$/.exec(pathname);
+  return m ? m[1]!.toUpperCase() : null;
+}
+
 export interface CardLinks {
   /** Codes of the projects the signed-in user can access — the linkify gate. */
   codes: ReadonlySet<string>;
