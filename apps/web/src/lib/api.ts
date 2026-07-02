@@ -12,6 +12,7 @@ import type {
   MentionsStatus,
   ProjectEventsResponse,
   SearchResponse,
+  MyQueueResponse,
   AuthMeResponse,
   RegisterInput,
   LoginInput,
@@ -167,6 +168,13 @@ export const getCard = (id: string) => request<{ card: CardDto }>('GET', `/v1/ca
 export const patchCard = (id: string, body: CardInput) =>
   request<{ card: CardDto }>('PATCH', `/v1/cards/${id}`, body);
 export const deleteCard = (id: string) => request<{ ok: true }>('DELETE', `/v1/cards/${id}`);
+
+// ── My queue (v0.15.0; { work, review } sections since v0.17.0) ──
+export const getMyQueue = (projectId?: string) =>
+  request<MyQueueResponse>(
+    'GET',
+    `/v1/me/queue${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`,
+  );
 
 // ── Global quick-find (v0.17.0) ──
 export const search = (q: string, limit?: number) =>

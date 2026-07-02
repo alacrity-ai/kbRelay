@@ -7,6 +7,7 @@ import { recordProjectView, orderByRecency } from '../lib/recentProjects';
 import Board, { type BoardNav } from '../components/Board';
 import ActivityFeed from '../components/ActivityFeed';
 import QuickFind from '../components/QuickFind';
+import MyWork from '../components/MyWork';
 import Dropdown from '../components/Dropdown';
 import ProjectSwitcher from '../components/ProjectSwitcher';
 import BrowseProjectsModal from '../components/BrowseProjectsModal';
@@ -52,6 +53,16 @@ function Pulse() {
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </svg>
+  );
+}
+
+function Inbox() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
     </svg>
   );
 }
@@ -116,8 +127,9 @@ export default function BoardApp({
   const [teamOpen, setTeamOpen] = useState(false);
   const [mentionCount, setMentionCount] = useState(0);
   const [nav, setNav] = useState<BoardNav | null>(null);
-  // Board vs Activity feed (v0.17.0, KBR-67). A card jump always returns to the board.
-  const [view, setView] = useState<'board' | 'activity'>('board');
+  // My Work (default landing, KBR-64) vs board vs Activity feed (KBR-67).
+  // A card jump always returns to the board.
+  const [view, setView] = useState<'mywork' | 'board' | 'activity'>('mywork');
   // Global quick-find palette (v0.17.0, KBR-68) — Cmd/Ctrl+K or the topbar button.
   const [findOpen, setFindOpen] = useState(false);
 
@@ -264,23 +276,32 @@ export default function BoardApp({
       <header className="topbar">
         <span className="brand"><BrandMark /> <span className="brand-name">kbRelay</span></span>
 
+        <button
+          className={`icon-btn subtle mywork-btn ${view === 'mywork' ? 'active' : ''}`}
+          onClick={() => setView('mywork')}
+          aria-label="My Work"
+          title="My Work — your queue, reviews, and mentions"
+        >
+          <Inbox />
+        </button>
+
         {projects.length > 0 && (
           <ProjectSwitcher
             projects={orderedProjects}
             currentId={selected}
-            onSelect={selectProject}
+            onSelect={(id) => { selectProject(id); setView('board'); }}
             onBrowse={() => setBrowseOpen(true)}
             onNew={() => setNewProjectOpen(true)}
           />
         )}
 
-        {selected && (
+        {selected && view !== 'mywork' && (
           <button className="icon-btn subtle project-settings-btn" onClick={() => setSettingsOpen(true)} aria-label="Project settings" title="Project settings">
             <Gear />
           </button>
         )}
 
-        {selected && (
+        {selected && view !== 'mywork' && (
           <button
             className={`icon-btn subtle filter-btn ${isFilterActive(filter) ? 'active' : ''}`}
             onClick={() => setFilterOpen(true)}
@@ -292,7 +313,7 @@ export default function BoardApp({
           </button>
         )}
 
-        {selected && (
+        {selected && view !== 'mywork' && (
           <button
             className={`icon-btn subtle activity-btn ${view === 'activity' ? 'active' : ''}`}
             onClick={() => setView((v) => (v === 'activity' ? 'board' : 'activity'))}
@@ -378,6 +399,17 @@ export default function BoardApp({
 
       {loading ? (
         <div className="loading-wrap"><div className="spinner" /></div>
+      ) : view === 'mywork' ? (
+        <MyWork
+          users={users}
+          onOpenCard={(projectId, cardId) => {
+            selectProject(projectId);
+            setNav({ cardId });
+            setView('board');
+          }}
+          onMention={navigateToMention}
+          onMentionCountChange={setMentionCount}
+        />
       ) : selected && view === 'activity' ? (
         <ActivityFeed key={selected} projectId={selected} users={projectUsers} />
       ) : selected ? (
