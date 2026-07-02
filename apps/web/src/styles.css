@@ -1045,6 +1045,16 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   border-radius: var(--r-md); box-shadow: 0 16px 40px #000a;
   overflow: hidden;
 }
+/* On small screens the bell isn't at the viewport edge, so a right-anchored
+   panel overhangs. Pin it to the viewport with gutters — always in bounds. */
+@media (max-width: 520px) {
+  .notif-dropdown {
+    position: fixed;
+    top: calc(var(--topbar-h) + 6px);
+    left: 8px; right: 8px;
+    width: auto; max-width: none;
+  }
+}
 .notif-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border);
