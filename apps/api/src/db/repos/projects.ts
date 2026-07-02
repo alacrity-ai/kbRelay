@@ -15,6 +15,7 @@ interface ProjectRow {
   description: string | null;
   color: string | null;
   status: string;
+  agent_events_enabled: number;
   created_by: string;
   created_at: number;
   updated_at: number;
@@ -30,6 +31,7 @@ function toDto(r: ProjectRow): ProjectDto {
     description: r.description,
     color: r.color,
     status: r.status as ProjectStatus,
+    agentEventsEnabled: r.agent_events_enabled !== 0,
     createdBy: r.created_by,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -163,12 +165,14 @@ export async function patchProject(
     description: input.description === undefined ? existing.description : input.description,
     color: input.color === undefined ? existing.color : input.color,
     status: input.status ?? existing.status,
+    agentEventsEnabled:
+      input.agentEventsEnabled === undefined ? existing.agentEventsEnabled : input.agentEventsEnabled,
   };
   await env.db.prepare(
-    `UPDATE projects SET name = ?, code = ?, description = ?, color = ?, status = ?, updated_at = ?
+    `UPDATE projects SET name = ?, code = ?, description = ?, color = ?, status = ?, agent_events_enabled = ?, updated_at = ?
       WHERE id = ? AND tenant_id = ?`,
   )
-    .bind(next.name, next.code, next.description, next.color, next.status, Date.now(), id, tenantId)
+    .bind(next.name, next.code, next.description, next.color, next.status, next.agentEventsEnabled ? 1 : 0, Date.now(), id, tenantId)
     .run();
 
   const updated = await getProject(env, tenantId, id);

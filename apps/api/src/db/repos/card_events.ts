@@ -1,6 +1,6 @@
 import type { Env } from '../../env';
 import type { DbStatement } from '../../runtime/shared/db';
-import type { CardEventDto, CardEventKind, SystemEventType, CreateCommentInput } from '@kbrelay/shared';
+import type { CardEventDto, CardEventKind, SystemEventType, CreateCommentInput, WebhookTrigger } from '@kbrelay/shared';
 import { classifyRedaction } from '@kbrelay/shared';
 import { HttpError } from '../../http';
 import { newId } from '../ids';
@@ -100,6 +100,8 @@ export async function addComment(
   cardId: string,
   userId: string,
   input: CreateCommentInput,
+  /** Optional collector for callback triggers (KBR-14); the handler dispatches them. */
+  triggers?: WebhookTrigger[],
 ): Promise<CardEventDto> {
   const id = newId('evt');
   const kind = input.type ?? 'note';
@@ -115,6 +117,7 @@ export async function addComment(
     env,
     { tenantId, cardId, authorId: userId, sourceKind: 'comment', sourceId: id, text: input.body },
     users,
+    triggers,
   );
 
   await env.db.batch([

@@ -1,6 +1,13 @@
 import type { Env } from '../../env';
 import type { DbStatement } from '../../runtime/shared/db';
-import type { CardDto, QueueCardDto, CreateCardInput, PatchCardInput, SystemEventType } from '@kbrelay/shared';
+import type {
+  CardDto,
+  QueueCardDto,
+  CreateCardInput,
+  PatchCardInput,
+  SystemEventType,
+  WebhookTrigger,
+} from '@kbrelay/shared';
 import { HttpError } from '../../http';
 import { newId } from '../ids';
 import { RANK_STEP } from '../../rank';
@@ -17,6 +24,23 @@ async function columnName(env: Env, tenantId: string, id: string): Promise<strin
     .bind(id, tenantId)
     .first<{ name: string }>();
   return r?.name ?? null;
+}
+
+/** A column's semantic role (for the assign-into-ready callback trigger). */
+async function columnRole(env: Env, tenantId: string, id: string): Promise<string | null> {
+  const r = await env.db.prepare('SELECT role FROM columns WHERE id = ? AND tenant_id = ?')
+    .bind(id, tenantId)
+    .first<{ role: string | null }>();
+  return r?.role ?? null;
+}
+
+/** Is this user an agent? (assign-into-ready only nudges agents.) */
+async function isAgent(env: Env, tenantId: string, userId: string | null): Promise<boolean> {
+  if (!userId) return false;
+  const r = await env.db.prepare('SELECT kind FROM users WHERE id = ? AND tenant_id = ?')
+    .bind(userId, tenantId)
+    .first<{ kind: string }>();
+  return r?.kind === 'agent';
 }
 
 interface CardRow {
@@ -156,6 +180,8 @@ export async function createCard(
   projectId: string,
   userId: string,
   input: CreateCardInput,
+  /** Optional collector for callback triggers (KBR-16); the handler dispatches them. */
+  triggers?: WebhookTrigger[],
 ): Promise<CardDto> {
   // Target column: caller's choice (validated) or the project's first column.
   let columnId = input.columnId;
@@ -198,11 +224,23 @@ export async function createCard(
   const users = await mentionableUsers(env, tenantId, projectId);
   const mentionStmts = (
     await Promise.all([
-      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind: 'summary', sourceId: 'summary', text: input.summary }, users),
-      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind: 'description', sourceId: 'description', text: input.description }, users),
-      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind: 'acceptance_criteria', sourceId: 'acceptance_criteria', text: input.acceptanceCriteria }, users),
+      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind: 'summary', sourceId: 'summary', text: input.summary }, users, triggers),
+      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind: 'description', sourceId: 'description', text: input.description }, users, triggers),
+      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind: 'acceptance_criteria', sourceId: 'acceptance_criteria', text: input.acceptanceCriteria }, users, triggers),
     ])
   ).flat();
+
+  // Assign-into-ready: a card created directly into a `ready` lane with an agent
+  // assignee is immediately actionable — nudge the agent.
+  if (triggers && input.assigneeUserId) {
+    const [role, agent] = await Promise.all([
+      columnRole(env, tenantId, columnId),
+      isAgent(env, tenantId, input.assigneeUserId),
+    ]);
+    if (role === 'ready' && agent) {
+      triggers.push({ event: 'card.ready', recipientUserId: input.assigneeUserId, source: { kind: 'assign' } });
+    }
+  }
 
   // Insert the card, its 'created' timeline event, and any mentions atomically.
   await env.db.batch([
@@ -238,6 +276,8 @@ export async function patchCard(
   id: string,
   userId: string,
   input: PatchCardInput,
+  /** Optional collector for callback triggers (KBR-16); the handler dispatches them. */
+  triggers?: WebhookTrigger[],
 ): Promise<CardDto> {
   const existing = await getCardRow(env, tenantId, id);
   if (!existing) throw new HttpError(404, 'Card not found');
@@ -317,11 +357,29 @@ export async function patchCard(
     const users = await mentionableUsers(env, tenantId, existing.project_id);
     const reconcilers: Promise<DbStatement[]>[] = [];
     const rc = (sourceKind: 'summary' | 'description' | 'acceptance_criteria', text: string | null) =>
-      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind, sourceId: sourceKind, text }, users);
+      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind, sourceId: sourceKind, text }, users, triggers);
     if (input.summary !== undefined) reconcilers.push(rc('summary', next.summary));
     if (input.description !== undefined) reconcilers.push(rc('description', next.description));
     if (input.acceptanceCriteria !== undefined) reconcilers.push(rc('acceptance_criteria', next.acceptance_criteria));
     mentionStmts.push(...(await Promise.all(reconcilers)).flat());
+  }
+
+  // Assign-into-ready: fire when the card is now in a `ready` lane assigned to
+  // an agent AND this patch caused it (moved into ready, or (re)assigned to the
+  // agent while in ready). A pure edit of a card already sitting actionable
+  // fires nothing.
+  if (
+    triggers &&
+    next.assignee_user_id &&
+    (next.column_id !== existing.column_id || next.assignee_user_id !== existing.assignee_user_id)
+  ) {
+    const [role, agent] = await Promise.all([
+      columnRole(env, tenantId, next.column_id),
+      isAgent(env, tenantId, next.assignee_user_id),
+    ]);
+    if (role === 'ready' && agent) {
+      triggers.push({ event: 'card.ready', recipientUserId: next.assignee_user_id, source: { kind: 'assign' } });
+    }
   }
 
   // Card update + its system event(s) + mention reconcile, atomically.

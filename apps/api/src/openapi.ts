@@ -476,6 +476,14 @@ export const OPENAPI_SPEC = {
         responses: { 200: { description: 'ok' } },
       },
     },
+    '/api/v1/webhooks': {
+      get: { summary: 'List webhook subscriptions (admin)', responses: { 200: { description: 'ok' } } },
+      post: { summary: 'Create a webhook subscription (admin) — returns the signing secret once', responses: { 201: { description: 'created' } } },
+    },
+    '/api/v1/webhooks/{id}': {
+      patch: { summary: 'Edit a webhook subscription (admin)', responses: { 200: { description: 'ok' } } },
+      delete: { summary: 'Delete a webhook subscription (admin)', responses: { 200: { description: 'ok' } } },
+    },
     '/api/v1/projects': {
       get: {
         summary: 'List projects',

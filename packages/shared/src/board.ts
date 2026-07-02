@@ -35,6 +35,8 @@ export interface ProjectDto {
   createdBy: string;
   createdAt: number;
   updatedAt: number;
+  /** Per-project mute valve for agent callback events (v0.15.x). Default true. */
+  agentEventsEnabled: boolean;
   /** Total cards in the project. Present on the list endpoint (for the project
    *  browser's badges); undefined on single-project fetches. */
   cardCount?: number;
@@ -111,6 +113,7 @@ export const patchProjectInput = z.object({
   description: longText,
   color,
   status: z.enum(['active', 'archived']).optional(),
+  agentEventsEnabled: z.boolean().optional(),
 });
 export type PatchProjectInput = z.infer<typeof patchProjectInput>;
 

@@ -302,6 +302,8 @@ select {
   flex: none; line-height: 1.4;
 }
 /* Role picker in Project Settings → Columns. */
+.toggle-row { display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer; font-size: 0.85rem; flex: none; }
+.toggle-row input { cursor: pointer; }
 .col-row-role {
   flex: none; font-size: 0.75rem; font-weight: 600;
   background: var(--surface-2); color: var(--text-dim);

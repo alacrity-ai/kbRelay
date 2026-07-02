@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { ColumnRole } from '@kbrelay/shared';
 import { ROLE_META } from '../lib/roles';
-import { mcpAddCommand, LOOP_COMMAND, CHANNELS_HINT } from '../lib/setupSnippets';
+import { mcpAddCommand, LOOP_COMMAND, CHANNELS_HINT, CHANNEL_MCP_JSON, channelRunCommand } from '../lib/setupSnippets';
 
 /**
  * "Claude Code setup" — a paged tutorial/guide opened from the account menu.
@@ -143,6 +143,29 @@ export default function ClaudeCodeGuide({ onClose }: { onClose: () => void }) {
           <p className="muted-note"><strong>Instant — push (optional).</strong> For real-time reaction, wire a Claude Code <em>channel</em> (research preview):</p>
           <CopyBlock code={CHANNELS_HINT} />
           <p className="muted-note">You don’t need both — start with <code>/loop</code>.</p>
+        </>
+      ),
+    },
+    {
+      title: 'Advanced: instant push with channels',
+      body: (
+        <>
+          <p className="muted-note">
+            Optional. For real-time reaction (no polling), kbRelay can push events into a running session via a
+            Claude Code <strong>channel</strong>. Register the bridge in your <code>.mcp.json</code>:
+          </p>
+          <CopyBlock code={CHANNEL_MCP_JSON} />
+          <p className="muted-note">Then start Claude Code with it (research-preview dev flag, until it's allowlisted):</p>
+          <CopyBlock code={channelRunCommand()} />
+          <p className="muted-note">
+            An admin registers the delivery + secret under <em>Team &amp; access → Channel events</em>; poll mode
+            (above) needs only the API key, signed mode also takes the secret.
+          </p>
+          <ul className="guide-rules">
+            <li><strong>Prerequisites:</strong> Claude Code ≥ v2.1.80 and Anthropic auth (claude.ai / Console key — not Bedrock/Vertex/Foundry).</li>
+            <li><strong>Team/Enterprise:</strong> an Owner must enable <code>channelsEnabled</code> in managed settings. Verify it's on for you with the <code>fakechat</code> quickstart.</li>
+            <li><strong>Research preview:</strong> our channel isn't allowlisted yet, hence <code>--dangerously-load-development-channels</code>.</li>
+          </ul>
         </>
       ),
     },

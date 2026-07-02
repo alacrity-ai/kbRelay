@@ -6,19 +6,22 @@ import type {
   MembershipRole,
   AgentSummary,
   TokenSummary,
+  WebhookSubscriptionDto,
 } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { useDialog } from './Dialog';
 import { McpGuideButton } from './McpGuide';
 
-type Tab = 'people' | 'agents';
+type Tab = 'people' | 'agents' | 'webhooks';
 
 /**
- * Tenant Settings — admin-only. Two tabs:
+ * Tenant Settings — admin-only. Three tabs:
  *  - People: invite / remove / re-role human members + per-member project access.
  *  - Agents: create/manage agent users (kind='agent', owned by a human), their
  *    project access, and their API keys — the keys you hand to an agent runtime
  *    so its work is attributed to the agent, not to you.
+ *  - Channel events: outbound webhook subscriptions (KBR-16) that push agent
+ *    callbacks to a Claude Code channel / routine.
  * Reached from the account menu (hidden for non-admins).
  */
 export default function TenantSettings({
@@ -128,6 +131,7 @@ export default function TenantSettings({
         <div className="settings-tabs">
           <button className={`tab ${tab === 'people' ? 'active' : ''}`} onClick={() => { setTab('people'); setExpanded(null); }}>People</button>
           <button className={`tab ${tab === 'agents' ? 'active' : ''}`} onClick={() => { setTab('agents'); setExpanded(null); }}>Agents</button>
+          <button className={`tab ${tab === 'webhooks' ? 'active' : ''}`} onClick={() => { setTab('webhooks'); setExpanded(null); }}>Channel events</button>
         </div>
 
         <div className="modal-body">
@@ -272,6 +276,8 @@ export default function TenantSettings({
               </div>
             </>
           )}
+
+          {tab === 'webhooks' && <WebhooksPanel agents={agents} />}
         </div>
 
         <div className="modal-footer">
@@ -512,4 +518,119 @@ function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
   const chars = parts.length > 1 ? parts[0]![0]! + parts[parts.length - 1]![0]! : name.slice(0, 2);
   return chars.toUpperCase();
+}
+
+/**
+ * Channel-events (webhooks) admin panel (KBR-16). Register a delivery target —
+ * URL + optional target agent — and get a signing secret ONCE on create. kbRelay
+ * POSTs a signed event when a card becomes actionable or an agent is @-mentioned.
+ */
+function WebhooksPanel({ agents }: { agents: AgentSummary[] | null }) {
+  const dialog = useDialog();
+  const [hooks, setHooks] = useState<WebhookSubscriptionDto[] | null>(null);
+  const [label, setLabel] = useState('');
+  const [url, setUrl] = useState('');
+  const [target, setTarget] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [freshSecret, setFreshSecret] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function load() {
+    try { setHooks((await api.listWebhooks()).webhooks); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Failed to load'); }
+  }
+  useEffect(() => { void load(); }, []);
+
+  async function create() {
+    const l = label.trim(); const u = url.trim();
+    if (!l || !u || busy) return;
+    setBusy(true); setError(null);
+    try {
+      const created = await api.createWebhook({ label: l, url: u, targetAgentUserId: target || null });
+      setFreshSecret(created.secret);
+      setLabel(''); setUrl(''); setTarget('');
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Create failed'); }
+    finally { setBusy(false); }
+  }
+
+  async function toggle(h: WebhookSubscriptionDto) {
+    setBusy(true); setError(null);
+    try { await api.patchWebhook(h.id, { enabled: !h.enabled }); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Update failed'); }
+    finally { setBusy(false); }
+  }
+
+  async function remove(h: WebhookSubscriptionDto) {
+    const yes = await dialog.confirm({ title: 'Delete channel event?', message: `Remove "${h.label}"? Deliveries to it stop immediately.`, confirmLabel: 'Delete', danger: true });
+    if (!yes) return;
+    setBusy(true); setError(null);
+    try { await api.deleteWebhook(h.id); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Delete failed'); }
+    finally { setBusy(false); }
+  }
+
+  async function copySecret() {
+    if (!freshSecret) return;
+    try { await navigator.clipboard.writeText(freshSecret); setCopied(true); } catch { /* manual */ }
+  }
+
+  const agentName = (id: string | null) => id ? (agents?.find((a) => a.id === id)?.name ?? id) : 'Any agent';
+
+  return (
+    <>
+      <p className="muted-note">
+        Push kbRelay events to a Claude Code channel (or routine) so an agent reacts the instant a card
+        becomes actionable — instead of waiting for its <code>/loop</code> poll. Fires on <strong>assign-into-Ready</strong>
+        and <strong>@-mentions</strong> of an agent; muted per board in Project settings.
+      </p>
+      {error && <div className="error-text">{error}</div>}
+
+      {freshSecret && (
+        <div className="field">
+          <label>Signing secret — copy it now, it won’t be shown again</label>
+          <div className="code-block">
+            <pre><code>{freshSecret}</code></pre>
+            <button className="ghost sm copy-btn" onClick={copySecret}>{copied ? 'Copied' : 'Copy'}</button>
+          </div>
+          <button className="ghost sm" onClick={() => { setFreshSecret(null); setCopied(false); }}>Dismiss</button>
+        </div>
+      )}
+
+      <div className="field">
+        <label>New channel event</label>
+        <input value={label} placeholder="Label (e.g. My laptop)" maxLength={120} onChange={(e) => setLabel(e.target.value)} />
+        <input value={url} placeholder="Delivery URL (https://…)" onChange={(e) => setUrl(e.target.value)} />
+        <select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Target agent">
+          <option value="">Any agent</option>
+          {(agents ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        <div className="member-projects-actions">
+          <button className="primary" onClick={create} disabled={!label.trim() || !url.trim() || busy}>Add</button>
+        </div>
+      </div>
+
+      <div className="member-list">
+        <span className="view-label">Channel events</span>
+        {hooks === null ? (
+          <div className="muted-note">Loading…</div>
+        ) : hooks.length === 0 ? (
+          <div className="muted-note">None yet.</div>
+        ) : (
+          hooks.map((h) => (
+            <div className="col-row" key={h.id}>
+              <span className="col-row-name">{h.label}</span>
+              <span className="muted-note" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.url} · {agentName(h.targetAgentUserId)}</span>
+              <label className="toggle-row">
+                <input type="checkbox" checked={h.enabled} disabled={busy} onChange={() => toggle(h)} />
+                <span>{h.enabled ? 'On' : 'Off'}</span>
+              </label>
+              <button className="ghost sm danger-text" disabled={busy} onClick={() => remove(h)}>Delete</button>
+            </div>
+          ))
+        )}
+      </div>
+    </>
+  );
 }

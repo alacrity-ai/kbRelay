@@ -53,6 +53,12 @@ import {
   handleCreateAgentToken,
   handleRevokeAgentToken,
 } from './routes/agents';
+import {
+  handleListWebhooks,
+  handleCreateWebhook,
+  handlePatchWebhook,
+  handleDeleteWebhook,
+} from './routes/webhooks';
 import type { AccessScope } from './auth/access';
 import { handleOpenApi } from './openapi';
 
@@ -137,6 +143,12 @@ export const routes: Route[] = [
   { method: 'GET', pattern: '/api/v1/agents/:userId/tokens', handler: handleListAgentTokens },
   { method: 'POST', pattern: '/api/v1/agents/:userId/tokens', handler: handleCreateAgentToken },
   { method: 'DELETE', pattern: '/api/v1/agents/:userId/tokens/:tokenId', handler: handleRevokeAgentToken },
+
+  // ── Webhook subscriptions (v0.15.x) — admin-gated in-handler; not project-scoped ──
+  { method: 'GET', pattern: '/api/v1/webhooks', handler: handleListWebhooks },
+  { method: 'POST', pattern: '/api/v1/webhooks', handler: handleCreateWebhook },
+  { method: 'PATCH', pattern: '/api/v1/webhooks/:id', handler: handlePatchWebhook },
+  { method: 'DELETE', pattern: '/api/v1/webhooks/:id', handler: handleDeleteWebhook },
 
   // ── Projects ── (list filters in-handler; create auto-grants the creator)
   { method: 'GET', pattern: '/api/v1/projects', handler: handleListProjects },

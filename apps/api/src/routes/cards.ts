@@ -1,4 +1,4 @@
-import { createCardInput, patchCardInput, createCommentInput } from '@kbrelay/shared';
+import { createCardInput, patchCardInput, createCommentInput, type WebhookTrigger } from '@kbrelay/shared';
 import type { RouteContext } from '../router';
 import { jsonResponse, HttpError } from '../http';
 import { parseJson } from '../validate';
@@ -6,6 +6,7 @@ import { tenantScope } from '../auth/tenant-scope';
 import { getProject } from '../db/repos/projects';
 import { listCards, getCard, createCard, patchCard, deleteCard } from '../db/repos/cards';
 import { listTimeline, addComment, redactComment } from '../db/repos/card_events';
+import { dispatchTriggers } from '../services/webhooks';
 
 export async function handleListCards(ctx: RouteContext): Promise<Response> {
   const { tenantId } = tenantScope(ctx.auth);
@@ -24,7 +25,9 @@ export async function handleCreateCard(ctx: RouteContext): Promise<Response> {
   const project = await getProject(ctx.env, tenantId, ctx.params.id!);
   if (!project) throw new HttpError(404, 'Project not found');
   const input = await parseJson(ctx.request, createCardInput);
-  const card = await createCard(ctx.env, tenantId, project.id, userId, input);
+  const triggers: WebhookTrigger[] = [];
+  const card = await createCard(ctx.env, tenantId, project.id, userId, input, triggers);
+  if (triggers.length) ctx.waitUntil(dispatchTriggers(ctx.env, tenantId, card, userId, triggers));
   return jsonResponse(201, { card }, ctx.cors);
 }
 
@@ -38,7 +41,9 @@ export async function handleGetCard(ctx: RouteContext): Promise<Response> {
 export async function handlePatchCard(ctx: RouteContext): Promise<Response> {
   const { tenantId, userId } = tenantScope(ctx.auth);
   const input = await parseJson(ctx.request, patchCardInput);
-  const card = await patchCard(ctx.env, tenantId, ctx.params.id!, userId, input);
+  const triggers: WebhookTrigger[] = [];
+  const card = await patchCard(ctx.env, tenantId, ctx.params.id!, userId, input, triggers);
+  if (triggers.length) ctx.waitUntil(dispatchTriggers(ctx.env, tenantId, card, userId, triggers));
   return jsonResponse(200, { card }, ctx.cors);
 }
 
@@ -63,7 +68,9 @@ export async function handleAddComment(ctx: RouteContext): Promise<Response> {
   const card = await getCard(ctx.env, tenantId, ctx.params.id!);
   if (!card) throw new HttpError(404, 'Card not found');
   const input = await parseJson(ctx.request, createCommentInput);
-  const event = await addComment(ctx.env, tenantId, card.id, userId, input);
+  const triggers: WebhookTrigger[] = [];
+  const event = await addComment(ctx.env, tenantId, card.id, userId, input, triggers);
+  if (triggers.length) ctx.waitUntil(dispatchTriggers(ctx.env, tenantId, card, userId, triggers));
   return jsonResponse(201, { event }, ctx.cors);
 }
 

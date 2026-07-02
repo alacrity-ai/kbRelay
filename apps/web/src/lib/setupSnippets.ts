@@ -23,3 +23,19 @@ export const LOOP_COMMAND = '/loop 10m work my kbRelay queue';
 
 /** Pointer for the push (channels) path — kept short; the docs carry the depth. */
 export const CHANNELS_HINT = 'claude --channels plugin:<channel>@<marketplace>';
+
+/** Register the kbRelay channel bridge in your project's .mcp.json. */
+export const CHANNEL_MCP_JSON = `{
+  "mcpServers": {
+    "kbrelaychannel": { "command": "npx", "args": ["-y", "@alacrity-ai/kbrelaychannel"] }
+  }
+}`;
+
+/** Run Claude Code with the kbRelay channel bridge (research-preview dev flag). */
+export function channelRunCommand(base: string = apiOrigin()): string {
+  return (
+    `KBRELAY_BASE_URL=${base} \\\n` +
+    `KBRELAY_API_KEY=<an agent key> \\\n` +
+    `claude --dangerously-load-development-channels server:kbrelaychannel`
+  );
+}

@@ -48,6 +48,7 @@ export default function ProjectSettings({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState<string | null>(null);
+  const [agentEvents, setAgentEvents] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -57,6 +58,7 @@ export default function ProjectSettings({
       setName(p.name);
       setDescription(p.description ?? '');
       setColor(p.color);
+      setAgentEvents(p.agentEventsEnabled);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load project');
     }
@@ -74,7 +76,8 @@ export default function ProjectSettings({
     !!project &&
     (name.trim() !== project.name ||
       (description.trim() || null) !== (project.description ?? null) ||
-      color !== project.color);
+      color !== project.color ||
+      agentEvents !== project.agentEventsEnabled);
 
   async function saveGeneral() {
     if (!project || !dirty || busy) return;
@@ -87,6 +90,7 @@ export default function ProjectSettings({
         name: trimmed,
         description: description.trim() || null,
         color,
+        agentEventsEnabled: agentEvents,
       });
       onProjectChanged?.();
       onChanged();
@@ -229,6 +233,22 @@ export default function ProjectSettings({
                     />
                   ))}
                 </div>
+              </div>
+
+              <div className="field">
+                <label className="toggle-row">
+                  <input
+                    type="checkbox"
+                    checked={agentEvents}
+                    onChange={(e) => setAgentEvents(e.target.checked)}
+                  />
+                  <span>Notify agents of activity on this board</span>
+                </label>
+                <p className="muted-note">
+                  When on, assigning a card into a <strong>Ready</strong> lane (or @-mentioning an agent) can
+                  push an event to a connected Claude Code channel. Only takes effect once an admin has set up
+                  channel events under <em>Team &amp; access</em>.
+                </p>
               </div>
 
               <div className="member-projects-actions">

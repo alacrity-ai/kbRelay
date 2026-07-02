@@ -18,6 +18,10 @@ import type {
   TeamResponse,
   MembershipRole,
   AgentSummary,
+  WebhookSubscriptionDto,
+  CreatedWebhookSubscription,
+  CreateWebhookInput,
+  PatchWebhookInput,
 } from '@kbrelay/shared';
 import { getToken } from './auth';
 
@@ -97,6 +101,16 @@ export const createAgentToken = (userId: string, label: string) =>
 export const revokeAgentToken = (userId: string, tokenId: string) =>
   request<{ ok: true }>('DELETE', `/v1/agents/${userId}/tokens/${tokenId}`);
 
+// ── Webhook subscriptions (v0.15.x) ── admin-only
+export const listWebhooks = () =>
+  request<{ webhooks: WebhookSubscriptionDto[] }>('GET', '/v1/webhooks');
+export const createWebhook = (body: CreateWebhookInput) =>
+  request<CreatedWebhookSubscription>('POST', '/v1/webhooks', body);
+export const patchWebhook = (id: string, body: PatchWebhookInput) =>
+  request<{ webhook: WebhookSubscriptionDto }>('PATCH', `/v1/webhooks/${id}`, body);
+export const deleteWebhook = (id: string) =>
+  request<{ ok: true }>('DELETE', `/v1/webhooks/${id}`);
+
 // ── Self-service API keys (v0.10.0) ──
 export const listTokens = () => request<{ tokens: TokenSummary[] }>('GET', '/v1/me/tokens');
 export const createToken = (label: string) =>
@@ -116,7 +130,7 @@ export const createProject = (body: { name: string; code: string; description?: 
   request<{ project: ProjectDto; columns: ColumnDto[] }>('POST', '/v1/projects', body);
 export const getProject = (id: string) =>
   request<{ project: ProjectDto; columns: ColumnDto[] }>('GET', `/v1/projects/${id}`);
-export const patchProject = (id: string, body: Partial<Pick<ProjectDto, 'name' | 'code' | 'description' | 'color' | 'status'>>) =>
+export const patchProject = (id: string, body: Partial<Pick<ProjectDto, 'name' | 'code' | 'description' | 'color' | 'status' | 'agentEventsEnabled'>>) =>
   request<{ project: ProjectDto }>('PATCH', `/v1/projects/${id}`, body);
 export const deleteProject = (id: string) => request<{ ok: true }>('DELETE', `/v1/projects/${id}`);
 

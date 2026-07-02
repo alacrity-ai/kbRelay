@@ -98,15 +98,15 @@ export async function mentionableUsers(
   env: Env,
   tenantId: string,
   projectId: string,
-): Promise<Array<{ id: string; handle: string | null }>> {
+): Promise<Array<{ id: string; handle: string | null; kind: string }>> {
   const rs = await env.db.prepare(
-    `SELECT u.id AS id, u.handle AS handle
+    `SELECT u.id AS id, u.handle AS handle, u.kind AS kind
        FROM users u
        JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
       WHERE m.role = 'admin'
          OR EXISTS (SELECT 1 FROM project_access pa WHERE pa.project_id = ? AND pa.user_id = u.id)`,
   )
     .bind(tenantId, projectId)
-    .all<{ id: string; handle: string | null }>();
+    .all<{ id: string; handle: string | null; kind: string }>();
   return rs.results ?? [];
 }
