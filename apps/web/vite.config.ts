@@ -15,4 +15,9 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    // jsdom so component tests can mount + drive the real DOM (the create→adopt
+    // attach flow is an effect/timing bug that only reproduces in a live tree).
+    environment: 'jsdom',
+  },
 });

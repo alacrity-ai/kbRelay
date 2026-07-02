@@ -75,14 +75,22 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Attachments (v0.16.0). Seeded from the card if present; (re)fetched on open
-  // and after upload/delete, since the board's card list carries only counts.
+  // Attachments (v0.16.0). Seeded from the card if present; (re)fetched on open,
+  // since the board's card list carries only counts.
   const [attachments, setAttachments] = useState<AttachmentDto[]>(card?.attachments ?? []);
+  // A monotonically-increasing token guards against a stale server read
+  // clobbering a fresher local mutation. When a brand-new card is adopted
+  // (undefined → saved) this effect fires a fetch, but the file the user is
+  // attaching hasn't landed on the server yet — without the guard, that empty
+  // read would wipe the just-uploaded attachment (KBR-38). Any local add/remove
+  // bumps the token so an in-flight fetch is ignored.
+  const refreshSeq = useRef(0);
   const refreshAttachments = useCallback(async () => {
     if (!card) return;
+    const seq = ++refreshSeq.current;
     try {
       const { card: full } = await api.getCard(card.id);
-      setAttachments(full.attachments ?? []);
+      if (seq === refreshSeq.current) setAttachments(full.attachments ?? []);
     } catch {
       /* leave the last-known list on a transient error */
     }
@@ -101,15 +109,22 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
     if (!ok) return;
     try {
       await api.deleteAttachment(a.id);
+      refreshSeq.current++; // a local mutation wins over any in-flight fetch
       setAttachments((list) => list.filter((x) => x.id !== a.id));
       // Unwind a description reference so it doesn't dangle. (Note/handoff refs
       // are append-only history; those render "🗑 Attachment removed" on reload.)
-      if (a.eventId == null && card) {
-        const current = card.description ?? '';
-        const stripped = stripAttachmentMarkdown(current, a.id);
-        if (stripped !== current) {
-          setDescription(stripped);
-          await onSave({ description: stripped || null });
+      if (a.eventId == null) {
+        if (editing) {
+          // Mid-edit: strip the in-progress buffer; it persists on Save. (Don't
+          // call onSave here — that would clobber the user's unsaved edits.)
+          setDescription((d) => stripAttachmentMarkdown(d, a.id));
+        } else if (card) {
+          const current = card.description ?? '';
+          const stripped = stripAttachmentMarkdown(current, a.id);
+          if (stripped !== current) {
+            setDescription(stripped);
+            await onSave({ description: stripped || null });
+          }
         }
       }
     } catch (err) {
@@ -119,6 +134,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
 
   // A file was uploaded: inject its markdown into the description + track it.
   function onUploaded(a: AttachmentDto) {
+    refreshSeq.current++; // beat any in-flight fetch (e.g. a just-adopted new card)
     setDescription((d) => (d ? `${d}\n` : '') + attachmentMarkdown(a));
     setAttachments((list) => (list.some((x) => x.id === a.id) ? list : [...list, a]));
   }
@@ -272,6 +288,14 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
                   onUploaded={onUploaded}
                   hint={card ? undefined : 'attaching will save the card first'}
                 />
+                {/* Attachments are visible + removable while editing, so a file
+                    you just added shows immediately (no need to leave edit). */}
+                {attachments.length > 0 && (
+                  <div className="attach-view">
+                    <span className="attach-view-label">Attachments</span>
+                    <AttachmentList items={attachments} onDelete={removeAttachment} />
+                  </div>
+                )}
               </div>
               <div className="field">
                 <label>Acceptance criteria</label>
@@ -345,10 +369,12 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
                 <div className={`view-text ${card!.description ? '' : 'empty'}`}>
                   {card!.description ? <Markdown users={users}>{card!.description}</Markdown> : 'No description.'}
                 </div>
+                {/* View mode is read-only: download/view, but no ✕ (removing is
+                    an edit action). */}
                 {attachments.length > 0 && (
                   <div className="attach-view">
                     <span className="attach-view-label">Attachments</span>
-                    <AttachmentList items={attachments} onDelete={removeAttachment} />
+                    <AttachmentList items={attachments} />
                   </div>
                 )}
               </div>
