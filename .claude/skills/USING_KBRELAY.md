@@ -71,6 +71,7 @@ tenant ── has many ── users (kind: "human" | "agent")   ← Leif, Joe (h
 - **Ordering** within a column is a numeric `position` (drag-and-drop uses fractional midpoints). Bigger = lower in the list.
 - **Column IDs are per-project and not guessable.** Always fetch a project's columns and map them **by name** — never hardcode a column id across projects.
 - **@-mentions are your inbox.** Write `@handle` (e.g. `@leif`, `@claude`) in a `description`, `acceptanceCriteria`, or a comment `body` to notify that user. Your own mentions are at **`GET /v1/me/mentions`** — this is how you find "what did people ask me?" See §4.5.
+- **Column roles are the flow (v0.15.0).** A column may carry a semantic **`role`** — `ready | in_progress | review | done | blocked` (or none). Roles, not names, define the flow, so resolve target lanes **by role**, never by hardcoded name. **Your actionable work = cards assigned to you in a `ready`-role column** — get it in one call from **`GET /v1/me/queue`** (MCP: `list_my_queue`). See §2.5 for the handback contract.
 
 - **Ticket keys.** Every project has a short **`code`** (e.g. `OBL`). Cards get an
   auto-assigned **`key`** (`OBL-1`, `OBL-2`, …) — sequential per project, never
@@ -87,6 +88,36 @@ Key shapes:
 
 ---
 
+## 2.5 The handback contract (v0.15.0) — how you pick up and return work
+
+This is the canonical relay flow. Following it is what keeps a human *in the
+loop*: they meter the work, they see you working, and nothing completes without
+them. Resolve every target column **by role** (from `get_project` /
+`GET /projects/{id}` → each column's `role`), never by name.
+
+1. **Find work.** `GET /v1/me/queue` (MCP `list_my_queue`) — cards assigned to
+   you that sit in a **`ready`**-role column, across every project you can access
+   (optional `?projectId=`). This is your actionable set; work these. *You never
+   grab cards that aren't assigned to you, and never cards outside `ready`.*
+2. **Take it.** Move the card to the **`in_progress`**-role column **and** post a
+   one-line note ("On it — <plan>."). Do this *immediately* on pickup so the
+   human sees it's being worked — don't work a card silently.
+3. **Do the work** (meet the `acceptanceCriteria`).
+4. **If blocked:** move the card to the **`blocked`**-role column and post a
+   comment explaining the blocker + what you need, `@`-mentioning the requester.
+   Then stop — don't guess past a blocker.
+5. **Finish → hand back.** Move the card to the **`review`**-role column and post
+   a **`handoff`** comment (summary / evidence / verify / spunOff), `@`-mentioning
+   the requester so they're notified. **Stop here by default.**
+6. **Close only when told.** Move the card to the **`done`**-role column *only*
+   when the human explicitly says so ("LGTM", "move to done", "@you close this").
+   Closing is the human's call; nothing you do auto-completes.
+
+> A project may not have every role wired (roles are optional per project). If a
+> project has **no** `ready` column, nothing there is in your queue — that's the
+> human's signal to grant it. If it lacks an `in_progress`/`review`/`blocked`
+> column, fall back to the nearest sensible lane by name and say so in a comment.
+
 ## 3. Endpoint reference (everything you need)
 
 All require the bearer token unless marked public.
@@ -98,7 +129,7 @@ All require the bearer token unless marked public.
 | `GET /api/v1/me` | who am I (user + tenant) |
 | `GET /api/v1/users` | list tenant users → resolve names to ids for assignment |
 | `GET /api/v1/projects?status=active` | list projects (each includes `cardCount`, total tickets) |
-| `POST /api/v1/projects` | create a project — **requires `code`** (2–6 alnum, e.g. `OBL`); auto-seeds Todo/In Progress/In Review/Done |
+| `POST /api/v1/projects` | create a project — **requires `code`** (2–6 alnum, e.g. `OBL`); auto-seeds Backlog/Blocked/Ready/In Progress/In Review/Done with roles pre-wired |
 | `GET /api/v1/projects/{id}` | project **+ its columns** |
 | `PATCH /api/v1/projects/{id}` | rename / recolor / `status:"archived"` |
 | `DELETE /api/v1/projects/{id}` | delete project (cascades) — **admin-only** (403 otherwise) |
@@ -114,6 +145,7 @@ All require the bearer token unless marked public.
 | `GET /api/v1/cards/{id}/timeline` | the card's activity log (system events + comments), oldest→newest |
 | `POST /api/v1/cards/{id}/comments` | post a `note` or a `handoff` to the timeline |
 | `DELETE /api/v1/cards/{id}/comments/{commentId}` | **redact** (soft-delete) *your own* comment — leaves a tombstone |
+| `GET /api/v1/me/queue?projectId=` | **your actionable queue** — cards assigned to you in a `ready`-role column (v0.15.0). Work these first |
 | `GET /api/v1/me/mentions?status=unread\|read\|all` | **your** @-mentions (default unread). Side-effect-free |
 | `POST /api/v1/me/mentions/read` | acknowledge mentions: `{ "mentionIds": [...] }` or `{ "all": true }` |
 | `PATCH /api/v1/me` | set **your own** color (`{ "color": "#rrggbb" }`) |
@@ -272,7 +304,7 @@ kbpost POST /v1/projects '{"name":"Landlord SEO v0.2","code":"LSEO","description
 
 - **Reflect reality by moving cards.** If you start something, move it to In Progress immediately so the human sees it's being worked. Don't silently work a Todo card.
 - **Read before you act.** A card's `description` + `acceptanceCriteria` are the spec. Meet the acceptance criteria before moving to In Review.
-- **Hand off at In Review, not Done** — unless the human explicitly told you to finish end-to-end. In Review = "ready for a human to verify."
+- **Follow the handback contract (§2.5).** Pick up from your `ready` queue → move to `in_progress` + a note → work → `review` + a handoff, `@`-mentioning the requester. Move to `done` **only** when explicitly told; if stuck, move to `blocked` + why. Resolve lanes by **role**, not name.
 - **Assign deliberately.** Assign a card to the person/agent who should act next. Use `GET /v1/users` to resolve names → ids.
 - **Report on the timeline, not in the description.** Progress notes, blockers, and results go to the card **timeline** (`POST …/comments`). The `description`/`acceptanceCriteria` are the **spec** — edit them only to change the plan, never to log what happened.
 - **Write in markdown.** `description`, `acceptanceCriteria`, and comment/handoff bodies render as GFM in view mode — structure them with headings, lists, task lists, code blocks, tables, and links. The card **`summary`** (and the handoff `summary`/slots) stay plain text — keep them short, one line.

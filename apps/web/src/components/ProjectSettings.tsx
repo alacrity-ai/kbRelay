@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ColumnDto, ProjectDto } from '@kbrelay/shared';
+import type { ColumnDto, ColumnRole, ProjectDto } from '@kbrelay/shared';
 import { USER_PALETTE } from '@kbrelay/shared';
 import * as api from '../lib/api';
+import { ROLE_META, ROLE_ORDER } from '../lib/roles';
 import { useDialog } from './Dialog';
 
 const STEP = 1000;
@@ -121,6 +122,27 @@ export default function ProjectSettings({
     }
   }
 
+  /**
+   * Set (or clear) a column's role. Roles are unique per project, so assigning
+   * one the API already holds elsewhere moves it here (the "yank"); reloading
+   * reflects the previous holder losing it.
+   */
+  async function setRole(column: ColumnDto, role: ColumnRole | null) {
+    if (busy || column.role === role) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.patchColumn(column.id, { role });
+      onChanged();
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not set role');
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function addColumn() {
     const colName = await dialog.prompt({ title: 'New column', label: 'Column name', placeholder: 'e.g. Blocked', confirmLabel: 'Add' });
     if (!colName) return;
@@ -219,13 +241,26 @@ export default function ProjectSettings({
 
           {tab === 'columns' && (
             <>
-              <p className="muted-note">Set the order lanes appear on the board, left to right (top = leftmost).</p>
+              <p className="muted-note">Order lanes left→right (top = leftmost). A <strong>role</strong> gives a lane meaning for you and your agents — each role belongs to one lane, so assigning it here moves it off any other lane.</p>
               <div className="col-reorder">
                 {cols.map((c, i) => (
                   <div className="col-row" key={c.id}>
                     <span className="col-index">{i + 1}</span>
                     <span className="column-dot" style={{ background: c.color ?? '#64748b' }} />
                     <span className="col-row-name">{c.name}</span>
+                    <select
+                      className="col-row-role"
+                      value={c.role ?? ''}
+                      disabled={busy}
+                      aria-label={`Role for ${c.name}`}
+                      style={c.role ? { color: ROLE_META[c.role].color } : undefined}
+                      onChange={(e) => setRole(c, (e.target.value || null) as ColumnRole | null)}
+                    >
+                      <option value="">No role</option>
+                      {ROLE_ORDER.map((r) => (
+                        <option key={r} value={r}>{ROLE_META[r].label}</option>
+                      ))}
+                    </select>
                     <div className="col-row-actions">
                       <button className="icon-btn subtle" disabled={busy || i === 0} onClick={() => move(i, -1)} aria-label={`Move ${c.name} up`}>↑</button>
                       <button className="icon-btn subtle" disabled={busy || i === cols.length - 1} onClick={() => move(i, 1)} aria-label={`Move ${c.name} down`}>↓</button>

@@ -58,6 +58,11 @@ export const OPENAPI_SPEC = {
           name: { type: 'string' },
           color: { type: ['string', 'null'] },
           position: { type: 'number' },
+          role: {
+            type: ['string', 'null'],
+            enum: ['ready', 'in_progress', 'review', 'done', 'blocked', null],
+            description: 'Semantic role (v0.15.0), or null for a neutral column. Unique within a project.',
+          },
           createdAt: { type: 'integer' },
         },
       },
@@ -441,6 +446,15 @@ export const OPENAPI_SPEC = {
         responses: { 200: { description: 'ok' } },
       },
     },
+    '/api/v1/me/queue': {
+      get: {
+        summary: 'Your actionable queue — cards assigned to you in a `ready`-role column',
+        parameters: [
+          { name: 'projectId', in: 'query', schema: { type: 'string' }, description: 'Narrow to one project.' },
+        ],
+        responses: { 200: { description: 'ok' } },
+      },
+    },
     '/api/v1/me/mentions/read': {
       post: {
         summary: 'Acknowledge (mark read) your mentions',
@@ -502,7 +516,7 @@ export const OPENAPI_SPEC = {
       post: { summary: 'Add a column', responses: { 201: { description: 'created' } } },
     },
     '/api/v1/columns/{id}': {
-      patch: { summary: 'Rename / recolor / reorder a column', responses: { 200: { description: 'ok' } } },
+      patch: { summary: 'Rename / recolor / reorder / set the role of a column', responses: { 200: { description: 'ok' } } },
       delete: { summary: 'Delete an empty column', responses: { 200: { description: 'ok' } } },
     },
     '/api/v1/projects/{id}/cards': {

@@ -130,9 +130,9 @@ export async function createProject(
     ).bind(id, tenantId, input.name, input.code, input.description ?? null, input.color ?? null, userId, now, now),
     ...DEFAULT_COLUMNS.map((c, i) =>
       env.db.prepare(
-        `INSERT INTO columns (id, tenant_id, project_id, name, color, position, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(newId('col'), tenantId, id, c.name, c.color, RANK_STEP * (i + 1), now),
+        `INSERT INTO columns (id, tenant_id, project_id, name, color, position, role, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(newId('col'), tenantId, id, c.name, c.color, RANK_STEP * (i + 1), c.role, now),
     ),
     // RBAC: the creator is auto-granted access to their new project (admins
     // bypass, but the grant is harmless and keeps the row set consistent).

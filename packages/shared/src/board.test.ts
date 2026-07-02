@@ -43,12 +43,14 @@ describe('board input schemas', () => {
     expect(patchProjectInput.safeParse({ status: 'deleted' }).success).toBe(false);
   });
 
-  it('DEFAULT_COLUMNS is the ordered four-lane board', () => {
-    expect(DEFAULT_COLUMNS.map((c) => c.name)).toEqual([
-      'Todo',
-      'In Progress',
-      'In Review',
-      'Done',
+  it('DEFAULT_COLUMNS is the ordered six-lane board with roles pre-wired', () => {
+    expect(DEFAULT_COLUMNS.map((c) => [c.name, c.role])).toEqual([
+      ['Backlog', null],
+      ['Blocked', 'blocked'],
+      ['Ready', 'ready'],
+      ['In Progress', 'in_progress'],
+      ['In Review', 'review'],
+      ['Done', 'done'],
     ]);
   });
 });

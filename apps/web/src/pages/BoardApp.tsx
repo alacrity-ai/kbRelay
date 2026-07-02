@@ -13,6 +13,7 @@ import ProjectSettings from '../components/ProjectSettings';
 import FilterModal, { EMPTY_FILTER, isFilterActive, filterCount, type BoardFilter } from '../components/FilterModal';
 import NewProjectModal from '../components/NewProjectModal';
 import ApiKeysModal from '../components/ApiKeysModal';
+import ClaudeCodeGuide from '../components/ClaudeCodeGuide';
 import TenantSettings from '../components/TenantSettings';
 
 const PROJECT_KEY = 'kbrelay.selectedProject';
@@ -68,6 +69,7 @@ export default function BoardApp({
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(false);
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   const [mentionCount, setMentionCount] = useState(0);
   const [nav, setNav] = useState<BoardNav | null>(null);
@@ -258,6 +260,7 @@ export default function BoardApp({
             {me.user.role === 'admin' && (
               <button className="menu-item" onClick={() => setTeamOpen(true)}>Team &amp; access</button>
             )}
+            <button className="menu-item" onClick={() => setGuideOpen(true)}>Claude Code setup</button>
             <button className="menu-item" onClick={() => setApiKeysOpen(true)}>API keys</button>
             <button className="menu-item" onClick={signOut}>Sign out</button>
           </div>
@@ -321,6 +324,7 @@ export default function BoardApp({
         />
       )}
       {apiKeysOpen && <ApiKeysModal onClose={() => setApiKeysOpen(false)} />}
+      {guideOpen && <ClaudeCodeGuide onClose={() => setGuideOpen(false)} />}
       {teamOpen && (
         <TenantSettings meId={me.user.id} projects={projects} onClose={() => setTeamOpen(false)} />
       )}

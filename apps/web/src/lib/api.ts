@@ -3,6 +3,7 @@ import type {
   UserDto,
   ProjectDto,
   ColumnDto,
+  ColumnRole,
   CardDto,
   CardEventDto,
   CreateCommentInput,
@@ -120,10 +121,14 @@ export const patchProject = (id: string, body: Partial<Pick<ProjectDto, 'name' |
 export const deleteProject = (id: string) => request<{ ok: true }>('DELETE', `/v1/projects/${id}`);
 
 // ── Columns ──
-export const createColumn = (projectId: string, body: { name: string; color?: string | null; position?: number }) =>
-  request<{ column: ColumnDto }>('POST', `/v1/projects/${projectId}/columns`, body);
-export const patchColumn = (id: string, body: { name?: string; color?: string | null; position?: number }) =>
-  request<{ column: ColumnDto }>('PATCH', `/v1/columns/${id}`, body);
+export const createColumn = (
+  projectId: string,
+  body: { name: string; color?: string | null; position?: number; role?: ColumnRole | null },
+) => request<{ column: ColumnDto }>('POST', `/v1/projects/${projectId}/columns`, body);
+export const patchColumn = (
+  id: string,
+  body: { name?: string; color?: string | null; position?: number; role?: ColumnRole | null },
+) => request<{ column: ColumnDto }>('PATCH', `/v1/columns/${id}`, body);
 export const deleteColumn = (id: string) => request<{ ok: true }>('DELETE', `/v1/columns/${id}`);
 
 // ── Cards ──

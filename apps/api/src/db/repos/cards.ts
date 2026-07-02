@@ -1,6 +1,6 @@
 import type { Env } from '../../env';
 import type { DbStatement } from '../../runtime/shared/db';
-import type { CardDto, CreateCardInput, PatchCardInput, SystemEventType } from '@kbrelay/shared';
+import type { CardDto, QueueCardDto, CreateCardInput, PatchCardInput, SystemEventType } from '@kbrelay/shared';
 import { HttpError } from '../../http';
 import { newId } from '../ids';
 import { RANK_STEP } from '../../rank';
@@ -92,6 +92,50 @@ export async function listCards(
     projectCode(env, tenantId, projectId),
   ]);
   return (rs.results ?? []).map((r) => toDto(r, code));
+}
+
+interface QueueRow extends CardRow {
+  project_code: string | null;
+  project_name: string;
+}
+
+/**
+ * The caller's actionable queue (v0.15.0): cards assigned to `userId` that sit
+ * in a `ready`-role column. RBAC-scoped exactly like `listMentions` — an admin
+ * sees all; a member only cards in projects they have `project_access` to.
+ * Optional `projectId` narrows to one project. Newest-updated first.
+ */
+export async function listMyQueue(
+  env: Env,
+  tenantId: string,
+  userId: string,
+  opts: { isAdmin: boolean; projectId?: string },
+): Promise<QueueCardDto[]> {
+  const clauses = ['c.tenant_id = ?', 'c.assignee_user_id = ?', "col.role = 'ready'"];
+  const binds: unknown[] = [tenantId, userId];
+  if (opts.projectId) {
+    clauses.push('c.project_id = ?');
+    binds.push(opts.projectId);
+  }
+  if (!opts.isAdmin) {
+    clauses.push('EXISTS (SELECT 1 FROM project_access pa WHERE pa.project_id = c.project_id AND pa.user_id = ?)');
+    binds.push(userId);
+  }
+  const rs = await env.db.prepare(
+    `SELECT c.*, p.code AS project_code, p.name AS project_name
+       FROM cards c
+       JOIN columns col ON col.id = c.column_id
+       JOIN projects p  ON p.id = c.project_id
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY c.updated_at DESC, c.id ASC`,
+  )
+    .bind(...binds)
+    .all<QueueRow>();
+  return (rs.results ?? []).map((r) => ({
+    ...toDto(r, r.project_code),
+    projectCode: r.project_code,
+    projectName: r.project_name,
+  }));
 }
 
 async function getCardRow(env: Env, tenantId: string, id: string): Promise<CardRow | null> {

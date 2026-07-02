@@ -2,6 +2,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { CardDto, ColumnDto, UserDto } from '@kbrelay/shared';
 import CardItem from './CardItem';
+import { ROLE_META } from '../lib/roles';
 
 /** A board lane: droppable body + a vertical sortable context of cards. */
 export default function Column({
@@ -22,6 +23,7 @@ export default function Column({
   onDelete: (column: ColumnDto) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  const role = column.role ? ROLE_META[column.role] : null;
 
   return (
     <div className="column">
@@ -34,6 +36,15 @@ export default function Column({
         >
           {column.name}
         </span>
+        {role && (
+          <span
+            className="column-role-badge"
+            style={{ color: role.color, borderColor: role.color }}
+            title={`This column carries the "${role.label}" role`}
+          >
+            {role.label}
+          </span>
+        )}
         <span className="column-count">{cards.length}</span>
         <div style={{ flex: 1 }} />
         <div className="column-actions">

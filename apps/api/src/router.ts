@@ -1,6 +1,6 @@
 import type { Env } from './env';
 import type { AuthContext } from '@kbrelay/shared';
-import { handleMe, handlePatchMe } from './routes/me';
+import { handleMe, handlePatchMe, handleMyQueue } from './routes/me';
 import { handleListMentions, handleMarkMentionsRead } from './routes/mentions';
 import { handleListUsers } from './routes/users';
 import {
@@ -111,6 +111,9 @@ export const routes: Route[] = [
   // ── Identity ──
   { method: 'GET', pattern: '/api/v1/me', handler: handleMe },
   { method: 'PATCH', pattern: '/api/v1/me', handler: handlePatchMe },
+  // Actionable queue (v0.15.0): assigned-to-me cards in a `ready`-role column.
+  // Not project-scoped in the router — it filters by RBAC internally.
+  { method: 'GET', pattern: '/api/v1/me/queue', handler: handleMyQueue },
   { method: 'GET', pattern: '/api/v1/users', handler: handleListUsers },
 
   // ── Mentions / notifications (v0.8.0) ──
