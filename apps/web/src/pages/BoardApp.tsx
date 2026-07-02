@@ -88,6 +88,18 @@ function Magnifier() {
   );
 }
 
+/** Kanban-board glyph for the "back to Board" toggle (KBR-79). */
+function Columns() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16" />
+      <path d="M15 4v16" />
+    </svg>
+  );
+}
+
 /** Small colored line-glyphs for the account menu (KBR-21). Not emojis. */
 const GLYPH_PATHS: Record<string, string> = {
   profile: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8',
@@ -357,15 +369,28 @@ export default function BoardApp({
       <header className="topbar">
         <span className="brand"><BrandMark /> <span className="brand-name">kbRelay</span></span>
 
-        <button
-          className={`icon-btn subtle topbar-tool mywork-btn ${view === 'mywork' ? 'active' : ''}`}
-          onClick={() => setView('mywork')}
-          aria-label={`My Work${needsMe > 0 ? ` (${needsMe} items)` : ''}`}
-          title="My Work — your queue, reviews, and mentions"
-        >
-          <Inbox />
-          {needsMe > 0 && <span className="notif-badge">{needsMe > 99 ? '99+' : needsMe}</span>}
-        </button>
+        {/* Primary view toggle (KBR-79): in My Work this is a "Board" button
+            back to the current project; on the board/activity it's "My Work". */}
+        {view === 'mywork' ? (
+          <button
+            className="icon-btn subtle topbar-tool board-btn"
+            onClick={() => setView('board')}
+            aria-label="Board"
+            title="Back to the board"
+          >
+            <Columns />
+          </button>
+        ) : (
+          <button
+            className="icon-btn subtle topbar-tool mywork-btn"
+            onClick={() => setView('mywork')}
+            aria-label={`My Work${needsMe > 0 ? ` (${needsMe} items)` : ''}`}
+            title="My Work — your queue, reviews, and mentions"
+          >
+            <Inbox />
+            {needsMe > 0 && <span className="notif-badge">{needsMe > 99 ? '99+' : needsMe}</span>}
+          </button>
+        )}
 
         {projects.length > 0 && (
           <ProjectSwitcher
@@ -424,14 +449,23 @@ export default function BoardApp({
           trigger={
             <>
               <Kebab />
-              {needsMe > 0 && <span className="notif-badge">{needsMe > 99 ? '99+' : needsMe}</span>}
+              {/* The needs-me badge only nudges you TOWARD My Work — drop it once
+                  you're already there (the menu shows "Board" then). */}
+              {view !== 'mywork' && needsMe > 0 && <span className="notif-badge">{needsMe > 99 ? '99+' : needsMe}</span>}
             </>
           }
         >
           <div className="menu-list">
-            <button className="menu-item" onClick={() => setView('mywork')}>
-              <Inbox /> My Work{needsMe > 0 ? ` (${needsMe})` : ''}
-            </button>
+            {/* Same view toggle as the desktop button (KBR-79). */}
+            {view === 'mywork' ? (
+              <button className="menu-item" onClick={() => setView('board')}>
+                <Columns /> Board
+              </button>
+            ) : (
+              <button className="menu-item" onClick={() => setView('mywork')}>
+                <Inbox /> My Work{needsMe > 0 ? ` (${needsMe})` : ''}
+              </button>
+            )}
             <button className="menu-item" onClick={() => setFindOpen(true)}>
               <Magnifier /> Quick find
             </button>
