@@ -10,11 +10,15 @@ import { uploadAttachment } from '../lib/api';
  */
 export default function AttachmentToolbar({
   cardId,
+  resolveCardId,
   onUploaded,
   disabled,
   hint,
 }: {
-  cardId: string;
+  /** The card to attach to. If absent, `resolveCardId` is called to obtain one
+   *  (e.g. save an unsaved card first); returning null aborts the upload. */
+  cardId?: string;
+  resolveCardId?: () => Promise<string | null>;
   onUploaded: (a: AttachmentDto) => void;
   disabled?: boolean;
   hint?: string;
@@ -26,11 +30,24 @@ export default function AttachmentToolbar({
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0 || disabled || uploading) return;
+    // Resolve the target card (may save an unsaved card first). Null = aborted.
+    let id = cardId ?? null;
+    if (!id && resolveCardId) {
+      try {
+        id = await resolveCardId();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not save the card');
+      }
+    }
+    if (!id) {
+      if (inputRef.current) inputRef.current.value = '';
+      return;
+    }
     setUploading(true);
     setError(null);
     try {
       for (const file of Array.from(files)) {
-        onUploaded(await uploadAttachment(cardId, file));
+        onUploaded(await uploadAttachment(id, file));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed');

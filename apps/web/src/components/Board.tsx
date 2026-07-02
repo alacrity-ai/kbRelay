@@ -204,17 +204,21 @@ export default function Board({ projectId, users, meId, reloadNonce = 0, filter 
     }
   }
 
-  async function saveCard(input: CardInput) {
+  async function saveCard(input: CardInput): Promise<CardDto> {
     if (modal?.mode === 'view') {
       // Existing card: persist, refresh the open modal with the saved card,
       // and reconcile the board behind it. Modal stays open (returns to view).
       const { card } = await api.patchCard(modal.card.id, input);
       setModal({ mode: 'view', card });
       await load();
-    } else if (modal?.mode === 'create') {
-      await api.createCard(projectId, input);
-      await load();
+      return card;
     }
+    // Create: persist, then ADOPT the new card into the modal (view mode) so it
+    // can carry attachments / further edits — instead of forcing a close+reopen.
+    const { card } = await api.createCard(projectId, input);
+    setModal({ mode: 'view', card });
+    await load();
+    return card;
   }
 
   async function deleteCard() {

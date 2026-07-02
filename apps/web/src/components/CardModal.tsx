@@ -9,6 +9,7 @@ import Markdown from './Markdown';
 import MentionTextArea from './MentionTextArea';
 import AttachmentToolbar from './AttachmentToolbar';
 import AttachmentList from './AttachmentList';
+import { useDialog } from './Dialog';
 
 export interface CardScrollTarget {
   kind: MentionSourceKind;
@@ -23,7 +24,7 @@ interface Props {
   createInColumnId?: string;
   /** When opened from a notification: scroll to (and flash) this location. */
   scrollTo?: CardScrollTarget;
-  onSave: (input: CardInput) => Promise<void>;
+  onSave: (input: CardInput) => Promise<CardDto>;
   onDelete?: () => Promise<void>;
   onClose: () => void;
 }
@@ -49,6 +50,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
   const [editing, setEditing] = useState(isNew);
   const descRef = useRef<HTMLDivElement>(null);
   const acRef = useRef<HTMLDivElement>(null);
+  const dialog = useDialog();
 
   // Deep-link from a notification: flash the mentioned field. Comment targets are
   // handled inside the Timeline (which owns the comment nodes).
@@ -98,6 +100,40 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
     }
   }
 
+  // A file was uploaded: inject its markdown into the description + track it.
+  function onUploaded(a: AttachmentDto) {
+    setDescription((d) => (d ? `${d}\n` : '') + attachmentMarkdown(a));
+    setAttachments((list) => (list.some((x) => x.id === a.id) ? list : [...list, a]));
+  }
+
+  // Attaching on an unsaved new card: confirm, then save it first (Board adopts
+  // the new card into this modal), and return its id so the upload can proceed.
+  async function saveNewCardForAttach(): Promise<string | null> {
+    if (!summary.trim()) {
+      setError('Add a summary before attaching a file.');
+      return null;
+    }
+    const ok = await dialog.confirm({
+      title: 'Save this card to attach?',
+      message: 'Attaching a file will save this card first, then add the file.',
+      confirmLabel: 'Save & attach',
+    });
+    if (!ok) return null;
+    try {
+      const saved = await onSave({
+        summary: summary.trim(),
+        description: description || null,
+        acceptanceCriteria: acceptance || null,
+        columnId,
+        assigneeUserId: assignee || null,
+      });
+      return saved.id;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+      return null;
+    }
+  }
+
   const userName = (id: string | null) => users.find((u) => u.id === id)?.name ?? id ?? '—';
   const userKind = (id: string | null) => users.find((u) => u.id === id)?.kind;
   const userColor = (id: string | null) => users.find((u) => u.id === id)?.color ?? UNASSIGNED_COLOR;
@@ -136,8 +172,9 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
         columnId,
         assigneeUserId: assignee || null,
       });
-      if (isNew) onClose();
-      else setEditing(false); // Board refreshed the card; drop back to view.
+      // Board adopts the saved card (new or existing) into the modal, so drop to
+      // view rather than closing — you see what you just created/edited.
+      setEditing(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed');
     } finally {
@@ -208,19 +245,14 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
               <div className="field">
                 <label>Description</label>
                 <MentionTextArea value={description} onChange={setDescription} users={users} rows={5} />
-                {isNew ? (
-                  <p className="attach-hint muted-note" style={{ fontSize: '0.8rem' }}>
-                    Save the card to attach files.
-                  </p>
-                ) : (
-                  <AttachmentToolbar
-                    cardId={card!.id}
-                    onUploaded={(a) => {
-                      setDescription((d) => (d ? `${d}\n` : '') + attachmentMarkdown(a));
-                      setAttachments((list) => [...list, a]);
-                    }}
-                  />
-                )}
+                {/* One toolbar, mounted across the create→adopt transition: for an
+                    existing card it attaches directly; for a new card it saves first. */}
+                <AttachmentToolbar
+                  cardId={card ? card.id : undefined}
+                  resolveCardId={card ? undefined : saveNewCardForAttach}
+                  onUploaded={onUploaded}
+                  hint={card ? undefined : 'attaching will save the card first'}
+                />
               </div>
               <div className="field">
                 <label>Acceptance criteria</label>

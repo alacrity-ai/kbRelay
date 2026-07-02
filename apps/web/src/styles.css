@@ -1165,3 +1165,11 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 .attach-badge.document { color: #34d399; }
 .attach-badge.archive { color: #fbbf24; }
 .attach-badge.misc { color: var(--muted); }
+
+/* Auth'd inline-image placeholder / error (bearer-only auth → fetch to object URL). */
+.md-img-status {
+  display: inline-block; margin: 0.4rem 0; padding: 0.4rem 0.7rem;
+  color: var(--muted); font-size: 0.85rem;
+  border: 1px dashed var(--border); border-radius: var(--r-sm);
+}
+.md-img-status.error { color: #fca5a5; border-color: #fca5a566; }

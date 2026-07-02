@@ -2,6 +2,7 @@ import type { AttachmentDto } from '@kbrelay/shared';
 import { attachmentBlobUrl } from '../lib/api';
 import { formatBytes } from '../lib/attachments';
 import AttachmentIcon from './AttachmentIcon';
+import AuthedDownloadLink from './AuthedDownloadLink';
 
 /** A card's attachments as a compact list of download links, with an optional
  *  remove (✕) affordance. */
@@ -20,9 +21,9 @@ export default function AttachmentList({
           <span className={`attach-glyph ${a.kind}`}>
             <AttachmentIcon kind={a.kind} />
           </span>
-          <a className="attach-name" href={attachmentBlobUrl(a.id, true)} download={a.filename}>
+          <AuthedDownloadLink className="attach-name" href={attachmentBlobUrl(a.id, true)} filename={a.filename}>
             {a.filename}
-          </a>
+          </AuthedDownloadLink>
           <span className="attach-size">{formatBytes(a.sizeBytes)}</span>
           {onDelete && (
             <button
