@@ -97,6 +97,13 @@ export const OPENAPI_SPEC = {
             $ref: '#/components/schemas/AttachmentCounts',
             description: 'Per-kind attachment counts (v0.16.0). Present on the board list endpoint.',
           },
+          taskCounts: {
+            type: 'object',
+            description:
+              'GFM task-list progress across description + acceptanceCriteria (v0.17.0). ' +
+              'Present on the board list endpoint when the card has any task items.',
+            properties: { done: { type: 'integer' }, total: { type: 'integer' } },
+          },
         },
       },
       Attachment: {

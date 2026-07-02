@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CardDto, ColumnDto, UserDto, MentionSourceKind, AttachmentDto } from '@kbrelay/shared';
-import { UNASSIGNED_COLOR } from '@kbrelay/shared';
+import { UNASSIGNED_COLOR, toggleTaskAtLine } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
 import { attachmentMarkdown, stripAttachmentMarkdown } from '../lib/attachments';
@@ -219,6 +219,25 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
     }
   }
 
+  // Interactive checklists (v0.17.0, KBR-59): a view-mode checkbox click
+  // toggles that source line. Re-fetch first so a toggle can't clobber a
+  // fresher edit; if the line no longer holds a task item, silently skip.
+  async function toggleTask(field: 'description' | 'acceptanceCriteria', line: number) {
+    if (!card || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { card: fresh } = await api.getCard(card.id);
+      const src = field === 'description' ? fresh.description : fresh.acceptanceCriteria;
+      const next = src ? toggleTaskAtLine(src, line) : null;
+      if (next != null) await onSave({ [field]: next });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update checklist');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function quickMove(targetColumnId: string) {
     if (!card || targetColumnId === card.columnId || busy) return;
     setBusy(true);
@@ -392,7 +411,11 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
               <div className="view-section" ref={descRef}>
                 <span className="view-label">Description</span>
                 <div className={`view-text ${card!.description ? '' : 'empty'}`}>
-                  {card!.description ? <Markdown users={users}>{card!.description}</Markdown> : 'No description.'}
+                  {card!.description ? (
+                    <Markdown users={users} onToggleTask={(line) => void toggleTask('description', line)}>
+                      {card!.description}
+                    </Markdown>
+                  ) : 'No description.'}
                 </div>
                 {/* View mode is read-only: download/view, but no ✕ (removing is
                     an edit action). */}
@@ -407,7 +430,11 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
               <div className="view-section" ref={acRef}>
                 <span className="view-label">Acceptance criteria</span>
                 <div className={`view-text ${card!.acceptanceCriteria ? '' : 'empty'}`}>
-                  {card!.acceptanceCriteria ? <Markdown users={users}>{card!.acceptanceCriteria}</Markdown> : 'None set.'}
+                  {card!.acceptanceCriteria ? (
+                    <Markdown users={users} onToggleTask={(line) => void toggleTask('acceptanceCriteria', line)}>
+                      {card!.acceptanceCriteria}
+                    </Markdown>
+                  ) : 'None set.'}
                 </div>
               </div>
 

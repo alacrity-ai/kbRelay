@@ -3,6 +3,7 @@ export * from './agents.ts';
 export * from './attachments.ts';
 export * from './auth.ts';
 export * from './board.ts';
+export * from './checklists.ts';
 export * from './colors.ts';
 export * from './events.ts';
 export * from './mentions.ts';

@@ -67,3 +67,22 @@ describe('Markdown ticket-key autolinks', () => {
     expect(out).toContain('KBR-12');
   });
 });
+
+/** Interactive checklists (v0.17.0, KBR-59): checkboxes go live only when a
+ *  toggle handler is passed (card view mode), never by default (comments). */
+describe('Markdown task lists', () => {
+  const md = '- [ ] first\n- [x] second';
+
+  it('renders live, enabled checkboxes when onToggleTask is passed', () => {
+    const out = renderToStaticMarkup(<Markdown onToggleTask={() => {}}>{md}</Markdown>);
+    expect(out).toContain('task-toggle');
+    expect(out).toContain('task-live');
+    expect(out).not.toContain('disabled');
+  });
+
+  it('keeps checkboxes static without a handler (timeline comments)', () => {
+    const out = renderToStaticMarkup(<Markdown>{md}</Markdown>);
+    expect(out).not.toContain('task-toggle');
+    expect(out).toContain('disabled');
+  });
+});

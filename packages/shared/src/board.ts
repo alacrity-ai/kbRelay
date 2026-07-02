@@ -81,6 +81,9 @@ export interface CardDto {
   attachments?: AttachmentDto[];
   /** Per-kind attachment counts (v0.16.0). Present on the board list endpoint. */
   attachmentCounts?: AttachmentCounts;
+  /** Task-list progress across description + acceptanceCriteria (v0.17.0,
+   *  KBR-59). Present on the board list endpoint when the card has any. */
+  taskCounts?: { done: number; total: number };
 }
 
 /**

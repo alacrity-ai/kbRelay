@@ -22,6 +22,7 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
   const color = assignee?.color ?? UNASSIGNED_COLOR;
   const counts = card.attachmentCounts;
   const hasBadges = !!counts && counts.image + counts.document + counts.archive + counts.misc > 0;
+  const tasks = card.taskCounts;
   return (
     <div
       ref={ref}
@@ -31,7 +32,7 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
     >
       {card.key && <div className="card-key">{card.key}</div>}
       <div className="card-title">{card.summary}</div>
-      {(assignee || reviewer || hasBadges) && (
+      {(assignee || reviewer || hasBadges || (tasks && tasks.total > 0)) && (
         <div className="card-meta">
           {assignee ? (
             <span className="assignee-chip">
@@ -50,6 +51,14 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
                 <circle cx="12" cy="12" r="3" />
               </svg>
               {reviewer.name}
+            </span>
+          )}
+          {tasks && tasks.total > 0 && (
+            <span
+              className={`task-chip ${tasks.done === tasks.total ? 'done' : ''}`}
+              title={`${tasks.done} of ${tasks.total} checklist items done`}
+            >
+              ☑ {tasks.done}/{tasks.total}
             </span>
           )}
           {hasBadges && <AttachmentBadges counts={counts} />}

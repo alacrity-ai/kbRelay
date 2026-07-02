@@ -1,4 +1,4 @@
-import { createCardInput, patchCardInput, createCommentInput, type WebhookTrigger } from '@kbrelay/shared';
+import { createCardInput, patchCardInput, createCommentInput, countCardTasks, type WebhookTrigger } from '@kbrelay/shared';
 import type { RouteContext } from '../router';
 import { jsonResponse, HttpError } from '../http';
 import { parseJson } from '../validate';
@@ -19,9 +19,13 @@ export async function handleListCards(ctx: RouteContext): Promise<Response> {
     q: ctx.url.searchParams.get('q') ?? undefined,
   });
   // Enrich each card with its per-kind attachment counts for the board badges
-  // (one grouped query for the whole list).
+  // (one grouped query for the whole list) and its task-list progress
+  // (v0.17.0, KBR-59 — computed here so the web never parses every body).
   const counts = await attachmentCountsForCards(ctx.env, tenantId, cards.map((c) => c.id));
-  const withCounts = cards.map((c) => ({ ...c, attachmentCounts: counts[c.id] }));
+  const withCounts = cards.map((c) => {
+    const tasks = countCardTasks(c.description, c.acceptanceCriteria);
+    return { ...c, attachmentCounts: counts[c.id], ...(tasks.total > 0 ? { taskCounts: tasks } : {}) };
+  });
   return jsonResponse(200, { cards: withCounts }, ctx.cors);
 }
 

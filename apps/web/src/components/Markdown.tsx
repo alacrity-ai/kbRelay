@@ -1,4 +1,4 @@
-import { useContext, useMemo, type ReactNode } from 'react';
+import { Children, isValidElement, useContext, useMemo, type ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -20,8 +20,46 @@ function nodeText(children: ReactNode): string {
 // card text can't execute — we keep that safe default. A `#mention-…` link is our
 // sentinel for an @-mention chip (see linkifyMentions below); a `#card-…` link is
 // the ticket-key sentinel (see lib/cardLinks) and opens that card in place.
-function makeComponents(cardLinks: CardLinks | null): Components {
+/** Swap the default disabled task checkbox for a live one (depth ≤ 2 — the
+ *  input sits directly in the li, or inside its first <p> in a loose list). */
+function replaceTaskInput(children: ReactNode, onToggle: () => void, depth = 0): ReactNode {
+  if (depth > 2) return children;
+  let replaced = false;
+  return Children.map(children, (child) => {
+    if (replaced || !isValidElement(child)) return child;
+    if (child.type === 'input') {
+      replaced = true;
+      const checked = Boolean((child.props as { checked?: boolean }).checked);
+      return (
+        <input type="checkbox" className="task-toggle" checked={checked} onChange={onToggle} />
+      );
+    }
+    if (child.type === 'p') {
+      const inner = replaceTaskInput((child.props as { children?: ReactNode }).children, onToggle, depth + 1);
+      return <p>{inner}</p>;
+    }
+    return child;
+  });
+}
+
+function makeComponents(cardLinks: CardLinks | null, onToggleTask?: (line: number) => void): Components {
   return {
+    // Interactive checklists (v0.17.0, KBR-59): when a toggle handler is given
+    // (card view mode — NOT timeline comments), a task item's checkbox becomes
+    // live; a click toggles the item's source line. The li's node position maps
+    // the rendered item back to that line.
+    li({ node, children, className, ...props }) {
+      const isTask = typeof className === 'string' && className.includes('task-list-item');
+      const line = node?.position?.start.line;
+      if (!isTask || !onToggleTask || line == null) {
+        return <li className={className} {...props}>{children}</li>;
+      }
+      return (
+        <li className={`${className} task-live`} {...props}>
+          {replaceTaskInput(children, () => onToggleTask(line))}
+        </li>
+      );
+    },
     a({ node: _node, href, children, ...props }) {
       if (href && href.startsWith('#mention-')) {
         return <span className="mention-chip">{children}</span>;
@@ -89,8 +127,19 @@ function linkifyMentions(text: string, nameByHandle: Map<string, string>): strin
 
 /** Render card text (description, acceptance criteria, timeline bodies) as markdown.
  *  Pass `users` to render @-mentions as chips. Ticket keys (`KBR-12`) linkify when
- *  a CardLinksContext provider is above us (see lib/cardLinks). */
-export default function Markdown({ children, users }: { children: string; users?: UserDto[] }) {
+ *  a CardLinksContext provider is above us (see lib/cardLinks). Pass `onToggleTask`
+ *  to make task-list checkboxes live (view mode only — never for timeline comments;
+ *  the toggle receives the item's 1-based source line, valid against `children`
+ *  because the mention/key preprocessing never adds or removes lines). */
+export default function Markdown({
+  children,
+  users,
+  onToggleTask,
+}: {
+  children: string;
+  users?: UserDto[];
+  onToggleTask?: (line: number) => void;
+}) {
   const cardLinks = useContext(CardLinksContext);
 
   const source = useMemo(() => {
@@ -106,7 +155,7 @@ export default function Markdown({ children, users }: { children: string; users?
     return text;
   }, [children, users, cardLinks]);
 
-  const components = useMemo(() => makeComponents(cardLinks), [cardLinks]);
+  const components = useMemo(() => makeComponents(cardLinks, onToggleTask), [cardLinks, onToggleTask]);
 
   return (
     <div className="markdown">
