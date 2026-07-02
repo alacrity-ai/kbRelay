@@ -3,6 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { CardDto, UserDto } from '@kbrelay/shared';
 import { UNASSIGNED_COLOR } from '@kbrelay/shared';
+import AttachmentBadges from './AttachmentBadges';
 
 type CardBodyProps = {
   card: CardDto;
@@ -18,6 +19,8 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
   const assignee = users.find((u) => u.id === card.assigneeUserId);
   // A card's color is its assignee's color (v0.2.0); gray if unassigned.
   const color = assignee?.color ?? UNASSIGNED_COLOR;
+  const counts = card.attachmentCounts;
+  const hasBadges = !!counts && counts.image + counts.document + counts.archive + counts.misc > 0;
   return (
     <div
       ref={ref}
@@ -27,12 +30,17 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
     >
       {card.key && <div className="card-key">{card.key}</div>}
       <div className="card-title">{card.summary}</div>
-      {assignee && (
+      {(assignee || hasBadges) && (
         <div className="card-meta">
-          <span className="assignee-chip">
-            <span className="dot" style={{ background: assignee.color }} />
-            {assignee.name}
-          </span>
+          {assignee ? (
+            <span className="assignee-chip">
+              <span className="dot" style={{ background: assignee.color }} />
+              {assignee.name}
+            </span>
+          ) : (
+            <span />
+          )}
+          {hasBadges && <AttachmentBadges counts={counts} />}
         </div>
       )}
     </div>

@@ -1146,7 +1146,7 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 .attach-del:hover { color: var(--danger); background: var(--surface-hover); }
 
 /* Board card attachment badges (KBR-28) */
-.attach-badges { display: inline-flex; align-items: center; gap: 0.4rem; }
+.attach-badges { display: inline-flex; align-items: center; gap: 0.4rem; margin-left: auto; }
 .attach-badge {
   display: inline-flex; align-items: center; gap: 0.15rem;
   color: var(--text-dim); font-size: 0.72rem; line-height: 1;
