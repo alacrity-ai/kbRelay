@@ -55,11 +55,18 @@ describe('linkifyTicketKeys', () => {
   });
 });
 
-/** External card links (KBR-71): the /c/<KEY> deep-link parser. */
+/** External card links (KBR-71): the deep-link parser. Canonical links carry
+ *  the workspace slug (keys are only unique per tenant); the bare form still
+ *  parses for early links. */
 describe('parseCardDeepLink', () => {
-  it('parses and uppercases a valid path (trailing slash ok)', () => {
-    expect(parseCardDeepLink('/c/KBR-12')).toBe('KBR-12');
-    expect(parseCardDeepLink('/c/kbr-12/')).toBe('KBR-12');
+  it('parses the slugged canonical form', () => {
+    expect(parseCardDeepLink('/t/lala/c/KBR-12')).toEqual({ key: 'KBR-12', tenantSlug: 'lala' });
+    expect(parseCardDeepLink('/t/my%20org/c/kbr-12/')).toEqual({ key: 'KBR-12', tenantSlug: 'my org' });
+  });
+
+  it('parses the bare legacy form with a null slug (trailing slash ok)', () => {
+    expect(parseCardDeepLink('/c/KBR-12')).toEqual({ key: 'KBR-12', tenantSlug: null });
+    expect(parseCardDeepLink('/c/kbr-12/')).toEqual({ key: 'KBR-12', tenantSlug: null });
   });
 
   it('rejects non-card paths and malformed keys', () => {
@@ -67,6 +74,8 @@ describe('parseCardDeepLink', () => {
     expect(parseCardDeepLink('/c/')).toBeNull();
     expect(parseCardDeepLink('/c/KBR')).toBeNull();
     expect(parseCardDeepLink('/c/KBR-12/extra')).toBeNull();
+    expect(parseCardDeepLink('/t/lala/KBR-12')).toBeNull();
+    expect(parseCardDeepLink('/t//c/KBR-12')).toBeNull();
     expect(parseCardDeepLink('/auth/reset/tok')).toBeNull();
     expect(parseCardDeepLink('/c/TOOLONGCODE-1')).toBeNull();
   });

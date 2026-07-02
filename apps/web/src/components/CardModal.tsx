@@ -23,6 +23,9 @@ interface Props {
   columns: ColumnDto[];
   users: UserDto[];
   meId: string;
+  /** Workspace slug for shareable links (KBR-71): keys are only unique per
+   *  workspace, so minted URLs carry it. */
+  tenantSlug?: string;
   /** The project's label palette (KBR-62) — empty hides the picker. */
   projectLabels?: LabelDto[];
   createInColumnId?: string;
@@ -59,7 +62,7 @@ function Pencil() {
  *  - Edit: the form. Reached via the Edit button, or immediately when creating.
  * Saving an existing card returns to View; creating closes the modal.
  */
-export default function CardModal({ card, columns, users, meId, projectLabels = [], createInColumnId, scrollTo, onSave, onDelete, onClose }: Props) {
+export default function CardModal({ card, columns, users, meId, tenantSlug, projectLabels = [], createInColumnId, scrollTo, onSave, onDelete, onClose }: Props) {
   const isNew = !card;
   const [editing, setEditing] = useState(isNew);
   const descRef = useRef<HTMLDivElement>(null);
@@ -267,7 +270,7 @@ export default function CardModal({ card, columns, users, meId, projectLabels = 
   async function copyLink() {
     if (!card?.key) return;
     try {
-      await navigator.clipboard.writeText(cardUrl(card.key));
+      await navigator.clipboard.writeText(cardUrl(card.key, tenantSlug));
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 1500);
     } catch {
@@ -356,7 +359,7 @@ export default function CardModal({ card, columns, users, meId, projectLabels = 
           )}
           <div className="modal-header-actions">
             {!editing && card!.key && (
-              <button className="subtle" onClick={() => void copyLink()} aria-label="Copy link to this card" title={`Copy ${cardUrl(card!.key)}`}>
+              <button className="subtle" onClick={() => void copyLink()} aria-label="Copy link to this card" title={`Copy ${cardUrl(card!.key, tenantSlug)}`}>
                 <Chain /> {linkCopied ? 'Copied' : 'Link'}
               </button>
             )}

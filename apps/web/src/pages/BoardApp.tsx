@@ -286,14 +286,23 @@ export default function BoardApp({
   // explicit error instead of the autolinks' silent no-op.
   useEffect(() => {
     if (loading) return;
-    const key = parseCardDeepLink(window.location.pathname);
-    if (!key) return;
+    const link = parseCardDeepLink(window.location.pathname);
+    if (!link) return;
     window.history.replaceState(null, '', '/');
-    void openCardByKey(key).then((ok) => {
+    // Keys are only unique per workspace: a slugged link minted elsewhere must
+    // NOT silently open this workspace's same-keyed card (KBR-71 follow-up).
+    if (link.tenantSlug && link.tenantSlug !== me.tenant.slug) {
+      void dialog.alert({
+        title: 'Link is for another workspace',
+        message: `${link.key} lives in the “${link.tenantSlug}” workspace — you're signed in to “${me.tenant.name}”. Sign in with an account in that workspace to open it.`,
+      });
+      return;
+    }
+    void openCardByKey(link.key).then((ok) => {
       if (!ok) {
         void dialog.alert({
           title: 'Card not available',
-          message: `${key} doesn't exist, or you don't have access to its project.`,
+          message: `${link.key} doesn't exist, or you don't have access to its project.`,
         });
       }
     });
@@ -521,6 +530,7 @@ export default function BoardApp({
           projectId={selected}
           users={projectUsers}
           meId={me.user.id}
+          tenantSlug={me.tenant.slug}
           reloadNonce={boardNonce}
           filter={filter}
           projectLabels={projectLabels}
