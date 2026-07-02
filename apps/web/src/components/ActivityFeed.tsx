@@ -24,6 +24,31 @@ function excerpt(e: ProjectEventDto): string | null {
   return line.length > 140 ? `${line.slice(0, 140)}…` : line;
 }
 
+/**
+ * Spam control (KBR-72): collapse a consecutive run of look-alike system
+ * events — same card, same author, same type (and same fields for `edited`) —
+ * into one row with a ×N badge. The list is newest-first, so the first event
+ * of a run is the one kept (freshest timestamp + final checklist counts).
+ */
+function collapseRuns(events: ProjectEventDto[]): { event: ProjectEventDto; runCount: number }[] {
+  const fieldsKey = (e: ProjectEventDto) => {
+    const f = e.meta?.fields;
+    return Array.isArray(f) ? f.join(',') : '';
+  };
+  const sameRun = (a: ProjectEventDto, b: ProjectEventDto) =>
+    a.kind === 'system' && b.kind === 'system' &&
+    a.cardId === b.cardId && a.authorUserId === b.authorUserId &&
+    a.eventType === b.eventType &&
+    (a.eventType === 'task' || (a.eventType === 'edited' && fieldsKey(a) === fieldsKey(b)));
+  const out: { event: ProjectEventDto; runCount: number }[] = [];
+  for (const e of events) {
+    const last = out[out.length - 1];
+    if (last && sameRun(last.event, e)) last.runCount++;
+    else out.push({ event: e, runCount: 1 });
+  }
+  return out;
+}
+
 /** Day bucket label for grouping ("Today", "Yesterday", or a date). */
 function dayLabel(ms: number, now: number): string {
   const d = new Date(ms);
@@ -85,13 +110,13 @@ export default function ActivityFeed({ projectId, users }: { projectId: string; 
     );
   }
 
-  // Group consecutive events by day (the list is already newest-first).
-  const groups: { label: string; items: ProjectEventDto[] }[] = [];
-  for (const e of events) {
-    const label = dayLabel(e.createdAt, now);
+  // Collapse spammy runs first (KBR-72), then group by day (newest-first).
+  const groups: { label: string; items: { event: ProjectEventDto; runCount: number }[] }[] = [];
+  for (const item of collapseRuns(events)) {
+    const label = dayLabel(item.event.createdAt, now);
     const last = groups[groups.length - 1];
-    if (last && last.label === label) last.items.push(e);
-    else groups.push({ label, items: [e] });
+    if (last && last.label === label) last.items.push(item);
+    else groups.push({ label, items: [item] });
   }
 
   return (
@@ -99,7 +124,7 @@ export default function ActivityFeed({ projectId, users }: { projectId: string; 
       {groups.map((g) => (
         <section key={g.label} className="activity-day">
           <h3 className="activity-day-label">{g.label}</h3>
-          {g.items.map((e) => {
+          {g.items.map(({ event: e, runCount }) => {
             const author = user(e.authorUserId);
             const ex = excerpt(e);
             return (
@@ -112,6 +137,7 @@ export default function ActivityFeed({ projectId, users }: { projectId: string; 
                     <strong>{userName(e.authorUserId)}</strong>
                     {author?.kind && <span className={`kind-badge ${author.kind}`}>{author.kind}</span>}
                     {' '}{phrase(e, userName)}
+                    {runCount > 1 && <span className="tl-run"> ×{runCount}</span>}
                     {' '}
                     {e.cardKey && cardLinks ? (
                       <a

@@ -1122,6 +1122,9 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 }
 .due-clear:hover { color: #f87171; }
 
+/* Run badge on collapsed spammy system-event rows (KBR-72): "×6". */
+.tl-run { color: var(--muted, #94a3b8); font-weight: 700; font-size: 0.85em; }
+
 /* Interactive checklists (v0.17.0, KBR-59). */
 .task-chip {
   display: inline-flex;

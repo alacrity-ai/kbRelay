@@ -11,8 +11,10 @@ import { z } from 'zod';
 
 export type CardEventKind = 'system' | 'note' | 'handoff';
 /** `reviewer` (v0.17.0): the reviewer pointer changed — meta {from, to}.
- *  `due` (v0.17.0, KBR-63): the due date changed — meta {from, to} epoch ms. */
-export type SystemEventType = 'created' | 'moved' | 'assigned' | 'edited' | 'reviewer' | 'due';
+ *  `due` (v0.17.0, KBR-63): the due date changed — meta {from, to} epoch ms.
+ *  `task` (v0.17.0, KBR-72): a checkbox-only edit — meta {fields, done, total}.
+ *  Quieter than `edited`; feed/timeline collapse consecutive runs of these. */
+export type SystemEventType = 'created' | 'moved' | 'assigned' | 'edited' | 'reviewer' | 'due' | 'task';
 
 /** Wire shape of a timeline entry (GET /cards/:id/timeline). */
 export interface CardEventDto {

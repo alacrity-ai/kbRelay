@@ -135,8 +135,8 @@ export default function Timeline({
         ) : events.length === 0 ? (
           <div className="timeline-empty">No activity yet.</div>
         ) : (
-          events.map((e) => (
-            <TimelineEntry key={e.id} event={e} users={users} now={now} userName={userName} meId={meId} onRedact={redact} />
+          collapseTaskRuns(events).map(({ event: e, runCount }) => (
+            <TimelineEntry key={e.id} event={e} users={users} now={now} userName={userName} meId={meId} onRedact={redact} runCount={runCount} />
           ))
         )}
       </div>
@@ -178,6 +178,32 @@ export default function Timeline({
   );
 }
 
+/**
+ * Collapse consecutive `task` system events by the same author into one entry
+ * (KBR-72): six checkbox clicks read as one "updated the checklist ×6" line.
+ * The list is oldest→newest, so the LAST event of a run carries the final
+ * done/total counts — that's the one we keep.
+ */
+export function collapseTaskRuns(
+  events: CardEventDto[],
+): { event: CardEventDto; runCount: number }[] {
+  const out: { event: CardEventDto; runCount: number }[] = [];
+  for (const e of events) {
+    const last = out[out.length - 1];
+    if (
+      last &&
+      e.kind === 'system' && e.eventType === 'task' &&
+      last.event.kind === 'system' && last.event.eventType === 'task' &&
+      last.event.authorUserId === e.authorUserId
+    ) {
+      out[out.length - 1] = { event: e, runCount: last.runCount + 1 };
+    } else {
+      out.push({ event: e, runCount: 1 });
+    }
+  }
+  return out;
+}
+
 function TimelineEntry({
   event,
   users,
@@ -185,6 +211,7 @@ function TimelineEntry({
   userName,
   meId,
   onRedact,
+  runCount = 1,
 }: {
   event: CardEventDto;
   users: UserDto[];
@@ -192,6 +219,7 @@ function TimelineEntry({
   userName: (id: string | null) => string;
   meId: string;
   onRedact: (id: string) => void;
+  runCount?: number;
 }) {
   const author = users.find((u) => u.id === event.authorUserId);
   const when = relTime(event.createdAt, now);
@@ -211,6 +239,7 @@ function TimelineEntry({
         <span className="tl-dot" />
         <span className="tl-sys-text">
           <strong>{userName(event.authorUserId)}</strong> {systemPhrase(event, userName)}
+          {runCount > 1 && <span className="tl-run"> ×{runCount}</span>}
         </span>
         <span className="tl-time">{when}</span>
       </div>
@@ -318,6 +347,13 @@ export function systemPhrase(e: CardEventDto, userName: (id: string | null) => s
       return to != null
         ? `set the due date to ${new Date(to).toLocaleDateString([], { month: 'short', day: 'numeric' })}`
         : 'cleared the due date';
+    }
+    case 'task': {
+      const done = typeof meta.done === 'number' ? meta.done : null;
+      const total = typeof meta.total === 'number' ? meta.total : null;
+      return done != null && total != null
+        ? `updated the checklist (${done}/${total} done)`
+        : 'updated the checklist';
     }
     case 'edited': {
       const fields = asStrings(meta.fields);

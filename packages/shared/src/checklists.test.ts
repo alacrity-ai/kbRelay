@@ -1,5 +1,33 @@
 import { describe, it, expect } from 'vitest';
-import { countTaskItems, countCardTasks, toggleTaskAtLine } from './checklists';
+import { countTaskItems, countCardTasks, toggleTaskAtLine, isChecklistOnlyEdit } from './checklists';
+
+/** KBR-72: classify checkbox-only edits so they log as quiet `task` events. */
+describe('isChecklistOnlyEdit', () => {
+  const md = '## AC\n- [ ] first\n- [x] second\nsome prose';
+
+  it('true for a single toggle and for multiple toggles', () => {
+    expect(isChecklistOnlyEdit(md, md.replace('- [ ] first', '- [x] first'))).toBe(true);
+    const both = md.replace('- [ ] first', '- [x] first').replace('- [x] second', '- [ ] second');
+    expect(isChecklistOnlyEdit(md, both)).toBe(true);
+  });
+
+  it('false when text changes beyond the checkbox slot', () => {
+    expect(isChecklistOnlyEdit(md, md.replace('first', 'FIRST'))).toBe(false);
+    expect(isChecklistOnlyEdit(md, md.replace('- [ ] first', '- [x] first!'))).toBe(false);
+    expect(isChecklistOnlyEdit(md, md.replace('some prose', 'other prose'))).toBe(false);
+  });
+
+  it('false when lines are added/removed, on no-ops, and on nulls', () => {
+    expect(isChecklistOnlyEdit(md, `${md}\n- [ ] third`)).toBe(false);
+    expect(isChecklistOnlyEdit(md, md)).toBe(false);
+    expect(isChecklistOnlyEdit(null, md)).toBe(false);
+    expect(isChecklistOnlyEdit(md, null)).toBe(false);
+  });
+
+  it('false when a non-task line is what changed', () => {
+    expect(isChecklistOnlyEdit('plain [ ] text', 'plain [x] text')).toBe(false);
+  });
+});
 
 describe('countTaskItems', () => {
   it('counts done/total across -, *, + and ordered markers', () => {

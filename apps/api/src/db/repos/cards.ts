@@ -9,7 +9,7 @@ import type {
   SystemEventType,
   WebhookTrigger,
 } from '@kbrelay/shared';
-import { DUE_SOON_WINDOW_MS } from '@kbrelay/shared';
+import { DUE_SOON_WINDOW_MS, isChecklistOnlyEdit, countCardTasks } from '@kbrelay/shared';
 import { HttpError } from '../../http';
 import { newId } from '../ids';
 import { RANK_STEP } from '../../rank';
@@ -400,7 +400,21 @@ export async function patchCard(
   if (next.summary !== existing.summary) editedFields.push('summary');
   if (next.description !== existing.description) editedFields.push('description');
   if (next.acceptance_criteria !== existing.acceptance_criteria) editedFields.push('acceptanceCriteria');
-  if (editedFields.length) events.push(ev('edited', { fields: editedFields }));
+  if (editedFields.length) {
+    // Checkbox-only edits get a compact `task` event instead of `edited`, so a
+    // run of checklist clicks doesn't spam the activity feed (KBR-72).
+    const checklistOnly = editedFields.every(
+      (f) =>
+        (f === 'description' && isChecklistOnlyEdit(existing.description, next.description)) ||
+        (f === 'acceptanceCriteria' && isChecklistOnlyEdit(existing.acceptance_criteria, next.acceptance_criteria)),
+    );
+    if (checklistOnly) {
+      const counts = countCardTasks(next.description, next.acceptance_criteria);
+      events.push(ev('task', { fields: editedFields, done: counts.done, total: counts.total }));
+    } else {
+      events.push(ev('edited', { fields: editedFields }));
+    }
+  }
 
   const updateStmt = env.db.prepare(
     `UPDATE cards SET summary = ?, description = ?, acceptance_criteria = ?, color = ?,
