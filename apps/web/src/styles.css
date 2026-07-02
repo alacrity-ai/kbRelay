@@ -499,6 +499,9 @@ select {
   border: 1px solid var(--border-strong);
   border-radius: var(--r-xl);
   width: min(440px, 94vw);
+  /* Cap like .modal so a tall page (e.g. the Claude guide's channels step)
+     scrolls its .modal-body instead of pushing the footer off-screen (KBR-69). */
+  max-height: 88dvh;
   box-shadow: var(--shadow-3);
   overflow: hidden;
   display: flex; flex-direction: column;
@@ -1002,6 +1005,12 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   .modal-title { font-size: 1.15rem; }
   .modal-footer { position: sticky; bottom: 0; }
   .row { flex-direction: column; align-items: stretch; gap: 1rem; }
+
+  /* Guides on a phone (KBR-69): fill the viewport height and let the body be
+     the scroll region — the desktop min-height would otherwise pin the footer
+     below the fold on short screens. */
+  .dialog-card { max-height: calc(100dvh - 2 * var(--space-4)); }
+  .cc-guide-body { min-height: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
