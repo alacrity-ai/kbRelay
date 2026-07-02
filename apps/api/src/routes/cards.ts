@@ -6,6 +6,7 @@ import { tenantScope } from '../auth/tenant-scope';
 import { getProject } from '../db/repos/projects';
 import { listCards, getCard, createCard, patchCard, deleteCard } from '../db/repos/cards';
 import { listTimeline, addComment, redactComment } from '../db/repos/card_events';
+import { listCardAttachments, attachmentCountsForCards } from '../db/repos/attachments';
 import { dispatchTriggers } from '../services/webhooks';
 
 export async function handleListCards(ctx: RouteContext): Promise<Response> {
@@ -17,7 +18,11 @@ export async function handleListCards(ctx: RouteContext): Promise<Response> {
     assignee: ctx.url.searchParams.get('assignee') ?? undefined,
     q: ctx.url.searchParams.get('q') ?? undefined,
   });
-  return jsonResponse(200, { cards }, ctx.cors);
+  // Enrich each card with its per-kind attachment counts for the board badges
+  // (one grouped query for the whole list).
+  const counts = await attachmentCountsForCards(ctx.env, tenantId, cards.map((c) => c.id));
+  const withCounts = cards.map((c) => ({ ...c, attachmentCounts: counts[c.id] }));
+  return jsonResponse(200, { cards: withCounts }, ctx.cors);
 }
 
 export async function handleCreateCard(ctx: RouteContext): Promise<Response> {
@@ -35,7 +40,8 @@ export async function handleGetCard(ctx: RouteContext): Promise<Response> {
   const { tenantId } = tenantScope(ctx.auth);
   const card = await getCard(ctx.env, tenantId, ctx.params.id!);
   if (!card) throw new HttpError(404, 'Card not found');
-  return jsonResponse(200, { card }, ctx.cors);
+  const attachments = await listCardAttachments(ctx.env, tenantId, card.id);
+  return jsonResponse(200, { card: { ...card, attachments } }, ctx.cors);
 }
 
 export async function handlePatchCard(ctx: RouteContext): Promise<Response> {

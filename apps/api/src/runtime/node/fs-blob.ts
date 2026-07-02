@@ -2,7 +2,27 @@ import { mkdir, writeFile, stat, unlink } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { dirname, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
-import type { BlobStore, BlobObject, BlobPutOpts } from '../shared/blob';
+import type { BlobStore, BlobBody, BlobObject, BlobPutOpts } from '../shared/blob';
+
+/**
+ * Read any upload body into a Buffer. Bytes pass through; a stream (a real web
+ * ReadableStream OR the @whatwg-node ponyfill self-host uses) is drained via its
+ * standard `getReader()`, so we don't depend on `instanceof`. Attachments are
+ * ≤25 MB, so buffering here is fine — only the self-host fs path buffers; CF
+ * streams straight to R2.
+ */
+async function toBuffer(body: BlobBody): Promise<Buffer> {
+  if (body instanceof Uint8Array) return Buffer.from(body); // includes Buffer
+  if (body instanceof ArrayBuffer) return Buffer.from(body);
+  const reader = (body as ReadableStream<Uint8Array>).getReader();
+  const chunks: Buffer[] = [];
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks);
+}
 
 /**
  * The self-host `BlobStore` adapter (v0.16.0): stores attachment bytes on the
@@ -31,13 +51,7 @@ export function createFsBlobStore(root: string): BlobStore {
     async put(key, body, _opts: BlobPutOpts) {
       const full = pathFor(key);
       await mkdir(dirname(full), { recursive: true });
-      const data =
-        body instanceof ReadableStream
-          ? Readable.fromWeb(body as Parameters<typeof Readable.fromWeb>[0])
-          : body instanceof Uint8Array
-            ? body
-            : Buffer.from(body);
-      await writeFile(full, data);
+      await writeFile(full, await toBuffer(body));
     },
 
     async get(key): Promise<BlobObject | null> {

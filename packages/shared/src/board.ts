@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { AttachmentDto, AttachmentCounts } from './attachments.ts';
 
 /**
  * Board domain: projects → columns → cards. Types are the wire shapes
@@ -73,6 +74,10 @@ export interface CardDto {
   updatedBy: string;
   createdAt: number;
   updatedAt: number;
+  /** Attachments on the card (v0.16.0). Present on single-card GET only. */
+  attachments?: AttachmentDto[];
+  /** Per-kind attachment counts (v0.16.0). Present on the board list endpoint. */
+  attachmentCounts?: AttachmentCounts;
 }
 
 /**

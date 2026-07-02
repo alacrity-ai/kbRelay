@@ -616,12 +616,61 @@ export const OPENAPI_SPEC = {
                       spunOff: { type: 'array', items: { type: 'string' } },
                     },
                   },
+                  attachmentIds: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Attachments (v0.16.0) uploaded for this comment; linked to it on post.',
+                  },
                 },
               },
             },
           },
         },
         responses: { 201: { description: 'created' } },
+      },
+    },
+    '/api/v1/cards/{id}/attachments': {
+      post: {
+        summary: 'Upload a file attachment to a card (multipart)',
+        description:
+          'Upload one file (multipart/form-data, part name `file`, ≤25 MB). Stored ' +
+          'card-scoped (on the description); link it to a note/handoff by passing ' +
+          'its id in the comment\'s `attachmentIds`. 503 if storage is unconfigured.',
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['file'],
+                properties: { file: { type: 'string', format: 'binary' } },
+              },
+            },
+          },
+        },
+        responses: {
+          201: { description: 'created' },
+          413: { description: 'file too large' },
+          415: { description: 'not multipart/form-data' },
+        },
+      },
+    },
+    '/api/v1/attachments/{id}': {
+      get: { summary: 'Get an attachment\'s metadata', responses: { 200: { description: 'ok' } } },
+      delete: {
+        summary: 'Delete an attachment (uploader or admin)',
+        responses: { 200: { description: 'deleted' }, 403: { description: 'not uploader/admin' } },
+      },
+    },
+    '/api/v1/attachments/{id}/blob': {
+      get: {
+        summary: 'Stream an attachment\'s bytes',
+        description:
+          'Streams the file. Images + PDFs are served inline; everything else as an ' +
+          'attachment download. Append ?download=1 to force download. Same-origin ' +
+          '(cookie/bearer authorizes it); nosniff + private cache.',
+        parameters: [{ name: 'download', in: 'query', schema: { type: 'string', enum: ['1'] } }],
+        responses: { 200: { description: 'ok' }, 404: { description: 'not found' } },
       },
     },
     '/api/v1/cards/{id}/comments/{commentId}': {

@@ -59,6 +59,12 @@ import {
   handlePatchWebhook,
   handleDeleteWebhook,
 } from './routes/webhooks';
+import {
+  handleUploadAttachment,
+  handleGetAttachment,
+  handleGetAttachmentBlob,
+  handleDeleteAttachment,
+} from './routes/attachments';
 import type { AccessScope } from './auth/access';
 import { handleOpenApi } from './openapi';
 
@@ -174,4 +180,11 @@ export const routes: Route[] = [
   { method: 'GET', pattern: '/api/v1/cards/:id/timeline', access: { kind: 'card', param: 'id' }, handler: handleListTimeline },
   { method: 'POST', pattern: '/api/v1/cards/:id/comments', access: { kind: 'card', param: 'id' }, handler: handleAddComment },
   { method: 'DELETE', pattern: '/api/v1/cards/:id/comments/:commentId', access: { kind: 'card', param: 'id' }, handler: handleRedactComment },
+
+  // ── Attachments (v0.16.0) ── upload is card-scoped; the rest resolve
+  // attachment → card → project via the `attachment` access scope.
+  { method: 'POST', pattern: '/api/v1/cards/:id/attachments', access: { kind: 'card', param: 'id' }, handler: handleUploadAttachment },
+  { method: 'GET', pattern: '/api/v1/attachments/:id', access: { kind: 'attachment', param: 'id' }, handler: handleGetAttachment },
+  { method: 'GET', pattern: '/api/v1/attachments/:id/blob', access: { kind: 'attachment', param: 'id' }, handler: handleGetAttachmentBlob },
+  { method: 'DELETE', pattern: '/api/v1/attachments/:id', access: { kind: 'attachment', param: 'id' }, handler: handleDeleteAttachment },
 ];
