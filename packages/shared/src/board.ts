@@ -70,6 +70,9 @@ export interface CardDto {
   color: string | null;
   position: number;
   assigneeUserId: string | null;
+  /** Who a review-lane card is waiting on (v0.17.0, KBR-61). A pointer, not a
+   *  workflow: set on handback (default: the card's creator), cleared freely. */
+  reviewerUserId: string | null;
   createdBy: string;
   updatedBy: string;
   createdAt: number;
@@ -78,6 +81,9 @@ export interface CardDto {
   attachments?: AttachmentDto[];
   /** Per-kind attachment counts (v0.16.0). Present on the board list endpoint. */
   attachmentCounts?: AttachmentCounts;
+  /** Task-list progress across description + acceptanceCriteria (v0.17.0,
+   *  KBR-59). Present on the board list endpoint when the card has any. */
+  taskCounts?: { done: number; total: number };
 }
 
 /**
@@ -88,6 +94,17 @@ export interface CardDto {
 export interface QueueCardDto extends CardDto {
   projectCode: string | null;
   projectName: string;
+}
+
+/**
+ * GET /me/queue (v0.17.0 shape, KBR-61): two typed sections so a caller can
+ * tell "do this" from "review this".
+ *  - `work`: cards assigned to me sitting in a `ready`-role column.
+ *  - `review`: cards where I'm the reviewer sitting in a `review`-role column.
+ */
+export interface MyQueueResponse {
+  work: QueueCardDto[];
+  review: QueueCardDto[];
 }
 
 // ── shared field validators ────────────────────────────────
@@ -152,6 +169,7 @@ export const createCardInput = z.object({
   acceptanceCriteria: longText,
   columnId: idRef.optional(), // defaults to the first column server-side
   assigneeUserId: idRef.nullable().optional(),
+  reviewerUserId: idRef.nullable().optional(),
   position,
 });
 export type CreateCardInput = z.infer<typeof createCardInput>;
@@ -163,6 +181,7 @@ export const patchCardInput = z.object({
   acceptanceCriteria: longText,
   columnId: idRef.optional(),
   assigneeUserId: idRef.nullable().optional(),
+  reviewerUserId: idRef.nullable().optional(),
   position,
 });
 export type PatchCardInput = z.infer<typeof patchCardInput>;

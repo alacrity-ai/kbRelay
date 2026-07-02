@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CardDto, ColumnDto, UserDto, MentionSourceKind, AttachmentDto } from '@kbrelay/shared';
-import { UNASSIGNED_COLOR } from '@kbrelay/shared';
+import { UNASSIGNED_COLOR, toggleTaskAtLine } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
 import { attachmentMarkdown, stripAttachmentMarkdown } from '../lib/attachments';
@@ -72,6 +72,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
   const [acceptance, setAcceptance] = useState(card?.acceptanceCriteria ?? '');
   const [columnId, setColumnId] = useState(card?.columnId ?? createInColumnId ?? columns[0]?.id ?? '');
   const [assignee, setAssignee] = useState(card?.assigneeUserId ?? '');
+  const [reviewer, setReviewer] = useState(card?.reviewerUserId ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -159,6 +160,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
         acceptanceCriteria: acceptance || null,
         columnId,
         assigneeUserId: assignee || null,
+        reviewerUserId: reviewer || null,
       });
       return saved.id;
     } catch (err) {
@@ -180,6 +182,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
     setAcceptance(card?.acceptanceCriteria ?? '');
     setColumnId(card?.columnId ?? columns[0]?.id ?? '');
     setAssignee(card?.assigneeUserId ?? '');
+    setReviewer(card?.reviewerUserId ?? '');
     setError(null);
     setEditing(true);
   }
@@ -204,12 +207,32 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
         acceptanceCriteria: acceptance || null,
         columnId,
         assigneeUserId: assignee || null,
+        reviewerUserId: reviewer || null,
       });
       // Board adopts the saved card (new or existing) into the modal, so drop to
       // view rather than closing — you see what you just created/edited.
       setEditing(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Interactive checklists (v0.17.0, KBR-59): a view-mode checkbox click
+  // toggles that source line. Re-fetch first so a toggle can't clobber a
+  // fresher edit; if the line no longer holds a task item, silently skip.
+  async function toggleTask(field: 'description' | 'acceptanceCriteria', line: number) {
+    if (!card || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { card: fresh } = await api.getCard(card.id);
+      const src = field === 'description' ? fresh.description : fresh.acceptanceCriteria;
+      const next = src ? toggleTaskAtLine(src, line) : null;
+      if (next != null) await onSave({ [field]: next });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update checklist');
     } finally {
       setBusy(false);
     }
@@ -315,6 +338,13 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
                     {users.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.kind})</option>)}
                   </select>
                 </div>
+                <div className="field">
+                  <label>Reviewer</label>
+                  <select value={reviewer} onChange={(e) => setReviewer(e.target.value)}>
+                    <option value="">No reviewer</option>
+                    {users.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.kind})</option>)}
+                  </select>
+                </div>
               </div>
               <p className="muted-note" style={{ fontSize: '0.8rem' }}>
                 The card takes on its assignee's color.
@@ -346,6 +376,20 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
                     ) : 'Unassigned'}
                   </span>
                 </div>
+                {card!.reviewerUserId && (
+                  <div className="view-section">
+                    <span className="view-label">Reviewer</span>
+                    <span className="pill">
+                      <span className="dot" style={{ background: userColor(card!.reviewerUserId) }} />
+                      {userName(card!.reviewerUserId)}
+                      {userKind(card!.reviewerUserId) && (
+                        <span className={`kind-badge ${userKind(card!.reviewerUserId)}`}>
+                          {userKind(card!.reviewerUserId)}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="view-section">
@@ -367,7 +411,11 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
               <div className="view-section" ref={descRef}>
                 <span className="view-label">Description</span>
                 <div className={`view-text ${card!.description ? '' : 'empty'}`}>
-                  {card!.description ? <Markdown users={users}>{card!.description}</Markdown> : 'No description.'}
+                  {card!.description ? (
+                    <Markdown users={users} onToggleTask={(line) => void toggleTask('description', line)}>
+                      {card!.description}
+                    </Markdown>
+                  ) : 'No description.'}
                 </div>
                 {/* View mode is read-only: download/view, but no ✕ (removing is
                     an edit action). */}
@@ -382,7 +430,11 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
               <div className="view-section" ref={acRef}>
                 <span className="view-label">Acceptance criteria</span>
                 <div className={`view-text ${card!.acceptanceCriteria ? '' : 'empty'}`}>
-                  {card!.acceptanceCriteria ? <Markdown users={users}>{card!.acceptanceCriteria}</Markdown> : 'None set.'}
+                  {card!.acceptanceCriteria ? (
+                    <Markdown users={users} onToggleTask={(line) => void toggleTask('acceptanceCriteria', line)}>
+                      {card!.acceptanceCriteria}
+                    </Markdown>
+                  ) : 'None set.'}
                 </div>
               </div>
 

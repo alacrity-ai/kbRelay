@@ -80,6 +80,10 @@ export const OPENAPI_SPEC = {
           color: { type: ['string', 'null'] },
           position: { type: 'number' },
           assigneeUserId: { type: ['string', 'null'] },
+          reviewerUserId: {
+            type: ['string', 'null'],
+            description: 'Who a review-lane card is waiting on (v0.17.0). Set on handback; a pointer, not an approval workflow.',
+          },
           createdBy: { type: 'string' },
           updatedBy: { type: 'string' },
           createdAt: { type: 'integer' },
@@ -92,6 +96,13 @@ export const OPENAPI_SPEC = {
           attachmentCounts: {
             $ref: '#/components/schemas/AttachmentCounts',
             description: 'Per-kind attachment counts (v0.16.0). Present on the board list endpoint.',
+          },
+          taskCounts: {
+            type: 'object',
+            description:
+              'GFM task-list progress across description + acceptanceCriteria (v0.17.0). ' +
+              'Present on the board list endpoint when the card has any task items.',
+            properties: { done: { type: 'integer' }, total: { type: 'integer' } },
           },
         },
       },
@@ -488,7 +499,11 @@ export const OPENAPI_SPEC = {
     },
     '/api/v1/me/queue': {
       get: {
-        summary: 'Your actionable queue — cards assigned to you in a `ready`-role column',
+        summary: 'Your actionable queue — { work, review } (v0.17.0 shape)',
+        description:
+          'Two typed sections: `work` = cards assigned to you in a `ready`-role column ' +
+          '(do these); `review` = cards where you are the reviewer in a `review`-role ' +
+          'column (verify these). Both RBAC-scoped, newest-updated first.',
         parameters: [
           { name: 'projectId', in: 'query', schema: { type: 'string' }, description: 'Narrow to one project.' },
         ],
@@ -586,6 +601,33 @@ export const OPENAPI_SPEC = {
         responses: { 200: { description: 'ok' } },
       },
       delete: { summary: 'Delete a card', responses: { 200: { description: 'ok' } } },
+    },
+    '/api/v1/search': {
+      get: {
+        summary: 'Global quick-find — cards by key/summary, projects by name/code',
+        description:
+          'Tenant-wide, RBAC-filtered to your accessible projects. Ranks an exact ' +
+          'ticket key ("KBR-3") above key prefixes, then project name/code hits, ' +
+          'then card-summary substrings. v1 does NOT search descriptions/comments. ' +
+          '`q` min 2 chars (400 below); `limit` default 20, max 50.',
+        parameters: [
+          { name: 'q', in: 'query', required: true, schema: { type: 'string', minLength: 2 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 20, maximum: 50 } },
+        ],
+        responses: { 200: { description: 'ok' }, 400: { description: 'q too short' } },
+      },
+    },
+    '/api/v1/projects/{id}/events': {
+      get: {
+        summary: 'Project activity feed — newest-first card events across the board',
+        description:
+          'Paginated union of the project\'s card timelines (system events + comments), ' +
+          'each enriched with cardKey + cardSummary. `?since=<unix ms>` lower-bounds, ' +
+          '`?limit=` caps the page (default 50, max 200), `?cursor=` (from nextCursor) ' +
+          'pages older. Redacted comments appear as tombstones. Use it to catch up on ' +
+          '"what happened on this board" without opening cards one by one.',
+        responses: { 200: { description: 'ok' } },
+      },
     },
     '/api/v1/cards/{id}/timeline': {
       get: {

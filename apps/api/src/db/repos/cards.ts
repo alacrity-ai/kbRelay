@@ -3,6 +3,7 @@ import type { DbStatement } from '../../runtime/shared/db';
 import type {
   CardDto,
   QueueCardDto,
+  MyQueueResponse,
   CreateCardInput,
   PatchCardInput,
   SystemEventType,
@@ -56,6 +57,7 @@ interface CardRow {
   color: string | null;
   position: number;
   assignee_user_id: string | null;
+  reviewer_user_id: string | null;
   created_by: string;
   updated_by: string;
   created_at: number;
@@ -76,6 +78,7 @@ function toDto(r: CardRow, code: string | null): CardDto {
     color: r.color,
     position: r.position,
     assigneeUserId: r.assignee_user_id,
+    reviewerUserId: r.reviewer_user_id,
     createdBy: r.created_by,
     updatedBy: r.updated_by,
     createdAt: r.created_at,
@@ -124,20 +127,17 @@ interface QueueRow extends CardRow {
   project_name: string;
 }
 
-/**
- * The caller's actionable queue (v0.15.0): cards assigned to `userId` that sit
- * in a `ready`-role column. RBAC-scoped exactly like `listMentions` — an admin
- * sees all; a member only cards in projects they have `project_access` to.
- * Optional `projectId` narrows to one project. Newest-updated first.
- */
-export async function listMyQueue(
+/** One RBAC-scoped queue section: cards where `whoCol` = userId in a `role` column. */
+async function queueSection(
   env: Env,
   tenantId: string,
   userId: string,
   opts: { isAdmin: boolean; projectId?: string },
+  whoCol: 'assignee_user_id' | 'reviewer_user_id',
+  role: 'ready' | 'review',
 ): Promise<QueueCardDto[]> {
-  const clauses = ['c.tenant_id = ?', 'c.assignee_user_id = ?', "col.role = 'ready'"];
-  const binds: unknown[] = [tenantId, userId];
+  const clauses = ['c.tenant_id = ?', `c.${whoCol} = ?`, 'col.role = ?'];
+  const binds: unknown[] = [tenantId, userId, role];
   if (opts.projectId) {
     clauses.push('c.project_id = ?');
     binds.push(opts.projectId);
@@ -161,6 +161,27 @@ export async function listMyQueue(
     projectCode: r.project_code,
     projectName: r.project_name,
   }));
+}
+
+/**
+ * The caller's actionable queue (v0.15.0; two sections since v0.17.0/KBR-61):
+ *  - `work`: cards assigned to `userId` sitting in a `ready`-role column.
+ *  - `review`: cards where `userId` is the reviewer sitting in a `review`-role column.
+ * RBAC-scoped exactly like `listMentions` — an admin sees all; a member only
+ * cards in projects they have `project_access` to. Optional `projectId`
+ * narrows to one project. Newest-updated first.
+ */
+export async function listMyQueue(
+  env: Env,
+  tenantId: string,
+  userId: string,
+  opts: { isAdmin: boolean; projectId?: string },
+): Promise<MyQueueResponse> {
+  const [work, review] = await Promise.all([
+    queueSection(env, tenantId, userId, opts, 'assignee_user_id', 'ready'),
+    queueSection(env, tenantId, userId, opts, 'reviewer_user_id', 'review'),
+  ]);
+  return { work, review };
 }
 
 async function getCardRow(env: Env, tenantId: string, id: string): Promise<CardRow | null> {
@@ -201,6 +222,12 @@ export async function createCard(
     !(await userHasProjectAccess(env, tenantId, projectId, input.assigneeUserId))
   ) {
     throw new HttpError(400, 'assignee has no access to this project');
+  }
+  if (
+    input.reviewerUserId &&
+    !(await userHasProjectAccess(env, tenantId, projectId, input.reviewerUserId))
+  ) {
+    throw new HttpError(400, 'reviewer has no access to this project');
   }
 
   // Append to the end of the target column unless a position is pinned.
@@ -248,12 +275,12 @@ export async function createCard(
     env.db.prepare(
       `INSERT INTO cards
          (id, tenant_id, project_id, column_id, seq, summary, description, acceptance_criteria,
-          color, position, assignee_user_id, created_by, updated_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          color, position, assignee_user_id, reviewer_user_id, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       id, tenantId, projectId, columnId, seq, input.summary,
       input.description ?? null, input.acceptanceCriteria ?? null, null, // card color removed (v0.2.0)
-      position, input.assigneeUserId ?? null, userId, userId, now, now,
+      position, input.assigneeUserId ?? null, input.reviewerUserId ?? null, userId, userId, now, now,
     ),
     insertEventStmt(env, {
       tenantId, cardId: id, authorUserId: userId,
@@ -296,6 +323,13 @@ export async function patchCard(
   ) {
     throw new HttpError(400, 'assignee has no access to this project');
   }
+  if (
+    input.reviewerUserId !== undefined &&
+    input.reviewerUserId !== null &&
+    !(await userHasProjectAccess(env, tenantId, existing.project_id, input.reviewerUserId))
+  ) {
+    throw new HttpError(400, 'reviewer has no access to this project');
+  }
 
   const next = {
     summary: input.summary ?? existing.summary,
@@ -307,6 +341,8 @@ export async function patchCard(
     position: input.position ?? existing.position,
     assignee_user_id:
       input.assigneeUserId === undefined ? existing.assignee_user_id : input.assigneeUserId,
+    reviewer_user_id:
+      input.reviewerUserId === undefined ? existing.reviewer_user_id : input.reviewerUserId,
   };
 
   // Derive system timeline events from what actually changed. Provenance is no
@@ -330,6 +366,9 @@ export async function patchCard(
   if (next.assignee_user_id !== existing.assignee_user_id) {
     events.push(ev('assigned', { from: existing.assignee_user_id, to: next.assignee_user_id }));
   }
+  if (next.reviewer_user_id !== existing.reviewer_user_id) {
+    events.push(ev('reviewer', { from: existing.reviewer_user_id, to: next.reviewer_user_id }));
+  }
   const editedFields: string[] = [];
   if (next.summary !== existing.summary) editedFields.push('summary');
   if (next.description !== existing.description) editedFields.push('description');
@@ -338,11 +377,11 @@ export async function patchCard(
 
   const updateStmt = env.db.prepare(
     `UPDATE cards SET summary = ?, description = ?, acceptance_criteria = ?, color = ?,
-        column_id = ?, position = ?, assignee_user_id = ?, updated_by = ?, updated_at = ?
+        column_id = ?, position = ?, assignee_user_id = ?, reviewer_user_id = ?, updated_by = ?, updated_at = ?
       WHERE id = ? AND tenant_id = ?`,
   ).bind(
     next.summary, next.description, next.acceptance_criteria, next.color,
-    next.column_id, next.position, next.assignee_user_id, userId, Date.now(),
+    next.column_id, next.position, next.assignee_user_id, next.reviewer_user_id, userId, Date.now(),
     id, tenantId,
   );
 

@@ -4,22 +4,26 @@ import type { CardDto, UserDto } from '@kbrelay/shared';
 /** A client-side board filter. Empty facets mean "show all". */
 export interface BoardFilter {
   assignees: string[]; // show only cards assigned to these users; [] = all
+  reviewers: string[]; // show only cards awaiting review by these users (v0.17.0); [] = all
   query: string; // show only cards whose summary/key contains this (case-insensitive); '' = all
 }
 
-export const EMPTY_FILTER: BoardFilter = { assignees: [], query: '' };
+export const EMPTY_FILTER: BoardFilter = { assignees: [], reviewers: [], query: '' };
 
 export function isFilterActive(f: BoardFilter): boolean {
-  return f.assignees.length > 0 || f.query.trim() !== '';
+  return f.assignees.length > 0 || f.reviewers.length > 0 || f.query.trim() !== '';
 }
 
 /** How many facets are active — shown as a badge on the filter button. */
 export function filterCount(f: BoardFilter): number {
-  return f.assignees.length + (f.query.trim() ? 1 : 0);
+  return f.assignees.length + f.reviewers.length + (f.query.trim() ? 1 : 0);
 }
 
 export function cardMatchesFilter(card: CardDto, f: BoardFilter): boolean {
   if (f.assignees.length > 0 && (!card.assigneeUserId || !f.assignees.includes(card.assigneeUserId))) {
+    return false;
+  }
+  if (f.reviewers.length > 0 && (!card.reviewerUserId || !f.reviewers.includes(card.reviewerUserId))) {
     return false;
   }
   const q = f.query.trim().toLowerCase();
@@ -45,18 +49,23 @@ export default function FilterModal({
   onClear: () => void;
 }) {
   const [assignees, setAssignees] = useState<string[]>(initial.assignees);
+  const [reviewers, setReviewers] = useState<string[]>(initial.reviewers);
   const [query, setQuery] = useState(initial.query);
 
-  const apply = () => onApply({ assignees, query: query.trim() });
+  const apply = () => onApply({ assignees, reviewers, query: query.trim() });
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onApply({ assignees, query: query.trim() }); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onApply({ assignees, reviewers, query: query.trim() }); };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [assignees, query, onApply]);
+  }, [assignees, reviewers, query, onApply]);
 
   function toggle(id: string) {
     setAssignees((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
+  }
+
+  function toggleReviewer(id: string) {
+    setReviewers((r) => (r.includes(id) ? r.filter((x) => x !== id) : [...r, id]));
   }
 
   return (
@@ -87,6 +96,23 @@ export default function FilterModal({
               ))}
             </div>
             <p className="muted-note">No one selected = show all assignees.</p>
+          </div>
+
+          <div className="view-section">
+            <div className="filter-section-head">
+              <span className="view-label">Reviewer</span>
+              <button className="subtle filter-mine" onClick={() => setReviewers([meId])}>Awaiting my review</button>
+            </div>
+            <div className="filter-users">
+              {users.map((u) => (
+                <label className="filter-user-row" key={u.id}>
+                  <input type="checkbox" checked={reviewers.includes(u.id)} onChange={() => toggleReviewer(u.id)} />
+                  <span className="dot" style={{ background: u.color }} />
+                  <span className="filter-user-name">{u.name}{u.id === meId ? ' (You)' : ''}</span>
+                  <span className={`kind-badge ${u.kind}`}>{u.kind}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
           <div className="field">

@@ -10,7 +10,8 @@ import { z } from 'zod';
  */
 
 export type CardEventKind = 'system' | 'note' | 'handoff';
-export type SystemEventType = 'created' | 'moved' | 'assigned' | 'edited';
+/** `reviewer` (v0.17.0): the reviewer pointer changed — meta {from, to}. */
+export type SystemEventType = 'created' | 'moved' | 'assigned' | 'edited' | 'reviewer';
 
 /** Wire shape of a timeline entry (GET /cards/:id/timeline). */
 export interface CardEventDto {
@@ -29,6 +30,23 @@ export interface CardEventDto {
   /** Redaction tombstone: when a comment was soft-deleted, and by whom. Null = live. */
   deletedAt: number | null;
   deletedBy: string | null;
+}
+
+/**
+ * Project activity feed (v0.17.0, KBR-67): a card event enriched with its
+ * card's key + summary, so a feed row is readable without a follow-up lookup.
+ * GET /projects/:id/events — newest-first, cursor-paginated.
+ */
+export interface ProjectEventDto extends CardEventDto {
+  /** Human ticket key (e.g. "KBR-12"); null if the project pre-dates codes. */
+  cardKey: string | null;
+  cardSummary: string;
+}
+
+export interface ProjectEventsResponse {
+  events: ProjectEventDto[];
+  /** Pass back as ?cursor= to fetch the next (older) page. Null = end. */
+  nextCursor: string | null;
 }
 
 /**

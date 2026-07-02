@@ -1,6 +1,6 @@
 import type { Env } from '../../env';
 import type { DbStatement } from '../../runtime/shared/db';
-import type { CardEventDto, CardEventKind, SystemEventType, CreateCommentInput, WebhookTrigger } from '@kbrelay/shared';
+import type { CardEventDto, CardEventKind, SystemEventType, CreateCommentInput, ProjectEventDto, ProjectEventsResponse, WebhookTrigger } from '@kbrelay/shared';
 import { classifyRedaction } from '@kbrelay/shared';
 import { HttpError } from '../../http';
 import { newId } from '../ids';
@@ -82,6 +82,71 @@ export function insertEventStmt(env: Env, e: EventInsert): DbStatement {
     e.meta ? JSON.stringify(e.meta) : null,
     Date.now(),
   );
+}
+
+/** Feed page size bounds (v0.17.0). */
+const FEED_DEFAULT_LIMIT = 50;
+const FEED_MAX_LIMIT = 200;
+
+/** Opaque feed cursor: "<createdAt>_<eventId>". Malformed input ⇒ null (start). */
+function parseFeedCursor(cursor: string | undefined): { ts: number; id: string } | null {
+  if (!cursor) return null;
+  const sep = cursor.indexOf('_');
+  if (sep <= 0) return null;
+  const ts = Number(cursor.slice(0, sep));
+  const id = cursor.slice(sep + 1);
+  return Number.isFinite(ts) && id ? { ts, id } : null;
+}
+
+/**
+ * Project activity feed (v0.17.0, KBR-67): newest-first union of the project's
+ * card timelines, each event enriched with its card's key + summary. A pure
+ * projection — zero new writes; redacted comments surface as tombstones via
+ * `toDto` exactly like the card timeline. `card_events` has no project_id, so
+ * we join through cards (measured fine at current scale; denormalize only if
+ * it ever hurts).
+ */
+export async function listProjectEvents(
+  env: Env,
+  tenantId: string,
+  projectId: string,
+  opts: { since?: number; limit?: number; cursor?: string } = {},
+): Promise<ProjectEventsResponse> {
+  const limit = Math.min(Math.max(Math.trunc(opts.limit ?? FEED_DEFAULT_LIMIT), 1), FEED_MAX_LIMIT);
+  const conds = ['c.project_id = ?', 'e.tenant_id = ?'];
+  const binds: (string | number)[] = [projectId, tenantId];
+  if (opts.since != null) {
+    conds.push('e.created_at >= ?');
+    binds.push(opts.since);
+  }
+  const cur = parseFeedCursor(opts.cursor);
+  if (cur) {
+    conds.push('(e.created_at < ? OR (e.created_at = ? AND e.id < ?))');
+    binds.push(cur.ts, cur.ts, cur.id);
+  }
+  // Fetch one extra row to know whether another page exists.
+  const rs = await env.db.prepare(
+    `SELECT e.*, c.seq AS card_seq, c.summary AS card_summary, p.code AS project_code
+       FROM card_events e
+       JOIN cards c ON c.id = e.card_id AND c.tenant_id = e.tenant_id
+       JOIN projects p ON p.id = c.project_id AND p.tenant_id = c.tenant_id
+      WHERE ${conds.join(' AND ')}
+      ORDER BY e.created_at DESC, e.id DESC
+      LIMIT ?`,
+  )
+    .bind(...binds, limit + 1)
+    .all<CardEventRow & { card_seq: number | null; card_summary: string; project_code: string | null }>();
+
+  const rows = rs.results ?? [];
+  const page = rows.slice(0, limit);
+  const events: ProjectEventDto[] = page.map((r) => ({
+    ...toDto(r),
+    cardKey: r.project_code && r.card_seq != null ? `${r.project_code}-${r.card_seq}` : null,
+    cardSummary: r.card_summary,
+  }));
+  const last = page[page.length - 1];
+  const nextCursor = rows.length > limit && last ? `${last.created_at}_${last.id}` : null;
+  return { events, nextCursor };
 }
 
 /** All timeline entries for a card, oldest → newest (a log reads top-down). */

@@ -43,7 +43,7 @@ const attachment = (over: Partial<AttachmentDto>): AttachmentDto => ({
 const savedCard = (): CardDto => ({
   id: 'card_new', projectId: 'p1', columnId: 'col1', key: 'KBR-99', seq: 99,
   summary: 'My card', description: 'Hello', acceptanceCriteria: null, color: null,
-  position: 1000, assigneeUserId: null, createdBy: 'u1', updatedBy: 'u1',
+  position: 1000, assigneeUserId: null, reviewerUserId: null, createdBy: 'u1', updatedBy: 'u1',
   createdAt: 0, updatedAt: 1, attachments: [],
 } as CardDto);
 

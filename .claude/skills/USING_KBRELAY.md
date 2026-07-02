@@ -1,10 +1,8 @@
 # Using kbRelay (agent skill)
 
-# NOTE: Deprecated 7/1/2026 - We now use MCP (@alacrity-ai/kbrelaymcp)
-
-Everything below this line is now deprecated - the API exists, but using the MCP should be your primary pathway
-
 **kbRelay** is a shared kanban board where humans and agents relay work to each other. If you're an agent, this is where you pick up tasks a human filed for you, and where you file tasks back for a human. This doc takes you from knowing nothing to using it in minutes.
+
+> **The MCP is your primary pathway (since 2026-07-01).** If your runtime has the `@alacrity-ai/kbrelaymcp` MCP server configured (Claude Code in the kbRelay repo does — server name `kbrelay`), use its 20 typed tools instead of raw curl; §1.5 maps every tool to its endpoint. The HTTP surface documented below is still fully supported and accurate — it's the fallback when you have no MCP client, and the only path for the few things the MCP doesn't wrap (webhook admin, token self-management, column management). The concepts (§2), the handback contract (§2.5), and the etiquette (§6) apply identically to both paths.
 
 - **Where:** `https://kbrelay.lalalimited.com`
 - **API base:** `https://kbrelay.lalalimited.com/api`
@@ -45,10 +43,39 @@ Confirm who you are:
 ```bash
 kbget $KB/v1/me
 # → {"tenant":{"id":"t_lala","name":"LaLa Solutions","slug":"lala"},
-#    "user":{"id":"u_claude","name":"Claude","kind":"agent","role":"owner"}}
+#    "user":{"id":"u_claude","name":"Claude","kind":"agent","role":"admin"}}
 ```
 
 Remember your own `user.id` (e.g. `u_claude`) — you'll use it to find work assigned to you and to stamp cards you create.
+
+---
+
+## 1.5 The MCP server — the primary pathway
+
+The published MCP server **`@alacrity-ai/kbrelaymcp`** (`packages/mcp`, currently `0.5.0`) is a thin stdio client over the same HTTP API — same token, same tenant scoping, same RBAC. Add it to any MCP client once:
+
+```bash
+claude mcp add kbrelay --scope user \
+  --env KBRELAY_BASE_URL=https://kbrelay.lalalimited.com \
+  --env KBRELAY_API_KEY=<a key minted for an agent user> \
+  -- npx -y @alacrity-ai/kbrelaymcp
+```
+
+The 20 tools and where they land on the API:
+
+| MCP tool | HTTP equivalent |
+|---|---|
+| `whoami` | `GET /v1/me` |
+| `list_users` | `GET /v1/users` |
+| `list_my_queue` | `GET /v1/me/queue` — **your actionable work; start here** |
+| `list_projects` · `get_project` · `create_project` · `update_project` | `GET/POST /v1/projects` · `GET/PATCH /v1/projects/{id}` (`get_project` includes columns + roles) |
+| `get_project_activity` | `GET /v1/projects/{id}/events` — the board's newest-first activity feed (v0.17.0); catch up before working a shared project |
+| `list_cards` · `get_card` · `create_card` · `update_card` · `delete_card` | `GET/POST /v1/projects/{id}/cards` · `GET/PATCH/DELETE /v1/cards/{id}` |
+| `get_timeline` · `add_comment` · `redact_comment` | `GET /v1/cards/{id}/timeline` · `POST /v1/cards/{id}/comments` (accepts `attachmentIds`) · `DELETE …/comments/{commentId}` |
+| `add_attachment` · `delete_attachment` | `POST /v1/cards/{id}/attachments` (multipart; the tool takes `filePath` or base64, ≤25 MB, returns a markdown snippet) · `DELETE /v1/attachments/{id}` (v0.17.0) |
+| `get_mentions` · `mark_mentions_read` | `GET /v1/me/mentions` · `POST /v1/me/mentions/read` |
+
+Not wrapped by the MCP (use HTTP): attachment *download* (`get_card` surfaces each attachment's URL — fetch it with your bearer token), webhook admin, `PATCH /me`, token self-management, team/agent admin, and column create/edit/delete.
 
 ---
 
@@ -57,11 +84,13 @@ Remember your own `user.id` (e.g. `u_claude`) — you'll use it to find work ass
 ```
 tenant ── has many ── users (kind: "human" | "agent")   ← Leif, Joe (human); Claude (agent)
    └───── has many ── projects
-                          └── columns   (lanes: Todo, In Progress, In Review, Done — customizable)
+                          └── columns   (lanes — customizable; new projects seed
+                                         Backlog · Blocked · Ready · In Progress · In Review · Done,
+                                         with semantic roles pre-wired)
                                  └── cards   (the tasks)
 ```
 
-- **A card's status *is* its column.** Moving a card from "Todo" to "In Progress" = changing its `columnId`. There's no separate status field.
+- **A card's status *is* its column.** Moving a card from "Ready" to "In Progress" = changing its `columnId`. There's no separate status field.
 - **Provenance is automatic.** Whatever token makes a change stamps the card's `created_by` / `updated_by`. So the board always shows *who* (and whether human or agent) created and last touched a card.
 - **Spec vs. log — this is the important one.** A card has two kinds of text:
   - the **spec** — `description` + `acceptanceCriteria`: *what to do / how we'll know it's done*. **Rewrite it in place** to improve the plan.
@@ -69,7 +98,7 @@ tenant ── has many ── users (kind: "human" | "agent")   ← Leif, Joe (h
   Moving/assigning/editing a card auto-emits a **system event** to the timeline (durable who-did-what-when — not just last-write). To report results, **post a comment** (`note` or `handoff`); don't edit the description.
 - **Write in markdown — always.** `description`, `acceptanceCriteria`, and timeline comment/handoff **bodies** render as **GitHub-flavored markdown** in the board's view mode. Default to markdown: use `##` headings, `-` bullets, `- [ ]` task lists, `` `code` `` / fenced ```` ``` ```` blocks, tables, `> quotes`, `**bold**`, and `[text](url)` links. A single newline is a line break. (Titles and the handoff `summary`/slot lists stay plain — don't format those.)
 - **Ordering** within a column is a numeric `position` (drag-and-drop uses fractional midpoints). Bigger = lower in the list.
-- **Column IDs are per-project and not guessable.** Always fetch a project's columns and map them **by name** — never hardcode a column id across projects.
+- **Column IDs are per-project and not guessable.** Always fetch a project's columns and map them **by `role`** (fall back to name only for role-less lanes) — never hardcode a column id across projects.
 - **@-mentions are your inbox.** Write `@handle` (e.g. `@leif`, `@claude`) in a `description`, `acceptanceCriteria`, or a comment `body` to notify that user. Your own mentions are at **`GET /v1/me/mentions`** — this is how you find "what did people ask me?" See §4.5.
 - **Column roles are the flow (v0.15.0).** A column may carry a semantic **`role`** — `ready | in_progress | review | done | blocked` (or none). Roles, not names, define the flow, so resolve target lanes **by role**, never by hardcoded name. **Your actionable work = cards assigned to you in a `ready`-role column** — get it in one call from **`GET /v1/me/queue`** (MCP: `list_my_queue`). See §2.5 for the handback contract.
 
@@ -81,9 +110,9 @@ tenant ── has many ── users (kind: "human" | "agent")   ← Leif, Joe (h
 
 Key shapes:
 - **Card:** `{ id, projectId, columnId, key, seq, summary, description, acceptanceCriteria, color, position, assigneeUserId, createdBy, updatedBy, createdAt, updatedAt }` — `key` (e.g. `"OBL-1"`) and `seq` are auto; `summary` is the text. **Attachments (v0.16.0):** single-card GET also returns `attachments[]` (each `{ id, kind, filename, sizeBytes, url }`); the board list returns `attachmentCounts`. Upload via `POST /cards/:id/attachments` (multipart `file`), fetch bytes at `GET /attachments/:id/blob`, delete via `DELETE /attachments/:id`; link an upload to a note/handoff by passing its id in the comment's `attachmentIds`.
-- **Column:** `{ id, projectId, name, color, position }`
-- **Project:** `{ id, name, code, description, color, status, createdBy, cardCount? }` — `code` drives ticket keys; `cardCount` (total tickets) is present on the list endpoint only.
-- **User:** `{ id, name, kind, role, color, handle }` — `handle` (e.g. `"leif"`) is what you `@`-mention.
+- **Column:** `{ id, projectId, name, color, position, role }` — `role` is `ready | in_progress | review | done | blocked` or `null` (neutral); at most one column per role per project.
+- **Project:** `{ id, name, code, description, color, status, agentEventsEnabled, createdBy, cardCount? }` — `code` drives ticket keys; `agentEventsEnabled` is the per-project valve for agent-event webhooks (v0.15.x); `cardCount` (total tickets) is present on the list endpoint only.
+- **User:** `{ id, name, kind, role, color, handle, profile }` — `handle` (e.g. `"leif"`) is what you `@`-mention; `profile` is optional free-text about who they are.
 - **Mention:** `{ id, cardId, cardKey, cardSummary, projectId, projectCode, projectName, source:{kind, commentId}, excerpt, authorUserId, createdAt, readAt }` — one place you were @-mentioned.
 
 ---
@@ -95,10 +124,12 @@ loop*: they meter the work, they see you working, and nothing completes without
 them. Resolve every target column **by role** (from `get_project` /
 `GET /projects/{id}` → each column's `role`), never by name.
 
-1. **Find work.** `GET /v1/me/queue` (MCP `list_my_queue`) — cards assigned to
-   you that sit in a **`ready`**-role column, across every project you can access
-   (optional `?projectId=`). This is your actionable set; work these. *You never
-   grab cards that aren't assigned to you, and never cards outside `ready`.*
+1. **Find work.** `GET /v1/me/queue` (MCP `list_my_queue`) — since v0.17.0 it
+   returns **two typed sections**: `work` = cards assigned to you in a
+   **`ready`**-role column (do these), and `review` = cards where **you are the
+   reviewer** in a `review`-role column (verify these). Across every project you
+   can access (optional `?projectId=`). *You never grab cards that aren't
+   assigned to you, and never cards outside `ready`.*
 2. **Take it.** Move the card to the **`in_progress`**-role column **and** post a
    one-line note ("On it — <plan>."). Do this *immediately* on pickup so the
    human sees it's being worked — don't work a card silently.
@@ -106,9 +137,11 @@ them. Resolve every target column **by role** (from `get_project` /
 4. **If blocked:** move the card to the **`blocked`**-role column and post a
    comment explaining the blocker + what you need, `@`-mentioning the requester.
    Then stop — don't guess past a blocker.
-5. **Finish → hand back.** Move the card to the **`review`**-role column and post
-   a **`handoff`** comment (summary / evidence / verify / spunOff), `@`-mentioning
-   the requester so they're notified. **Stop here by default.**
+5. **Finish → hand back.** Move the card to the **`review`**-role column, **set
+   `reviewerUserId` to the requester** (default: the card's `createdBy` — v0.17.0,
+   KBR-61; this puts the card in *their* `review` queue), and post a **`handoff`**
+   comment (summary / evidence / verify / spunOff), `@`-mentioning the requester
+   so they're notified. **Stop here by default.**
 6. **Close only when told.** Move the card to the **`done`**-role column *only*
    when the human explicitly says so ("LGTM", "move to done", "@you close this").
    Closing is the human's call; nothing you do auto-completes.
@@ -145,7 +178,10 @@ All require the bearer token unless marked public.
 | `GET /api/v1/cards/{id}/timeline` | the card's activity log (system events + comments), oldest→newest |
 | `POST /api/v1/cards/{id}/comments` | post a `note` or a `handoff` to the timeline |
 | `DELETE /api/v1/cards/{id}/comments/{commentId}` | **redact** (soft-delete) *your own* comment — leaves a tombstone |
-| `GET /api/v1/me/queue?projectId=` | **your actionable queue** — cards assigned to you in a `ready`-role column (v0.15.0). Work these first |
+| `POST /api/v1/cards/{id}/attachments` | upload a file (multipart `file`, ≤25 MB) → attachment DTO (v0.16.0) |
+| `GET /api/v1/attachments/{id}` · `GET …/{id}/blob` | attachment metadata · the bytes (same-origin stream; `?download=1` forces download) |
+| `DELETE /api/v1/attachments/{id}` | delete an attachment (uploader or admin) |
+| `GET /api/v1/me/queue?projectId=` | **your actionable queue** — `{ work, review }` (v0.17.0): assigned-to-you cards in `ready` + awaiting-your-review cards in `review`. Work these first |
 | `GET /api/v1/me/mentions?status=unread\|read\|all` | **your** @-mentions (default unread). Side-effect-free |
 | `POST /api/v1/me/mentions/read` | acknowledge mentions: `{ "mentionIds": [...] }` or `{ "all": true }` |
 | `PATCH /api/v1/me` | set **your own** color (`{ "color": "#rrggbb" }`) |
@@ -153,13 +189,13 @@ All require the bearer token unless marked public.
 | `POST /api/v1/me/tokens` | mint a token: `{ "label": "…" }` → returns the plaintext **once** |
 | `DELETE /api/v1/me/tokens/{id}` | revoke one of your tokens |
 
-Admin-only endpoints (a member key gets `403`): team management `GET /api/v1/team`, `POST/DELETE /api/v1/team/invites…`, `PATCH/DELETE /api/v1/team/members/{userId}`, `PUT /api/v1/team/members/{userId}/projects`; and **agent users** `GET/POST /api/v1/agents`, `PATCH/DELETE /api/v1/agents/{userId}`, `GET/POST /api/v1/agents/{userId}/tokens`, `DELETE /api/v1/agents/{userId}/tokens/{tokenId}` (create/manage agent identities + their keys).
+Admin-only endpoints (a member key gets `403`): team management `GET /api/v1/team`, `POST/DELETE /api/v1/team/invites…`, `PATCH/DELETE /api/v1/team/members/{userId}`, `PUT /api/v1/team/members/{userId}/projects`; **agent users** `GET/POST /api/v1/agents`, `PATCH/DELETE /api/v1/agents/{userId}`, `GET/POST /api/v1/agents/{userId}/tokens`, `DELETE /api/v1/agents/{userId}/tokens/{tokenId}` (create/manage agent identities + their keys); and **webhook subscriptions** `GET/POST /api/v1/webhooks`, `PATCH/DELETE /api/v1/webhooks/{id}` (v0.15.x push — fires on assign-into-ready + agent @-mention, gated per project by `agentEventsEnabled`).
 
 Human-only auth endpoints (public; cookie-based — agents don't need these): `POST /api/v1/auth/{register,login,logout,forgot-password,reset-password}`, `GET /api/v1/auth/me`.
 
-> **MCP option (v0.13.0+).** Instead of raw curl, an agent runtime can add the published MCP server for typed tools (`whoami`, `list_projects`, `create_project`, `update_project`, `create_card`, `add_comment`, `get_mentions`, `mark_mentions_read`, …): `claude mcp add kbrelay --env KBRELAY_BASE_URL=https://kbrelay.lalalimited.com --env KBRELAY_API_KEY=<token> -- npx -y @alacrity-ai/kbrelaymcp`. It's a thin client over this same API — the token's tenant + RBAC still govern everything. Prefer a key minted for an **agent user** (above) so the MCP's work is attributed to the agent. See `packages/mcp/README.md`.
+> **Prefer the MCP (§1.5).** Every row above that has an MCP tool should be driven through it; the curl surface is the fallback. Prefer a key minted for an **agent user** (§1) so the MCP's work is attributed to the agent. See `packages/mcp/README.md`.
 
-Card create/patch body fields (all optional except `summary` on create): `summary, description, acceptanceCriteria, columnId, assigneeUserId, position`. The ticket **`key`/`seq` are auto-assigned — never sent.** (Card **color** is no longer settable — a card shows in its **assignee's** color; set yours with `PATCH /me`.) The `?q=` list filter matches **`summary`** (+ description).
+Card create/patch body fields (all optional except `summary` on create): `summary, description, acceptanceCriteria, columnId, assigneeUserId, reviewerUserId, position`. The ticket **`key`/`seq` are auto-assigned — never sent.** (Card **color** is no longer settable — a card shows in its **assignee's** color; set yours with `PATCH /me`.) The `?q=` list filter matches **`summary`** (+ description).
 
 Project create/patch body: `name` (required on create), **`code`** (required on create; 2–6 alphanumerics, uppercased, unique per tenant), `description`, `color`, `status`.
 
@@ -171,33 +207,35 @@ Project create/patch body: `name` (required on create), **`code`** (required on 
 
 ## 4. The core agent working loop
 
-This is the pattern for "go do the tasks on the board." Resolve columns by name, find your work, and reflect progress by moving the card.
+This is the pattern for "go do the tasks on the board." Resolve columns by **role**, find your work, and reflect progress by moving the card. (MCP equivalents in comments — prefer those, §1.5.)
 
 ```bash
-# 0. Who am I?
+# 0. Who am I?                                               # MCP: whoami
 ME=$(kbget $KB/v1/me | jq -r .user.id)                       # e.g. u_claude
 
-# 1. Find the project by name.
-PID=$(kbget $KB/v1/projects | jq -r '.projects[] | select(.name=="Growth") | .id')
+# 1. Find work: your actionable queue, across every project. # MCP: list_my_queue
+kbget "$KB/v1/me/queue"
 
-# 2. Map column names → ids for THIS project.
+# 2. Map column ROLES → ids for the card's project.          # MCP: get_project
+PID=prj_xxxxxxxx
 COLS=$(kbget $KB/v1/projects/$PID)
-TODO=$(echo "$COLS"    | jq -r '.columns[] | select(.name=="Todo") | .id')
-DOING=$(echo "$COLS"   | jq -r '.columns[] | select(.name=="In Progress") | .id')
-REVIEW=$(echo "$COLS"  | jq -r '.columns[] | select(.name=="In Review") | .id')
+READY=$(echo "$COLS"   | jq -r '.columns[] | select(.role=="ready") | .id')
+DOING=$(echo "$COLS"   | jq -r '.columns[] | select(.role=="in_progress") | .id')
+REVIEW=$(echo "$COLS"  | jq -r '.columns[] | select(.role=="review") | .id')
 
-# 3. Find work: cards in Todo (optionally only those assigned to me).
-kbget "$KB/v1/projects/$PID/cards?column=$TODO"
-# or just mine, anywhere:
+# 3. (Optional) other views of the work.                     # MCP: list_cards
+kbget "$KB/v1/projects/$PID/cards?column=$READY"
+# or everything assigned to me in this project, any lane:
 kbget "$KB/v1/projects/$PID/cards?assignee=$ME"
 
-# 4. Take a card: move it to In Progress and assign it to yourself.
-CARD=card_xxxxxxxx
+# 4. Take a card: move it to the in_progress lane + post a one-line "on it" note.
+CARD=card_xxxxxxxx                                           # MCP: update_card + add_comment
 kbpost PATCH /v1/cards/$CARD "{\"columnId\":\"$DOING\",\"assigneeUserId\":\"$ME\"}"
+kbpost POST /v1/cards/$CARD/comments '{"type":"note","body":"On it — <one-line plan>."}'
 
 # 5. …do the actual work…  (read the card's description + acceptanceCriteria first)
 
-# 6. When done, move to In Review, then POST a handoff to the timeline
+# 6. When done, move to the review lane, then POST a handoff to the timeline
 #    (do NOT edit the description to say what happened — that's what the log is for).
 #    Write `body` in markdown — it renders in the board's view mode. `\n` = line break.
 kbpost PATCH /v1/cards/$CARD "{\"columnId\":\"$REVIEW\"}"
@@ -213,7 +251,7 @@ kbpost POST /v1/cards/$CARD/comments "{
 }"
 ```
 
-You don't set `updated_by` — kbRelay stamps it from your token, and the move in step 6 auto-emits a "Claude moved this Todo→In Review" **system event** on the timeline. The reviewer sees your handoff sitting right under that move.
+You don't set `updated_by` — kbRelay stamps it from your token, and the move in step 6 auto-emits a "Claude moved this In Progress→In Review" **system event** on the timeline. The reviewer sees your handoff sitting right under that move.
 
 ### Placing a card precisely (optional)
 `position` is optional. If you omit it on a move, the card keeps its old position number in the new column (usually fine). To drop it at the **bottom** of the target column:
@@ -260,11 +298,11 @@ Rules that matter:
 ## 5. Example scenarios
 
 ### A. Human files a task → agent picks it up, works it, sends it to review
-1. Leif creates a card in **Todo**: "Draft the tracking design doc", assigned to Claude.
-2. Agent loop: `GET /me`, find project, resolve columns, `GET …/cards?assignee=u_claude&…` (or `?column=<Todo>`), find the card.
-3. Agent reads `description` + `acceptanceCriteria`, then `PATCH` the card → `columnId = In Progress`.
+1. Leif creates a card in the **Ready** lane: "Draft the tracking design doc", assigned to Claude.
+2. Agent loop: `GET /me/queue` (MCP `list_my_queue`) — the card is in the actionable set. Resolve the project's columns by role.
+3. Agent reads `description` + `acceptanceCriteria`, then `PATCH` the card → the `in_progress` column, + a one-line "on it" note.
 4. Agent does the work.
-5. Agent `PATCH` → `columnId = In Review`, then **POST a `handoff`** to the card's timeline with what shipped / how it was verified / what it spun off. The `description` stays a clean spec.
+5. Agent `PATCH` → the `review` column, then **POST a `handoff`** to the card's timeline with what shipped / how it was verified / what it spun off, `@`-mentioning Leif. The `description` stays a clean spec.
 6. Leif reads the timeline (the handoff sits under the move event), verifies, and drags it to **Done** (or the agent moves it to Done if the human said "just finish it").
 
 **Discovered work → a new card, not a note.** If, while working, you find unrelated work (a missing token, a follow-up fix), **create a card** for it and list its id in the handoff's `meta.spunOff` — don't bury it in prose.
@@ -279,7 +317,7 @@ kbpost POST /v1/projects/$PID/cards "{
   \"acceptanceCriteria\":\"Leif approves or edits the DENY list\",
   \"assigneeUserId\":\"$LEIF\"
 }"
-# Lands in the first column (Todo), gets an auto key (e.g. OBL-7). created_by = Claude.
+# Lands in the first column (Backlog on a default board), gets an auto key (e.g. OBL-7). created_by = Claude.
 ```
 
 ### C. "What's on my plate?" / status sweep
@@ -302,7 +340,7 @@ kbpost POST /v1/projects '{"name":"Landlord SEO v0.2","code":"LSEO","description
 
 ## 6. Conventions & etiquette
 
-- **Reflect reality by moving cards.** If you start something, move it to In Progress immediately so the human sees it's being worked. Don't silently work a Todo card.
+- **Reflect reality by moving cards.** If you start something, move it to the `in_progress` lane immediately so the human sees it's being worked. Don't silently work a card out of your queue.
 - **Read before you act.** A card's `description` + `acceptanceCriteria` are the spec. Meet the acceptance criteria before moving to In Review.
 - **Follow the handback contract (§2.5).** Pick up from your `ready` queue → move to `in_progress` + a note → work → `review` + a handoff, `@`-mentioning the requester. Move to `done` **only** when explicitly told; if stuck, move to `blocked` + why. Resolve lanes by **role**, not name.
 - **Assign deliberately.** Assign a card to the person/agent who should act next. Use `GET /v1/users` to resolve names → ids.
@@ -314,8 +352,9 @@ kbpost POST /v1/projects '{"name":"Landlord SEO v0.2","code":"LSEO","description
 
 - **Timeline is append-only — correct by adding, not editing.** There's no comment *edit*: to fix or update something, **post a follow-up comment**. The one exception is **redaction**: `DELETE /cards/{id}/comments/{commentId}` soft-deletes **your own** comment if it contains something that must not persist (a **leaked secret/token**, PII, or a wrong-card post). Redaction removes the content but leaves a *tombstone* (who removed it, when) — it doesn't erase history. You can only redact your **own** comments; **system events can't be redacted**. Deleting a card removes its whole timeline (and mentions). System events (create/move/assign/edit) are emitted automatically — you don't post those.
 - **@-mention with `@handle`** (from `GET /v1/users` → `.handle`). An unknown handle or a mention of yourself is just text (no notification). Emails like `a@b.com` don't trigger a mention.
-- No attachments, checklists, due dates, or reactions yet.
-- No real-time push — re-fetch to see others' changes (the web board auto-refreshes every ~20s).
+- **Attachments shipped in v0.16.0** (≤25 MB per file; images render inline on the board). Upload via MCP `add_attachment` (`filePath` or base64 → returns a markdown snippet to embed; link to a note/handoff via `add_comment` `attachmentIds`) or HTTP multipart (`POST /cards/{id}/attachments`). `get_card` returns every attachment's metadata + URL; fetch the bytes from `GET /attachments/{id}/blob` with your bearer token.
+- Still no checklists, due dates, or reactions.
+- No real-time board push — re-fetch to see others' changes (the web board auto-refreshes every ~20s). For agents there IS push (v0.15.x): an admin can create a **webhook subscription** (Team & access, or `POST /v1/webhooks`) that fires the instant a card becomes actionable (assign-into-ready) or an agent is @-mentioned, gated per project by `agentEventsEnabled`. Polling `/me/queue` + `/me/mentions` needs zero setup and stays correct either way — the webhook is a nudge, the queue is the source of truth.
 - Deleting a column requires it be empty (move its cards first) → otherwise `409`.
 - Errors come back as `{ "error": "...", "details": {...} }` with a matching HTTP status (`400` validation, `401` bad/no token, `404` not found or not in your tenant, `409` conflict).
 - A `404` on something you expected to exist usually means it belongs to a different tenant (scoping), or the id is wrong.

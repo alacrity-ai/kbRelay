@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { CardEventDto, UserDto, AttachmentDto } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { attachmentMarkdown } from '../lib/attachments';
+import { CardLinksContext, TICKET_KEY_RE, cardHref } from '../lib/cardLinks';
 import Markdown from './Markdown';
 import MentionTextArea from './MentionTextArea';
 import AttachmentToolbar from './AttachmentToolbar';
@@ -13,8 +14,8 @@ function initials(name: string): string {
   return chars.toUpperCase();
 }
 
-/** "3m ago" / "2h ago" / a date for older entries. */
-function relTime(ms: number, now: number): string {
+/** "3m ago" / "2h ago" / a date for older entries. (Shared with ActivityFeed.) */
+export function relTime(ms: number, now: number): string {
   const s = Math.max(0, Math.round((now - ms) / 1000));
   if (s < 60) return 'just now';
   const m = Math.round(s / 60);
@@ -257,12 +258,44 @@ function SlotList({ label, items }: { label: string; items: string[] }) {
   return (
     <div className="tl-slot">
       <span className="tl-slot-label">{label}</span>
-      <ul>{items.map((it, i) => <li key={i}>{it}</li>)}</ul>
+      <ul>{items.map((it, i) => <li key={i}><SlotText text={it} /></li>)}</ul>
     </div>
   );
 }
 
-function systemPhrase(e: CardEventDto, userName: (id: string | null) => string): string {
+/** Handoff slots are plain text in the data; render-only linkify any accessible
+ *  ticket keys they contain (KBR-65) — e.g. a `spunOff` entry of "KBR-59". */
+function SlotText({ text }: { text: string }) {
+  const cardLinks = useContext(CardLinksContext);
+  if (!cardLinks || cardLinks.codes.size === 0) return <>{text}</>;
+  const parts: ReactNode[] = [];
+  const re = new RegExp(TICKET_KEY_RE.source, 'g');
+  let last = 0;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    const [key, code] = [m[0], m[1]!];
+    if (!cardLinks.codes.has(code)) continue;
+    parts.push(text.slice(last, m.index));
+    parts.push(
+      <a
+        key={m.index}
+        href={cardHref(key)}
+        className="card-link"
+        title={`Open ${key}`}
+        onClick={(e) => { e.preventDefault(); cardLinks.openCard(key); }}
+      >
+        {key}
+      </a>,
+    );
+    last = m.index + key.length;
+  }
+  if (last === 0) return <>{text}</>;
+  parts.push(text.slice(last));
+  return <>{parts}</>;
+}
+
+/** Human phrase for a system event ("moved this Ready → In Progress").
+ *  (Shared with ActivityFeed.) */
+export function systemPhrase(e: CardEventDto, userName: (id: string | null) => string): string {
   const meta = e.meta ?? {};
   switch (e.eventType) {
     case 'created':
@@ -275,6 +308,10 @@ function systemPhrase(e: CardEventDto, userName: (id: string | null) => string):
     case 'assigned': {
       const to = (meta.to as string | null | undefined) ?? null;
       return to ? `assigned this to ${userName(to)}` : 'unassigned this card';
+    }
+    case 'reviewer': {
+      const to = (meta.to as string | null | undefined) ?? null;
+      return to ? `requested review from ${userName(to)}` : 'cleared the reviewer';
     }
     case 'edited': {
       const fields = asStrings(meta.fields);
