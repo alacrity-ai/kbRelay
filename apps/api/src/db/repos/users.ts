@@ -23,12 +23,32 @@ export async function getTenant(env: Env, tenantId: string): Promise<TenantRow |
     .first<TenantRow>();
 }
 
-/** All users in a tenant — for assignee pickers and the /users route. */
-export async function listUsers(env: Env, tenantId: string): Promise<UserDto[]> {
-  const rs = await env.db.prepare(
-    'SELECT id, name, kind, role, color, handle FROM users WHERE tenant_id = ? ORDER BY name ASC',
-  )
-    .bind(tenantId)
+/**
+ * Users in a tenant — for assignee pickers and the /users route. Returns only
+ * CURRENT members (a removed user keeps its row for provenance but loses its
+ * membership, so it must not appear in pickers). With `projectId`, further
+ * scopes to users who can access that project (admins + `project_access`) — the
+ * same rule the mention reconciler uses, so the @-autocomplete matches who a
+ * mention would actually notify.
+ */
+export async function listUsers(
+  env: Env,
+  tenantId: string,
+  projectId?: string,
+): Promise<UserDto[]> {
+  const sql = projectId
+    ? `SELECT u.id, u.name, u.kind, u.role, u.color, u.handle
+         FROM users u
+         JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
+        WHERE m.role = 'admin'
+           OR EXISTS (SELECT 1 FROM project_access pa WHERE pa.project_id = ? AND pa.user_id = u.id)
+        ORDER BY u.name ASC`
+    : `SELECT u.id, u.name, u.kind, u.role, u.color, u.handle
+         FROM users u
+         JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
+        ORDER BY u.name ASC`;
+  const rs = await env.db.prepare(sql)
+    .bind(...(projectId ? [tenantId, projectId] : [tenantId]))
     .all<UserRow>();
   return (rs.results ?? []).map(toUserDto);
 }

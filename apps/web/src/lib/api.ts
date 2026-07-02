@@ -105,7 +105,8 @@ export const deleteToken = (id: string) => request<{ ok: true }>('DELETE', `/v1/
 // ── Identity ──
 export const getMe = () => request<MeResponse>('GET', '/v1/me');
 export const patchMe = (color: string) => request<MeResponse>('PATCH', '/v1/me', { color });
-export const listUsers = () => request<{ users: UserDto[] }>('GET', '/v1/users');
+export const listUsers = (projectId?: string) =>
+  request<{ users: UserDto[] }>('GET', `/v1/users${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`);
 
 // ── Projects ──
 export const listProjects = (status?: ProjectStatus) =>

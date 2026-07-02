@@ -419,7 +419,14 @@ export const OPENAPI_SPEC = {
       },
     },
     '/api/v1/users': {
-      get: { summary: 'List tenant users', responses: { 200: { description: 'ok' } } },
+      get: {
+        summary: 'List current tenant members (assignee/mention pickers)',
+        description: 'Only current members (a removed user is excluded). Optional `projectId` scopes to users who can access that project.',
+        parameters: [
+          { name: 'projectId', in: 'query', schema: { type: 'string' }, description: 'Scope to users with access to this project.' },
+        ],
+        responses: { 200: { description: 'ok' } },
+      },
     },
     '/api/v1/me/mentions': {
       get: {

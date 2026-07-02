@@ -8,7 +8,8 @@ import { registerTenant } from '../../db/repos/auth';
 import { createProject, listProjects, getProject } from '../../db/repos/projects';
 import { createCard, patchCard, getCard } from '../../db/repos/cards';
 import { addComment, listTimeline, redactComment } from '../../db/repos/card_events';
-import { replaceMemberProjectAccess } from '../../db/repos/team';
+import { replaceMemberProjectAccess, removeMember } from '../../db/repos/team';
+import { listUsers } from '../../db/repos/users';
 import { listMentions } from '../../db/repos/mentions';
 
 /**
@@ -131,5 +132,31 @@ describe('libsql adapter — repo parity', () => {
     expect(moved.updatedBy).toBe(agentId);
     const fresh = await getCard(env, tenantId, card.id);
     expect(fresh!.columnId).toBe(target.id);
+  });
+
+  it('listUsers: current members only, and projectId scopes to those with access', async () => {
+    const project = await createProject(env, tenantId, ownerId, { name: 'Scoped', code: 'SCP' });
+
+    // Unscoped → all current members (owner admin + starter agent).
+    const all = await listUsers(env, tenantId);
+    expect(all.some((u) => u.id === ownerId)).toBe(true);
+    expect(all.some((u) => u.id === agentId)).toBe(true);
+
+    // Scoped to a project the agent can't access → admin owner in, agent out.
+    let scoped = await listUsers(env, tenantId, project.id);
+    expect(scoped.some((u) => u.id === ownerId)).toBe(true);   // admin bypasses
+    expect(scoped.some((u) => u.id === agentId)).toBe(false);
+
+    // Grant the agent access → now offered for this project.
+    await replaceMemberProjectAccess(env, tenantId, agentId, [project.id]);
+    scoped = await listUsers(env, tenantId, project.id);
+    expect(scoped.some((u) => u.id === agentId)).toBe(true);
+
+    // Remove the agent's membership (the "deleted user" case) → gone from pickers
+    // even though its users row survives for provenance.
+    await removeMember(env, tenantId, agentId);
+    expect((await listUsers(env, tenantId)).some((u) => u.id === agentId)).toBe(false);
+    const row = await env.db.prepare('SELECT id FROM users WHERE id = ?').bind(agentId).first();
+    expect(row).not.toBeNull(); // row kept
   });
 });

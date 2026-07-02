@@ -53,7 +53,12 @@ export default function BoardApp({
   onSignOut: () => void;
 }) {
   const [projects, setProjects] = useState<ProjectDto[]>([]);
+  // `users` = all current tenant members (for the bell — mention authors can be
+  // cross-project). `projectUsers` = scoped to the selected project (for the
+  // assignee picker + @-autocomplete, so we only offer people who actually have
+  // access to this board).
   const [users, setUsers] = useState<UserDto[]>([]);
+  const [projectUsers, setProjectUsers] = useState<UserDto[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -109,6 +114,15 @@ export default function BoardApp({
 
   useEffect(() => { void loadProjects(); }, []);
 
+  // Load the project-scoped user list whenever the active project changes, so
+  // the assignee picker + @-autocomplete only offer people with access to it.
+  useEffect(() => {
+    if (!selected) { setProjectUsers([]); return; }
+    let alive = true;
+    void api.listUsers(selected).then(({ users: us }) => { if (alive) setProjectUsers(us); }).catch(() => {});
+    return () => { alive = false; };
+  }, [selected]);
+
   // Projects ordered most-recently-viewed first, for the switcher + browser.
   // `selected` is a dep on purpose: selecting a project updates the recency store
   // (localStorage), so we must recompute the order even though it's not read here.
@@ -142,8 +156,12 @@ export default function BoardApp({
     const updated = await api.patchMe(color);
     onMeChange(updated);
     // Re-fetch users so cards assigned to me recolor immediately.
-    const { users: us } = await api.listUsers();
+    const [{ users: us }, pu] = await Promise.all([
+      api.listUsers(),
+      selected ? api.listUsers(selected) : Promise.resolve({ users: [] as UserDto[] }),
+    ]);
     setUsers(us);
+    setProjectUsers(pu.users);
   }
 
   function signOut() {
@@ -252,7 +270,7 @@ export default function BoardApp({
         <Board
           key={selected}
           projectId={selected}
-          users={users}
+          users={projectUsers}
           meId={me.user.id}
           reloadNonce={boardNonce}
           filter={filter}
@@ -281,7 +299,7 @@ export default function BoardApp({
 
       {filterOpen && (
         <FilterModal
-          users={users}
+          users={projectUsers}
           meId={me.user.id}
           initial={filter}
           onApply={applyFilter}
