@@ -240,7 +240,9 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
             <>
               <div className="field">
                 <label>Summary{!isNew && card!.key ? ` · ${card!.key}` : ''}</label>
-                <input className="modal-title-input" value={summary} onChange={(e) => setSummary(e.target.value)} autoFocus />
+                {/* Only auto-focus when creating — clicking Edit on an existing
+                    card shouldn't pop the mobile keyboard (KBR-32). */}
+                <input className="modal-title-input" value={summary} onChange={(e) => setSummary(e.target.value)} autoFocus={isNew} />
               </div>
               <div className="field">
                 <label>Description</label>

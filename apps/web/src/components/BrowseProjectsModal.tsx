@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ProjectDto } from '@kbrelay/shared';
+import { shouldAutofocusInput } from '../lib/autofocus';
 
 /**
  * Browse Projects modal (KBR-6). A scrollable, filterable list of every project
@@ -78,7 +79,7 @@ export default function BrowseProjectsModal({
         <div className="modal-body">
           <input
             className="browse-search"
-            autoFocus
+            autoFocus={shouldAutofocusInput()}
             value={q}
             placeholder="Filter by name or code…"
             onChange={(e) => setQ(e.target.value)}

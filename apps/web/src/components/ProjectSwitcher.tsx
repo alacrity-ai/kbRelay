@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ProjectDto } from '@kbrelay/shared';
+import { shouldAutofocusInput } from '../lib/autofocus';
 
 /**
  * The top-bar project switcher (KBR-6). A controlled popover (not the shared
@@ -31,7 +32,8 @@ export default function ProjectSwitcher({
 
   useEffect(() => {
     if (!open) { setQ(''); return; }
-    inputRef.current?.focus();
+    // Don't grab focus on touch devices — it pops the keyboard (KBR-32).
+    if (shouldAutofocusInput()) inputRef.current?.focus();
     const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', onDoc);
