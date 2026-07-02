@@ -1246,7 +1246,9 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 .mywork-empty { margin: 0.2rem 0 0; padding: 0.4rem 0.6rem; color: var(--muted, #94a3b8); font-size: 0.88rem; }
 @media (max-width: 560px) {
   .mywork-row .tl-time { display: none; }
-  .mywork-summary { white-space: normal; }
+  /* Keep summaries/mention excerpts to a single ellipsed line on mobile too
+     (KBR-78) — `white-space: normal` here let long mentions wrap to the full
+     text; `.mywork-summary`'s base nowrap+ellipsis now applies on all widths. */
 }
 
 /* ── Global quick-find (v0.17.0, KBR-68) ───────────────────── */
