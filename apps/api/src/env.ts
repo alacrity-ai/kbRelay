@@ -1,4 +1,5 @@
 import type { Db } from './runtime/shared/db';
+import type { BlobStore } from './runtime/shared/blob';
 
 /**
  * The application environment handlers see — runtime-neutral (v0.12.0). Both
@@ -22,4 +23,10 @@ export interface Env {
 
   // The database port (D1 on Cloudflare, libsql when self-hosted).
   db: Db;
+
+  // The blob storage port for attachments (R2 on Cloudflare, filesystem when
+  // self-hosted). Optional: unset ⇒ attachment upload/download return a clean
+  // 503 (feature disabled) while the rest of the app is unaffected — the same
+  // graceful-degrade as MAILGUN_*.
+  blob?: BlobStore;
 }
