@@ -17,6 +17,7 @@ import { userHasProjectAccess } from '../../auth/access';
 import { projectCode, nextCardSeq } from './projects';
 import { insertEventStmt, type EventInsert } from './card_events';
 import { reconcileMentionStmts, deleteMentionsForCardStmt } from './mentions';
+import { blobKeysForCard, deleteAttachmentsForCardStmt, purgeBlobs } from './attachments';
 
 /** Look up a column's name for durable move-event snapshots. */
 async function columnName(env: Env, tenantId: string, id: string): Promise<string | null> {
@@ -393,11 +394,15 @@ export async function patchCard(
 export async function deleteCard(env: Env, tenantId: string, id: string): Promise<void> {
   const existing = await getCardRow(env, tenantId, id);
   if (!existing) throw new HttpError(404, 'Card not found');
-  // Cascade the timeline + mentions explicitly (D1 FK enforcement is not
-  // reliably on) so no bell entries dangle at a deleted card.
+  // Grab attachment blob keys before their rows go, so we can purge the bytes.
+  const blobKeys = await blobKeysForCard(env, tenantId, id);
+  // Cascade the timeline + mentions + attachments explicitly (D1 FK enforcement
+  // is not reliably on) so nothing dangles at a deleted card.
   await env.db.batch([
     env.db.prepare('DELETE FROM card_events WHERE card_id = ? AND tenant_id = ?').bind(id, tenantId),
     deleteMentionsForCardStmt(env, tenantId, id),
+    deleteAttachmentsForCardStmt(env, tenantId, id),
     env.db.prepare('DELETE FROM cards WHERE id = ? AND tenant_id = ?').bind(id, tenantId),
   ]);
+  await purgeBlobs(env, blobKeys);
 }

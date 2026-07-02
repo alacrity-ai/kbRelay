@@ -64,5 +64,8 @@ export const createCommentInput = z.object({
   type: z.enum(['note', 'handoff']).optional(),
   body: z.string().trim().min(1).max(20_000),
   meta: handoffMeta.optional(), // only meaningful for a handoff
+  /** Attachments (v0.16.0) uploaded for this comment; on post they're linked to
+   *  the new timeline event. Ignored if they don't belong to this card. */
+  attachmentIds: z.array(z.string().min(1).max(64)).max(20).optional(),
 });
 export type CreateCommentInput = z.infer<typeof createCommentInput>;

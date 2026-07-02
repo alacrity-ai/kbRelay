@@ -84,6 +84,44 @@ export const OPENAPI_SPEC = {
           updatedBy: { type: 'string' },
           createdAt: { type: 'integer' },
           updatedAt: { type: 'integer' },
+          attachments: {
+            type: 'array',
+            description: 'All attachments on the card (v0.16.0). Present on single-card GET only.',
+            items: { $ref: '#/components/schemas/Attachment' },
+          },
+          attachmentCounts: {
+            $ref: '#/components/schemas/AttachmentCounts',
+            description: 'Per-kind attachment counts (v0.16.0). Present on the board list endpoint.',
+          },
+        },
+      },
+      Attachment: {
+        type: 'object',
+        description:
+          'A file attached to a card (v0.16.0). Hung off the card description ' +
+          '(eventId null) or a specific note/handoff (eventId set). Bytes are ' +
+          'streamed from `url` (same-origin; append ?download=1 to force download).',
+        properties: {
+          id: { type: 'string' },
+          cardId: { type: 'string' },
+          eventId: { type: ['string', 'null'], description: 'Null = on the description; set = on that timeline comment.' },
+          filename: { type: 'string' },
+          contentType: { type: 'string' },
+          sizeBytes: { type: 'integer' },
+          kind: { type: 'string', enum: ['image', 'document', 'archive', 'misc'] },
+          createdBy: { type: 'string' },
+          createdAt: { type: 'integer' },
+          url: { type: 'string', description: 'Same-origin bytes URL, e.g. /api/v1/attachments/{id}/blob.' },
+        },
+      },
+      AttachmentCounts: {
+        type: 'object',
+        description: 'Per-kind attachment counts for a card (v0.16.0 board badges).',
+        properties: {
+          image: { type: 'integer' },
+          document: { type: 'integer' },
+          archive: { type: 'integer' },
+          misc: { type: 'integer' },
         },
       },
       CardEvent: {
