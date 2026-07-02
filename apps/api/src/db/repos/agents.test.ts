@@ -120,6 +120,15 @@ describe('agent users', () => {
     expect(refreshed.ownerUserId).toBe(assistant.id);
   });
 
+  it('patch recolors an agent; null color means the palette fallback (KBR-74)', async () => {
+    const claude = (await listAgents(env, tenantId)).find((a) => a.name === 'Claude Opus')!;
+    expect(claude.color).toBeNull(); // never explicitly colored
+
+    await patchAgent(env, tenantId, claude.id, { color: '#DB2777' });
+    const refreshed = (await listAgents(env, tenantId)).find((a) => a.id === claude.id)!;
+    expect(refreshed.color).toBe('#DB2777');
+  });
+
   it('deactivate drops membership/access/tokens but keeps the user row', async () => {
     const claude = (await listAgents(env, tenantId)).find((a) => a.name === 'Claude Opus')!;
     await removeAgent(env, tenantId, claude.id);

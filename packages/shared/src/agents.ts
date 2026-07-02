@@ -18,14 +18,16 @@ export const createAgentInput = z.object({
 });
 export type CreateAgentInput = z.infer<typeof createAgentInput>;
 
-/** Rename an agent and/or reassign its owner. At least one field required. */
+/** Rename an agent, reassign its owner, and/or recolor it (KBR-74). At least
+ *  one field required. Same #rrggbb rule as PATCH /me. */
 export const patchAgentInput = z
   .object({
     name: z.string().trim().min(1).max(80).optional(),
     ownerUserId: z.string().min(1).optional(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'color must be a #rrggbb hex').optional(),
   })
-  .refine((v) => v.name !== undefined || v.ownerUserId !== undefined, {
-    message: 'Provide name and/or ownerUserId',
+  .refine((v) => v.name !== undefined || v.ownerUserId !== undefined || v.color !== undefined, {
+    message: 'Provide name, ownerUserId, and/or color',
   });
 export type PatchAgentInput = z.infer<typeof patchAgentInput>;
 
@@ -37,6 +39,8 @@ export interface AgentSummary {
   /** The managing human (may be null for legacy/unmanaged agents). */
   ownerUserId: string | null;
   ownerName: string | null;
+  /** Explicit color, or null → deterministic palette fallback (KBR-74). */
+  color: string | null;
   /** Project ids this agent can access. */
   projectIds: string[];
   /** Count of live (non-revoked) API keys. */

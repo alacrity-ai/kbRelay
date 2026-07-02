@@ -8,6 +8,7 @@ import type {
   TokenSummary,
   WebhookSubscriptionDto,
 } from '@kbrelay/shared';
+import { USER_PALETTE, colorForUser } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { useDialog } from './Dialog';
 import { McpGuideButton } from './McpGuide';
@@ -303,10 +304,13 @@ function AgentCard({
   guarded: (fn: () => Promise<unknown>) => Promise<void>;
   dialog: ReturnType<typeof useDialog>;
 }) {
-  const [panel, setPanel] = useState<'projects' | 'keys' | null>(null);
+  const [panel, setPanel] = useState<'projects' | 'keys' | 'color' | null>(null);
   const open = panel !== null;
 
-  const toggle = (p: 'projects' | 'keys') => setPanel((cur) => (cur === p ? null : p));
+  const toggle = (p: 'projects' | 'keys' | 'color') => setPanel((cur) => (cur === p ? null : p));
+
+  // Effective color mirrors the board: explicit, else the deterministic fallback.
+  const agentColor = agent.color ?? colorForUser(agent.id);
 
   const rename = async () => {
     const name = await dialog.prompt({
@@ -331,7 +335,7 @@ function AgentCard({
     <div className="member-card">
       <div className="member-row">
         <div className="member-main">
-          <span className="avatar sm" aria-hidden>{initials(agent.name)}</span>
+          <span className="avatar sm" style={{ background: agentColor }} aria-hidden>{initials(agent.name)}</span>
           <div className="member-ident">
             <div className="member-name">
               {agent.name}
@@ -346,6 +350,7 @@ function AgentCard({
         <div className="member-actions">
           <button className={`ghost sm ${open && panel === 'projects' ? 'active' : ''}`} onClick={() => toggle('projects')}>Projects</button>
           <button className={`ghost sm ${open && panel === 'keys' ? 'active' : ''}`} onClick={() => toggle('keys')}>Keys</button>
+          <button className={`ghost sm ${open && panel === 'color' ? 'active' : ''}`} onClick={() => toggle('color')}>Color</button>
           <button className="ghost sm" onClick={rename} disabled={busy}>Rename</button>
           <button className="ghost sm danger-text" onClick={() => void remove()} disabled={busy}>Remove</button>
         </div>
@@ -360,6 +365,26 @@ function AgentCard({
         />
       )}
       {open && panel === 'keys' && <AgentKeys agentId={agent.id} />}
+      {/* Recolor (KBR-74): same palette as your own profile; a click saves. The
+          agent's cards + avatar pick it up everywhere its color is shown. */}
+      {open && panel === 'color' && (
+        <div className="field agent-color-panel">
+          <div className="color-swatches">
+            {USER_PALETTE.map((c) => (
+              <button
+                type="button"
+                key={c}
+                className={`color-swatch ${agentColor.toLowerCase() === c.toLowerCase() ? 'active' : ''}`}
+                style={{ background: c }}
+                aria-label={`set ${agent.name}'s color to ${c}`}
+                disabled={busy}
+                onClick={() => void guarded(() => api.patchAgent(agent.id, { color: c }))}
+              />
+            ))}
+          </div>
+          <p className="muted-note">Cards assigned to {agent.name} show in this color.</p>
+        </div>
+      )}
     </div>
   );
 }

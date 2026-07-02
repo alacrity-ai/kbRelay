@@ -94,7 +94,7 @@ export const setMemberProjects = (userId: string, projectIds: string[]) =>
 export const listAgents = () => request<{ agents: AgentSummary[] }>('GET', '/v1/agents');
 export const createAgent = (name: string, projectIds?: string[]) =>
   request<{ agent: AgentSummary }>('POST', '/v1/agents', { name, projectIds });
-export const patchAgent = (userId: string, body: { name?: string; ownerUserId?: string }) =>
+export const patchAgent = (userId: string, body: { name?: string; ownerUserId?: string; color?: string }) =>
   request<{ ok: true }>('PATCH', `/v1/agents/${userId}`, body);
 export const removeAgent = (userId: string) =>
   request<{ ok: true }>('DELETE', `/v1/agents/${userId}`);

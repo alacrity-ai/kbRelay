@@ -167,6 +167,7 @@ export const OPENAPI_SPEC = {
           id: { type: 'string' },
           name: { type: 'string' },
           handle: { type: ['string', 'null'] },
+          color: { type: ['string', 'null'], description: 'Explicit #rrggbb, or null → deterministic palette fallback (KBR-74).' },
           ownerUserId: { type: ['string', 'null'], description: 'The managing human.' },
           ownerName: { type: ['string', 'null'] },
           projectIds: { type: 'array', items: { type: 'string' } },

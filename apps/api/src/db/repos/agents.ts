@@ -20,6 +20,7 @@ interface AgentRow {
   id: string;
   name: string;
   handle: string | null;
+  color: string | null;
   owner_user_id: string | null;
   owner_name: string | null;
   created_at: number;
@@ -28,7 +29,7 @@ interface AgentRow {
 /** List the tenant's agent users with owner, project access, and key count. */
 export async function listAgents(env: Env, tenantId: string): Promise<AgentSummary[]> {
   const rs = await env.db.prepare(
-    `SELECT u.id AS id, u.name AS name, u.handle AS handle,
+    `SELECT u.id AS id, u.name AS name, u.handle AS handle, u.color AS color,
             u.owner_user_id AS owner_user_id, o.name AS owner_name, u.created_at AS created_at
        FROM users u
        JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
@@ -66,6 +67,7 @@ export async function listAgents(env: Env, tenantId: string): Promise<AgentSumma
     id: r.id,
     name: r.name,
     handle: r.handle,
+    color: r.color,
     ownerUserId: r.owner_user_id,
     ownerName: r.owner_name,
     projectIds: projectsByUser.get(r.id) ?? [],
@@ -134,6 +136,7 @@ export async function createAgent(
     id: userId,
     name: trimmed,
     handle,
+    color: null,
     ownerUserId,
     ownerName: null,
     projectIds: validProjects,
@@ -142,12 +145,13 @@ export async function createAgent(
   };
 }
 
-/** Rename an agent and/or reassign its owner. Owner must be a member of the tenant. */
+/** Rename an agent, reassign its owner, and/or recolor it (KBR-74). Owner must
+ *  be a member of the tenant. */
 export async function patchAgent(
   env: Env,
   tenantId: string,
   userId: string,
-  input: { name?: string; ownerUserId?: string },
+  input: { name?: string; ownerUserId?: string; color?: string },
 ): Promise<void> {
   await assertAgentInTenant(env, tenantId, userId);
 
@@ -164,6 +168,7 @@ export async function patchAgent(
   const binds: unknown[] = [];
   if (input.name !== undefined) { sets.push('name = ?'); binds.push(input.name.trim()); }
   if (input.ownerUserId !== undefined) { sets.push('owner_user_id = ?'); binds.push(input.ownerUserId); }
+  if (input.color !== undefined) { sets.push('color = ?'); binds.push(input.color); }
   if (sets.length === 0) return;
 
   await env.db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`)
