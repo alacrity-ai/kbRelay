@@ -135,7 +135,7 @@ export const listProjects = (status?: ProjectStatus) =>
 export const createProject = (body: { name: string; code: string; description?: string | null; color?: string | null }) =>
   request<{ project: ProjectDto; columns: ColumnDto[] }>('POST', '/v1/projects', body);
 export const getProject = (id: string) =>
-  request<{ project: ProjectDto; columns: ColumnDto[] }>('GET', `/v1/projects/${id}`);
+  request<{ project: ProjectDto; columns: ColumnDto[]; archivedCardCount: number }>('GET', `/v1/projects/${id}`);
 export const patchProject = (id: string, body: Partial<Pick<ProjectDto, 'name' | 'code' | 'description' | 'color' | 'status' | 'agentEventsEnabled' | 'autoArchiveDoneDays'>>) =>
   request<{ project: ProjectDto }>('PATCH', `/v1/projects/${id}`, body);
 export const deleteProject = (id: string) => request<{ ok: true }>('DELETE', `/v1/projects/${id}`);

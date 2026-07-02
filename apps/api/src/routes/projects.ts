@@ -15,6 +15,7 @@ import {
 import { listColumns } from '../db/repos/columns';
 import { listProjectEvents } from '../db/repos/card_events';
 import { purgeBlobs } from '../db/repos/attachments';
+import { countArchivedCards } from '../db/repos/cards';
 
 export async function handleListProjects(ctx: RouteContext): Promise<Response> {
   const { tenantId, userId } = tenantScope(ctx.auth);
@@ -42,8 +43,13 @@ export async function handleGetProject(ctx: RouteContext): Promise<Response> {
   const { tenantId } = tenantScope(ctx.auth);
   const project = await getProject(ctx.env, tenantId, ctx.params.id!);
   if (!project) throw new HttpError(404, 'Project not found');
-  const columns = await listColumns(ctx.env, tenantId, project.id);
-  return jsonResponse(200, { project, columns }, ctx.cors);
+  // archivedCardCount (KBR-75) feeds the Done-lane "(N) Archived" badge — a
+  // single COUNT so the board never fetches the (potentially huge) archive.
+  const [columns, archivedCardCount] = await Promise.all([
+    listColumns(ctx.env, tenantId, project.id),
+    countArchivedCards(ctx.env, tenantId, project.id),
+  ]);
+  return jsonResponse(200, { project, columns, archivedCardCount }, ctx.cors);
 }
 
 export async function handlePatchProject(ctx: RouteContext): Promise<Response> {

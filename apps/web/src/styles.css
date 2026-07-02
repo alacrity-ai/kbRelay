@@ -325,6 +325,17 @@ select {
   color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border);
 }
 .role-help > .role-help-toggle[aria-expanded="true"] { color: var(--text); border-color: var(--border-strong); }
+/* Done-lane archived-count badge (KBR-75): right-justified in the role row,
+   deep-links to Project Settings → Archive. */
+.column-archived-badge {
+  margin-left: auto; flex: none;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.7rem; font-weight: 600; white-space: nowrap;
+  color: var(--text-dim);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-pill); cursor: pointer;
+}
+.column-archived-badge:hover { color: var(--text); border-color: var(--border-strong); }
 .role-popover {
   position: absolute; top: 1.5rem; left: 0; z-index: 20; width: 15rem;
   background: var(--surface-2); border: 1px solid var(--border-strong);

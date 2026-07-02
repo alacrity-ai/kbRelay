@@ -14,7 +14,8 @@ function rankBetween(before: number | null, after: number | null): number {
   return (before + after) / 2;
 }
 
-type Tab = 'general' | 'columns' | 'labels' | 'archive';
+export type SettingsTab = 'general' | 'columns' | 'labels' | 'archive';
+type Tab = SettingsTab;
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'columns', label: 'Columns' },
@@ -30,17 +31,20 @@ const TABS: { id: Tab; label: string }[] = [
  */
 export default function ProjectSettings({
   projectId,
+  initialTab = 'general',
   onClose,
   onChanged,
   onProjectChanged,
 }: {
   projectId: string;
+  /** Which tab to open on (KBR-75: the Done-lane badge deep-links to 'archive'). */
+  initialTab?: SettingsTab;
   onClose: () => void;
   onChanged: () => void;
   onProjectChanged?: () => void;
 }) {
   const dialog = useDialog();
-  const [tab, setTab] = useState<Tab>('general');
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [project, setProject] = useState<ProjectDto | null>(null);
   const [cols, setCols] = useState<ColumnDto[]>([]);
   const [busy, setBusy] = useState(false);

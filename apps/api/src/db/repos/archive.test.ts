@@ -7,7 +7,7 @@ import type { Env } from '../../env';
 import { registerTenant } from './auth';
 import { createProject, patchProject, getProject } from './projects';
 import { listColumns } from './columns';
-import { createCard, patchCard, listCards, listMyQueue, autoArchiveDone } from './cards';
+import { createCard, patchCard, listCards, listMyQueue, autoArchiveDone, countArchivedCards } from './cards';
 import { listTimeline, addComment } from './card_events';
 
 /**
@@ -116,5 +116,23 @@ describe('card archiving', () => {
     expect((await getProject(env, tenantId, projectId))?.autoArchiveDoneDays).toBe(14);
     await patchProject(env, tenantId, projectId, { autoArchiveDoneDays: null });
     expect((await getProject(env, tenantId, projectId))?.autoArchiveDoneDays).toBeNull();
+  });
+
+  it('countArchivedCards is project-scoped and tracks archive/restore (KBR-75)', async () => {
+    const proj = await createProject(env, tenantId, ownerId, { name: 'Counting', code: 'CNT' });
+    expect(await countArchivedCards(env, tenantId, proj.id)).toBe(0);
+
+    const a = await createCard(env, tenantId, proj.id, ownerId, { summary: 'a' });
+    const b = await createCard(env, tenantId, proj.id, ownerId, { summary: 'b' });
+    // A card in a DIFFERENT project must not leak into this project's count.
+    const other = await createCard(env, tenantId, projectId, ownerId, { summary: 'elsewhere' });
+    await patchCard(env, tenantId, other.id, ownerId, { archived: true });
+
+    await patchCard(env, tenantId, a.id, ownerId, { archived: true });
+    await patchCard(env, tenantId, b.id, ownerId, { archived: true });
+    expect(await countArchivedCards(env, tenantId, proj.id)).toBe(2);
+
+    await patchCard(env, tenantId, a.id, ownerId, { archived: false });
+    expect(await countArchivedCards(env, tenantId, proj.id)).toBe(1);
   });
 });

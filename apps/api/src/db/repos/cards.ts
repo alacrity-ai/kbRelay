@@ -226,6 +226,16 @@ async function getCardRow(env: Env, tenantId: string, id: string): Promise<CardR
     .first<CardRow>();
 }
 
+/** How many cards a project has archived (KBR-75) — for the Done-lane badge. */
+export async function countArchivedCards(env: Env, tenantId: string, projectId: string): Promise<number> {
+  const row = await env.db.prepare(
+    'SELECT COUNT(*) AS n FROM cards WHERE tenant_id = ? AND project_id = ? AND archived_at IS NOT NULL',
+  )
+    .bind(tenantId, projectId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
 export async function getCard(env: Env, tenantId: string, id: string): Promise<CardDto | null> {
   const row = await getCardRow(env, tenantId, id);
   if (!row) return null;

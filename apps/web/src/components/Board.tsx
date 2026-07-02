@@ -41,8 +41,9 @@ type ModalState =
   | { mode: 'view'; card: CardDto } // open an existing card (modal toggles view/edit itself)
   | null;
 
-export default function Board({ projectId, users, meId, tenantSlug, reloadNonce = 0, filter = EMPTY_FILTER, projectLabels = [], nav = null, onNavHandled }: { projectId: string; users: UserDto[]; meId: string; tenantSlug?: string; reloadNonce?: number; filter?: BoardFilter; projectLabels?: LabelDto[]; nav?: BoardNav | null; onNavHandled?: () => void }) {
+export default function Board({ projectId, users, meId, tenantSlug, reloadNonce = 0, filter = EMPTY_FILTER, projectLabels = [], nav = null, onNavHandled, onViewArchive }: { projectId: string; users: UserDto[]; meId: string; tenantSlug?: string; reloadNonce?: number; filter?: BoardFilter; projectLabels?: LabelDto[]; nav?: BoardNav | null; onNavHandled?: () => void; onViewArchive?: () => void }) {
   const [columns, setColumns] = useState<ColumnDto[]>([]);
+  const [archivedCount, setArchivedCount] = useState(0);
   const [items, setItems] = useState<Record<string, string[]>>({});
   const [cardsById, setCardsById] = useState<Record<string, CardDto>>({});
   const [loading, setLoading] = useState(true);
@@ -72,10 +73,11 @@ export default function Board({ projectId, users, meId, tenantSlug, reloadNonce 
     if (!opts?.silent) setLoading(true);
     setError(null);
     try {
-      const [{ columns: cols }, { cards }] = await Promise.all([
+      const [{ columns: cols, archivedCardCount }, { cards }] = await Promise.all([
         api.getProject(projectId),
         api.listCards(projectId),
       ]);
+      setArchivedCount(archivedCardCount);
       const byId: Record<string, CardDto> = {};
       const byCol: Record<string, string[]> = {};
       for (const c of cols) byCol[c.id] = [];
@@ -327,6 +329,8 @@ export default function Board({ projectId, users, meId, tenantSlug, reloadNonce 
               onDelete={deleteColumn}
               onSetRole={setColumnRole}
               onArchiveAll={col.role === 'done' ? () => void archiveAll(col) : undefined}
+              archivedCount={col.role === 'done' ? archivedCount : undefined}
+              onViewArchive={col.role === 'done' ? onViewArchive : undefined}
             />
           ))}
         </div>

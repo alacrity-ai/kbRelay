@@ -13,7 +13,7 @@ import Dropdown from '../components/Dropdown';
 import ProjectSwitcher from '../components/ProjectSwitcher';
 import BrowseProjectsModal from '../components/BrowseProjectsModal';
 import NotificationBell from '../components/NotificationBell';
-import ProjectSettings from '../components/ProjectSettings';
+import ProjectSettings, { type SettingsTab } from '../components/ProjectSettings';
 import FilterModal, { EMPTY_FILTER, isFilterActive, filterCount, type BoardFilter } from '../components/FilterModal';
 import NewProjectModal from '../components/NewProjectModal';
 import ApiKeysModal from '../components/ApiKeysModal';
@@ -128,6 +128,13 @@ export default function BoardApp({
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Which tab Project Settings opens on — the gear opens General; the Done-lane
+  // "(N) Archived" badge deep-links to Archive (KBR-75).
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('general');
+  const openSettings = useCallback((tab: SettingsTab = 'general') => {
+    setSettingsTab(tab);
+    setSettingsOpen(true);
+  }, []);
   const [boardNonce, setBoardNonce] = useState(0);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filter, setFilter] = useState<BoardFilter>(EMPTY_FILTER);
@@ -371,7 +378,7 @@ export default function BoardApp({
         )}
 
         {selected && view !== 'mywork' && (
-          <button className="icon-btn subtle topbar-tool project-settings-btn" onClick={() => setSettingsOpen(true)} aria-label="Project settings" title="Project settings">
+          <button className="icon-btn subtle topbar-tool project-settings-btn" onClick={() => openSettings()} aria-label="Project settings" title="Project settings">
             <Gear />
           </button>
         )}
@@ -431,7 +438,7 @@ export default function BoardApp({
             {selected && view !== 'mywork' && (
               <>
                 <div className="menu-divider" />
-                <button className="menu-item" onClick={() => setSettingsOpen(true)}>
+                <button className="menu-item" onClick={() => openSettings()}>
                   <Gear /> Project settings
                 </button>
                 <button className="menu-item" onClick={() => setFilterOpen(true)}>
@@ -536,6 +543,7 @@ export default function BoardApp({
           projectLabels={projectLabels}
           nav={nav && nav.cardId ? nav : null}
           onNavHandled={() => setNav(null)}
+          onViewArchive={() => openSettings('archive')}
         />
       ) : (
         <div className="center">
@@ -551,6 +559,7 @@ export default function BoardApp({
       {settingsOpen && selected && (
         <ProjectSettings
           projectId={selected}
+          initialTab={settingsTab}
           onClose={() => setSettingsOpen(false)}
           onChanged={() => setBoardNonce((n) => n + 1)}
           onProjectChanged={() => void loadProjects(selected)}

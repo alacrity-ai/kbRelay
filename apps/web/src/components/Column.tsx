@@ -16,6 +16,8 @@ export default function Column({
   onDelete,
   onSetRole,
   onArchiveAll,
+  archivedCount,
+  onViewArchive,
 }: {
   column: ColumnDto;
   cards: CardDto[];
@@ -27,6 +29,10 @@ export default function Column({
   onSetRole: (column: ColumnDto, role: ColumnRole | null) => void;
   /** Present only on the done-role lane (KBR-60): archive every card in it. */
   onArchiveAll?: () => void;
+  /** Project's archived-card count (KBR-75) — badge shown on the done lane. */
+  archivedCount?: number;
+  /** Open Project Settings → Archive from the done-lane badge (KBR-75). */
+  onViewArchive?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const role = column.role ? ROLE_META[column.role] : null;
@@ -81,6 +87,18 @@ export default function Column({
             ))}
           </select>
           <RoleHelp role={role} roleHelp={roleHelp} />
+          {/* Archived count on the done lane (KBR-75): right-justified, deep-links
+              to Project Settings → Archive. */}
+          {column.role === 'done' && !!archivedCount && archivedCount > 0 && (
+            <button
+              className="column-archived-badge"
+              onClick={onViewArchive}
+              title={`View ${archivedCount.toLocaleString()} archived card${archivedCount === 1 ? '' : 's'}`}
+              aria-label={`${archivedCount} archived cards — open the archive`}
+            >
+              ({archivedCount.toLocaleString()}) Archived
+            </button>
+          )}
         </div>
       </div>
 
