@@ -4,7 +4,7 @@ import { jsonResponse, HttpError } from '../http';
 import { parseJson } from '../validate';
 import { tenantScope } from '../auth/tenant-scope';
 import { getProject } from '../db/repos/projects';
-import { listCards, getCard, createCard, patchCard, deleteCard } from '../db/repos/cards';
+import { listCards, getCard, createCard, patchCard, deleteCard, autoArchiveDone } from '../db/repos/cards';
 import { listTimeline, addComment, redactComment } from '../db/repos/card_events';
 import { listCardAttachments, attachmentCountsForCards, purgeBlobs } from '../db/repos/attachments';
 import { dispatchTriggers } from '../services/webhooks';
@@ -22,12 +22,17 @@ export async function handleListCards(ctx: RouteContext): Promise<Response> {
   if (sort !== undefined && sort !== 'due') {
     throw new HttpError(400, "sort must be 'due'");
   }
+  // Lazy done-column hygiene (KBR-60): the board read IS the scheduler.
+  if (project.autoArchiveDoneDays != null) {
+    await autoArchiveDone(ctx.env, tenantId, project.id, project.autoArchiveDoneDays);
+  }
   const cards = await listCards(ctx.env, tenantId, project.id, {
     columnId: ctx.url.searchParams.get('column') ?? undefined,
     assignee: ctx.url.searchParams.get('assignee') ?? undefined,
     q: ctx.url.searchParams.get('q') ?? undefined,
     due,
     sort,
+    archived: ctx.url.searchParams.get('archived') === '1',
   });
   // Enrich each card with its per-kind attachment counts for the board badges
   // (one grouped query for the whole list) and its task-list progress

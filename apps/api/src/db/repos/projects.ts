@@ -18,6 +18,7 @@ interface ProjectRow {
   color: string | null;
   status: string;
   agent_events_enabled: number;
+  auto_archive_done_days: number | null;
   created_by: string;
   created_at: number;
   updated_at: number;
@@ -34,6 +35,7 @@ function toDto(r: ProjectRow): ProjectDto {
     color: r.color,
     status: r.status as ProjectStatus,
     agentEventsEnabled: r.agent_events_enabled !== 0,
+    autoArchiveDoneDays: r.auto_archive_done_days,
     createdBy: r.created_by,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -169,12 +171,14 @@ export async function patchProject(
     status: input.status ?? existing.status,
     agentEventsEnabled:
       input.agentEventsEnabled === undefined ? existing.agentEventsEnabled : input.agentEventsEnabled,
+    autoArchiveDoneDays:
+      input.autoArchiveDoneDays === undefined ? existing.autoArchiveDoneDays : input.autoArchiveDoneDays,
   };
   await env.db.prepare(
-    `UPDATE projects SET name = ?, code = ?, description = ?, color = ?, status = ?, agent_events_enabled = ?, updated_at = ?
+    `UPDATE projects SET name = ?, code = ?, description = ?, color = ?, status = ?, agent_events_enabled = ?, auto_archive_done_days = ?, updated_at = ?
       WHERE id = ? AND tenant_id = ?`,
   )
-    .bind(next.name, next.code, next.description, next.color, next.status, next.agentEventsEnabled ? 1 : 0, Date.now(), id, tenantId)
+    .bind(next.name, next.code, next.description, next.color, next.status, next.agentEventsEnabled ? 1 : 0, next.autoArchiveDoneDays, Date.now(), id, tenantId)
     .run();
 
   const updated = await getProject(env, tenantId, id);

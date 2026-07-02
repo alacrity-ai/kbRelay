@@ -127,6 +127,7 @@ export default function ActivityFeed({ projectId, users }: { projectId: string; 
           {g.items.map(({ event: e, runCount }) => {
             const author = user(e.authorUserId);
             const ex = excerpt(e);
+            const p = phrase(e, userName);
             return (
               <div key={e.id} className={`activity-row ${e.deletedAt != null ? 'redacted' : ''}`}>
                 <span className="avatar sm" style={{ background: author?.color ?? '#64748b' }}>
@@ -134,9 +135,16 @@ export default function ActivityFeed({ projectId, users }: { projectId: string; 
                 </span>
                 <div className="activity-main">
                   <span className="activity-line">
-                    <strong>{userName(e.authorUserId)}</strong>
-                    {author?.kind && <span className={`kind-badge ${author.kind}`}>{author.kind}</span>}
-                    {' '}{phrase(e, userName)}
+                    {/* Null author = policy event (auto-archive): phrase stands alone. */}
+                    {e.authorUserId != null ? (
+                      <>
+                        <strong>{userName(e.authorUserId)}</strong>
+                        {author?.kind && <span className={`kind-badge ${author.kind}`}>{author.kind}</span>}
+                        {' '}{p}
+                      </>
+                    ) : (
+                      <>{p.charAt(0).toUpperCase() + p.slice(1)}</>
+                    )}
                     {runCount > 1 && <span className="tl-run"> ×{runCount}</span>}
                     {' '}
                     {e.cardKey && cardLinks ? (

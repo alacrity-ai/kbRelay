@@ -14,7 +14,12 @@ export type CardEventKind = 'system' | 'note' | 'handoff';
  *  `due` (v0.17.0, KBR-63): the due date changed — meta {from, to} epoch ms.
  *  `task` (v0.17.0, KBR-72): a checkbox-only edit — meta {fields, done, total}.
  *  Quieter than `edited`; feed/timeline collapse consecutive runs of these. */
-export type SystemEventType = 'created' | 'moved' | 'assigned' | 'edited' | 'reviewer' | 'due' | 'task';
+/** `archived`/`restored` (v0.17.0, KBR-60): visibility flag flips — meta may
+ *  carry {auto: true} when the project's done-column policy did it lazily
+ *  (those have a null author). */
+export type SystemEventType =
+  | 'created' | 'moved' | 'assigned' | 'edited' | 'reviewer' | 'due' | 'task'
+  | 'archived' | 'restored';
 
 /** Wire shape of a timeline entry (GET /cards/:id/timeline). */
 export interface CardEventDto {

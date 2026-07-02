@@ -308,6 +308,28 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
     }
   }
 
+  // Archive (KBR-60): the card leaves the board (history intact), so close the
+  // modal after — there's nothing to look at behind it. Restore lives in
+  // Project Settings → Archive.
+  async function archive() {
+    if (!card || busy) return;
+    const ok = await dialog.confirm({
+      title: `Archive ${card.key ?? 'this card'}?`,
+      message: 'It leaves the board but keeps its timeline and attachments. Restore any time from Project Settings → Archive.',
+      confirmLabel: 'Archive',
+    });
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onSave({ archived: true });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Archive failed');
+      setBusy(false);
+    }
+  }
+
   // Accent follows the assignee's color (selected assignee in edit; card's in view).
   const accent = userColor(editing ? (assignee || null) : (card?.assigneeUserId ?? null));
 
@@ -539,6 +561,9 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
         <div className="modal-footer">
           {!isNew && onDelete && (
             <button className="danger" onClick={remove} disabled={busy}>Delete</button>
+          )}
+          {!isNew && !editing && !card!.archivedAt && (
+            <button className="ghost" onClick={() => void archive()} disabled={busy}>Archive</button>
           )}
           <div className="spacer" />
           {editing ? (

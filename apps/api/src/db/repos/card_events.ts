@@ -54,7 +54,8 @@ function toDto(r: CardEventRow): CardEventDto {
 export interface EventInsert {
   tenantId: string;
   cardId: string;
-  authorUserId: string;
+  /** Null for policy-driven events with no human/agent actor (lazy auto-archive, KBR-60). */
+  authorUserId: string | null;
   kind: CardEventKind;
   eventType?: SystemEventType | null;
   body?: string | null;

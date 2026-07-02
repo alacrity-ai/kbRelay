@@ -258,6 +258,27 @@ export default function Board({ projectId, users, meId, reloadNonce = 0, filter 
     }
   }
 
+  // Done-column hygiene (KBR-60): archive every card in the lane after a
+  // type-nothing confirm that shows the count. History survives; restore lives
+  // in Project Settings → Archive.
+  async function archiveAll(col: ColumnDto) {
+    const list = (items[col.id] ?? []).map((id) => cardsById[id]!).filter(Boolean);
+    if (list.length === 0) return;
+    const ok = await dialog.confirm({
+      title: `Archive all ${list.length} card${list.length === 1 ? '' : 's'} in “${col.name}”?`,
+      message: 'They leave the board but keep their timeline and attachments. Restore any time from Project Settings → Archive.',
+      confirmLabel: `Archive ${list.length}`,
+    });
+    if (!ok) return;
+    try {
+      await Promise.all(list.map((c) => api.patchCard(c.id, { archived: true })));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Archive failed');
+      void load();
+    }
+  }
+
   async function deleteColumn(col: ColumnDto) {
     const ok = await dialog.confirm({
       title: 'Delete column?',
@@ -305,6 +326,7 @@ export default function Board({ projectId, users, meId, reloadNonce = 0, filter 
               onRename={renameColumn}
               onDelete={deleteColumn}
               onSetRole={setColumnRole}
+              onArchiveAll={col.role === 'done' ? () => void archiveAll(col) : undefined}
             />
           ))}
         </div>

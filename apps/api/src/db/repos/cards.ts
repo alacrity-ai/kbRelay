@@ -60,6 +60,7 @@ interface CardRow {
   assignee_user_id: string | null;
   reviewer_user_id: string | null;
   due_at: number | null;
+  archived_at: number | null;
   created_by: string;
   updated_by: string;
   created_at: number;
@@ -82,6 +83,7 @@ function toDto(r: CardRow, code: string | null): CardDto {
     assigneeUserId: r.assignee_user_id,
     reviewerUserId: r.reviewer_user_id,
     dueAt: r.due_at,
+    archivedAt: r.archived_at,
     createdBy: r.created_by,
     updatedBy: r.updated_by,
     createdAt: r.created_at,
@@ -98,6 +100,8 @@ export interface CardFilters {
   due?: 'overdue' | 'soon';
   /** `due` = due-soonest first, cards without a due date last. */
   sort?: 'due';
+  /** true = ONLY archived cards, newest-archived first; default excludes them (KBR-60). */
+  archived?: boolean;
 }
 
 export async function listCards(
@@ -106,7 +110,8 @@ export async function listCards(
   projectId: string,
   filters: CardFilters = {},
 ): Promise<CardDto[]> {
-  const clauses = ['tenant_id = ?', 'project_id = ?'];
+  // Archived cards leave the board by default; ?archived=1 flips the lens (KBR-60).
+  const clauses = ['tenant_id = ?', 'project_id = ?', filters.archived ? 'archived_at IS NOT NULL' : 'archived_at IS NULL'];
   const binds: unknown[] = [tenantId, projectId];
   if (filters.columnId) {
     clauses.push('column_id = ?');
@@ -131,9 +136,11 @@ export async function listCards(
       binds.push(now, now + DUE_SOON_WINDOW_MS);
     }
   }
-  const order = filters.sort === 'due'
-    ? '(due_at IS NULL) ASC, due_at ASC, position ASC'
-    : 'position ASC';
+  const order = filters.archived
+    ? 'archived_at DESC'
+    : filters.sort === 'due'
+      ? '(due_at IS NULL) ASC, due_at ASC, position ASC'
+      : 'position ASC';
   const [rs, code] = await Promise.all([
     env.db.prepare(`SELECT * FROM cards WHERE ${clauses.join(' AND ')} ORDER BY ${order}`)
       .bind(...binds)
@@ -157,7 +164,7 @@ async function queueSection(
   whoCol: 'assignee_user_id' | 'reviewer_user_id',
   role: 'ready' | 'review',
 ): Promise<QueueCardDto[]> {
-  const clauses = ['c.tenant_id = ?', `c.${whoCol} = ?`, 'col.role = ?'];
+  const clauses = ['c.tenant_id = ?', `c.${whoCol} = ?`, 'col.role = ?', 'c.archived_at IS NULL'];
   const binds: unknown[] = [tenantId, userId, role];
   if (opts.projectId) {
     clauses.push('c.project_id = ?');
@@ -367,6 +374,14 @@ export async function patchCard(
     reviewer_user_id:
       input.reviewerUserId === undefined ? existing.reviewer_user_id : input.reviewerUserId,
     due_at: input.dueAt === undefined ? existing.due_at : input.dueAt,
+    // Archive flag (KBR-60): true stamps now, false clears; untouched otherwise.
+    // A restore drops the card back into its retained column_id — no recompute.
+    archived_at:
+      input.archived === undefined
+        ? existing.archived_at
+        : input.archived
+          ? existing.archived_at ?? Date.now()
+          : null,
   };
 
   // Derive system timeline events from what actually changed. Provenance is no
@@ -396,6 +411,9 @@ export async function patchCard(
   if (next.due_at !== existing.due_at) {
     events.push(ev('due', { from: existing.due_at, to: next.due_at }));
   }
+  if (next.archived_at !== existing.archived_at) {
+    events.push(ev(next.archived_at != null ? 'archived' : 'restored', {}));
+  }
   const editedFields: string[] = [];
   if (next.summary !== existing.summary) editedFields.push('summary');
   if (next.description !== existing.description) editedFields.push('description');
@@ -418,11 +436,11 @@ export async function patchCard(
 
   const updateStmt = env.db.prepare(
     `UPDATE cards SET summary = ?, description = ?, acceptance_criteria = ?, color = ?,
-        column_id = ?, position = ?, assignee_user_id = ?, reviewer_user_id = ?, due_at = ?, updated_by = ?, updated_at = ?
+        column_id = ?, position = ?, assignee_user_id = ?, reviewer_user_id = ?, due_at = ?, archived_at = ?, updated_by = ?, updated_at = ?
       WHERE id = ? AND tenant_id = ?`,
   ).bind(
     next.summary, next.description, next.acceptance_criteria, next.color,
-    next.column_id, next.position, next.assignee_user_id, next.reviewer_user_id, next.due_at, userId, Date.now(),
+    next.column_id, next.position, next.assignee_user_id, next.reviewer_user_id, next.due_at, next.archived_at, userId, Date.now(),
     id, tenantId,
   );
 
@@ -469,6 +487,46 @@ export async function patchCard(
   const row = await getCardRow(env, tenantId, id);
   if (!row) throw new HttpError(500, 'Card update did not return row');
   return toDto(row, await projectCode(env, tenantId, existing.project_id));
+}
+
+/**
+ * Lazy auto-archive (KBR-60): archive this project's done-column cards whose
+ * last activity is older than `days`. Runs on board read when the project's
+ * `autoArchiveDoneDays` knob is set — no cron, no scheduler. Each archived
+ * card gets an `archived` event with a NULL author + `{auto: true}` meta, so
+ * the timeline explains the disappearance without inventing an actor.
+ */
+export async function autoArchiveDone(
+  env: Env,
+  tenantId: string,
+  projectId: string,
+  days: number,
+): Promise<number> {
+  const cutoff = Date.now() - days * 86_400_000;
+  const rs = await env.db.prepare(
+    `SELECT c.id FROM cards c
+       JOIN columns col ON col.id = c.column_id
+      WHERE c.tenant_id = ? AND c.project_id = ? AND c.archived_at IS NULL
+        AND col.role = 'done' AND c.updated_at < ?`,
+  )
+    .bind(tenantId, projectId, cutoff)
+    .all<{ id: string }>();
+  const ids = (rs.results ?? []).map((r) => r.id);
+  if (ids.length === 0) return 0;
+
+  const now = Date.now();
+  await env.db.batch([
+    ...ids.map((id) =>
+      env.db.prepare('UPDATE cards SET archived_at = ? WHERE id = ? AND tenant_id = ?').bind(now, id, tenantId),
+    ),
+    ...ids.map((id) =>
+      insertEventStmt(env, {
+        tenantId, cardId: id, authorUserId: null,
+        kind: 'system', eventType: 'archived', meta: { auto: true, days },
+      }),
+    ),
+  ]);
+  return ids.length;
 }
 
 /** Delete a card + its children (timeline, mentions, attachment rows). Returns

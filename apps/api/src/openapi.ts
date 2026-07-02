@@ -88,6 +88,10 @@ export const OPENAPI_SPEC = {
             type: ['integer', 'null'],
             description: 'Optional deadline, epoch ms (v0.17.0). Null = no due date. No reminders — a display + ordering signal only.',
           },
+          archivedAt: {
+            type: ['integer', 'null'],
+            description: 'When the card was archived (v0.17.0). Null = on the board. Archive via PATCH {archived: true|false}; timeline/attachments/mentions survive.',
+          },
           createdBy: { type: 'string' },
           updatedBy: { type: 'string' },
           createdAt: { type: 'integer' },
@@ -596,6 +600,7 @@ export const OPENAPI_SPEC = {
           { name: 'q', in: 'query', schema: { type: 'string' } },
           { name: 'due', in: 'query', schema: { type: 'string', enum: ['overdue', 'soon'] }, description: 'Due-date filter: overdue, or due within 48h (KBR-63).' },
           { name: 'sort', in: 'query', schema: { type: 'string', enum: ['due'] }, description: 'due = due-soonest first, undated cards last.' },
+          { name: 'archived', in: 'query', schema: { type: 'string', enum: ['1'] }, description: '1 = ONLY archived cards, newest-archived first (KBR-60). Default excludes archived.' },
         ],
         responses: { 200: { description: 'ok' } },
       },

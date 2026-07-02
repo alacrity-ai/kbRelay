@@ -117,6 +117,7 @@ export default function BoardApp({
   onMeChange: (me: MeResponse) => void;
   onSignOut: () => void;
 }) {
+  const dialog = useDialog();
   const [projects, setProjects] = useState<ProjectDto[]>([]);
   // `users` = all current tenant members (for the bell — mention authors can be
   // cross-project). `projectUsers` = scoped to the selected project (for the
@@ -239,7 +240,19 @@ export default function BoardApp({
     try {
       const { cards } = await api.listCards(project.id);
       const card = cards.find((c) => c.key === key);
-      if (!card) return false;
+      if (!card) {
+        // Keys are never reused (KBR-60): the card may be archived. Point the
+        // user at the restore path instead of failing as "doesn't exist".
+        const { cards: archived } = await api.listCards(project.id, { archived: true });
+        if (archived.some((c) => c.key === key)) {
+          void dialog.alert({
+            title: `${key} is archived`,
+            message: `Restore it from Project Settings → Archive in “${project.name}” to open it.`,
+          });
+          return true; // resolved — just not openable on the board
+        }
+        return false;
+      }
       selectProject(project.id);
       setNav({ cardId: card.id });
       setView('board');
@@ -248,6 +261,7 @@ export default function BoardApp({
       /* lost access mid-session or transient failure — leave the text alone */
       return false;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects, selectProject]);
 
   const cardLinks = useMemo<CardLinks>(() => ({
@@ -260,7 +274,6 @@ export default function BoardApp({
   // are known. The URL is cleaned first so a failed open doesn't loop; an
   // unresolvable key (no such card, or no access to its project) gets an
   // explicit error instead of the autolinks' silent no-op.
-  const dialog = useDialog();
   useEffect(() => {
     if (loading) return;
     const key = parseCardDeepLink(window.location.pathname);

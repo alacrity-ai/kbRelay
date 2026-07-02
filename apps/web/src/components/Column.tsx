@@ -15,6 +15,7 @@ export default function Column({
   onRename,
   onDelete,
   onSetRole,
+  onArchiveAll,
 }: {
   column: ColumnDto;
   cards: CardDto[];
@@ -24,6 +25,8 @@ export default function Column({
   onRename: (column: ColumnDto) => void;
   onDelete: (column: ColumnDto) => void;
   onSetRole: (column: ColumnDto, role: ColumnRole | null) => void;
+  /** Present only on the done-role lane (KBR-60): archive every card in it. */
+  onArchiveAll?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const role = column.role ? ROLE_META[column.role] : null;
@@ -47,6 +50,16 @@ export default function Column({
           </span>
           <span className="column-count">{cards.length}</span>
           <div className="column-actions">
+            {onArchiveAll && cards.length > 0 && (
+              <button className="icon-btn ghost" title={`Archive all ${cards.length} cards`} onClick={onArchiveAll} aria-label="Archive all cards in this column">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="2" y="4" width="20" height="5" rx="1" />
+                  <path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9" />
+                  <path d="M10 13h4" />
+                </svg>
+              </button>
+            )}
             <button className="icon-btn ghost" title="Rename column" onClick={() => onRename(column)} aria-label="Rename column">✎</button>
             <button className="icon-btn ghost" title="Delete column" onClick={() => onDelete(column)} aria-label="Delete column">✕</button>
           </div>

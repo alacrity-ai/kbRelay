@@ -38,6 +38,9 @@ export interface ProjectDto {
   updatedAt: number;
   /** Per-project mute valve for agent callback events (v0.15.x). Default true. */
   agentEventsEnabled: boolean;
+  /** Lazily archive done-column cards older than N days on board read
+   *  (v0.17.0, KBR-60). Null = off. */
+  autoArchiveDoneDays: number | null;
   /** Total cards in the project. Present on the list endpoint (for the project
    *  browser's badges); undefined on single-project fetches. */
   cardCount?: number;
@@ -75,6 +78,9 @@ export interface CardDto {
   reviewerUserId: string | null;
   /** Optional deadline, epoch ms (v0.17.0, KBR-63). Null = no due date. */
   dueAt: number | null;
+  /** When the card was archived (v0.17.0, KBR-60). Null = on the board.
+   *  Archiving is a visibility flag: timeline/attachments/mentions all stay. */
+  archivedAt: number | null;
   createdBy: string;
   updatedBy: string;
   createdAt: number;
@@ -140,6 +146,7 @@ export const patchProjectInput = z.object({
   color,
   status: z.enum(['active', 'archived']).optional(),
   agentEventsEnabled: z.boolean().optional(),
+  autoArchiveDoneDays: z.number().int().min(1).max(365).nullable().optional(),
 });
 export type PatchProjectInput = z.infer<typeof patchProjectInput>;
 
@@ -188,6 +195,8 @@ export const patchCardInput = z.object({
   assigneeUserId: idRef.nullable().optional(),
   reviewerUserId: idRef.nullable().optional(),
   dueAt,
+  /** true archives (card leaves the board), false restores to its retained column (KBR-60). */
+  archived: z.boolean().optional(),
   position,
 });
 export type PatchCardInput = z.infer<typeof patchCardInput>;

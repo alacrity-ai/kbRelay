@@ -93,15 +93,16 @@ export const allTools: Tool[] = [
   // ── Cards ──
   defineTool({
     name: 'list_cards',
-    description: 'List cards in a project. Optional filters: column (id), assignee (user id), q (text search on summary/description).',
+    description: 'List cards in a project. Optional filters: column (id), assignee (user id), q (text search on summary/description), archived=true (archived cards only; default excludes them).',
     inputSchema: z.object({
       projectId: z.string(),
       column: z.string().optional(),
       assignee: z.string().optional(),
       q: z.string().optional(),
+      archived: z.boolean().optional(),
     }),
     handler: (a, c) =>
-      c.request('GET', `/v1/projects/${enc(a.projectId)}/cards${qs({ column: a.column, assignee: a.assignee, q: a.q })}`),
+      c.request('GET', `/v1/projects/${enc(a.projectId)}/cards${qs({ column: a.column, assignee: a.assignee, q: a.q, archived: a.archived ? '1' : undefined })}`),
   }),
   defineTool({
     name: 'get_card',
@@ -139,6 +140,7 @@ export const allTools: Tool[] = [
       assigneeUserId: z.string().nullish(),
       reviewerUserId: z.string().nullish(),
       dueAt: z.number().nullish(),
+      archived: z.boolean().optional(),
       position: z.number().optional(),
     }),
     handler: (a, c) => {

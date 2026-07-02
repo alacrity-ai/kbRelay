@@ -234,11 +234,16 @@ function TimelineEntry({
   }
 
   if (event.kind === 'system') {
+    // A null author is a policy-driven event (lazy auto-archive, KBR-60):
+    // no actor to name, so the phrase stands alone.
+    const p = systemPhrase(event, userName);
     return (
       <div className="tl-system">
         <span className="tl-dot" />
         <span className="tl-sys-text">
-          <strong>{userName(event.authorUserId)}</strong> {systemPhrase(event, userName)}
+          {event.authorUserId != null
+            ? <><strong>{userName(event.authorUserId)}</strong> {p}</>
+            : <>{p.charAt(0).toUpperCase() + p.slice(1)}</>}
           {runCount > 1 && <span className="tl-run"> ×{runCount}</span>}
         </span>
         <span className="tl-time">{when}</span>
@@ -355,6 +360,12 @@ export function systemPhrase(e: CardEventDto, userName: (id: string | null) => s
         ? `updated the checklist (${done}/${total} done)`
         : 'updated the checklist';
     }
+    case 'archived':
+      return meta.auto === true
+        ? `auto-archived this card (in Done past the project's ${typeof meta.days === 'number' ? `${meta.days}-day ` : ''}limit)`
+        : 'archived this card';
+    case 'restored':
+      return 'restored this card to the board';
     case 'edited': {
       const fields = asStrings(meta.fields);
       return fields.length ? `edited the ${fields.join(', ')}` : 'edited this card';

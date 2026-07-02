@@ -135,7 +135,7 @@ export const createProject = (body: { name: string; code: string; description?: 
   request<{ project: ProjectDto; columns: ColumnDto[] }>('POST', '/v1/projects', body);
 export const getProject = (id: string) =>
   request<{ project: ProjectDto; columns: ColumnDto[] }>('GET', `/v1/projects/${id}`);
-export const patchProject = (id: string, body: Partial<Pick<ProjectDto, 'name' | 'code' | 'description' | 'color' | 'status' | 'agentEventsEnabled'>>) =>
+export const patchProject = (id: string, body: Partial<Pick<ProjectDto, 'name' | 'code' | 'description' | 'color' | 'status' | 'agentEventsEnabled' | 'autoArchiveDoneDays'>>) =>
   request<{ project: ProjectDto }>('PATCH', `/v1/projects/${id}`, body);
 export const deleteProject = (id: string) => request<{ ok: true }>('DELETE', `/v1/projects/${id}`);
 
@@ -151,8 +151,11 @@ export const patchColumn = (
 export const deleteColumn = (id: string) => request<{ ok: true }>('DELETE', `/v1/columns/${id}`);
 
 // ── Cards ──
-export const listCards = (projectId: string) =>
-  request<{ cards: CardDto[] }>('GET', `/v1/projects/${projectId}/cards`);
+export const listCards = (projectId: string, opts: { archived?: boolean } = {}) =>
+  request<{ cards: CardDto[] }>(
+    'GET',
+    `/v1/projects/${projectId}/cards${opts.archived ? '?archived=1' : ''}`,
+  );
 export interface CardInput {
   summary?: string;
   description?: string | null;
@@ -161,6 +164,8 @@ export interface CardInput {
   assigneeUserId?: string | null;
   reviewerUserId?: string | null;
   dueAt?: number | null;
+  /** true archives, false restores to the retained column (KBR-60). */
+  archived?: boolean;
   position?: number;
 }
 export const createCard = (projectId: string, body: CardInput) =>

@@ -1122,6 +1122,20 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 }
 .due-clear:hover { color: #f87171; }
 
+/* Archive list in Project Settings (KBR-60). */
+.archive-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.archive-row {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+}
+.archive-ident { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.archive-ident .view-eyebrow { margin-bottom: 0; }
+.archive-summary { font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archive-date { flex: none; font-size: 0.78rem; color: var(--muted, #94a3b8); }
+
 /* Run badge on collapsed spammy system-event rows (KBR-72): "×6". */
 .tl-run { color: var(--muted, #94a3b8); font-weight: 700; font-size: 0.85em; }
 
