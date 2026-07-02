@@ -17,6 +17,11 @@ const components: Components = {
     // the link text (a bare autolinked URL then vanishes entirely).
     return <a href={href} {...props} target="_blank" rel="noopener noreferrer">{children}</a>;
   },
+  // Attachment images (and any markdown image) render inline, scaled to a sane
+  // max so a large upload doesn't blow out the card view (v0.16.0).
+  img({ node: _node, ...props }) {
+    return <img {...props} className="md-img" loading="lazy" />;
+  },
 };
 
 const plugins = [remarkGfm, remarkBreaks];

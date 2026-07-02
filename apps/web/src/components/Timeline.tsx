@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { CardEventDto, UserDto } from '@kbrelay/shared';
+import type { CardEventDto, UserDto, AttachmentDto } from '@kbrelay/shared';
 import * as api from '../lib/api';
+import { attachmentMarkdown } from '../lib/attachments';
 import Markdown from './Markdown';
 import MentionTextArea from './MentionTextArea';
+import AttachmentToolbar from './AttachmentToolbar';
 import { useDialog } from './Dialog';
 
 function initials(name: string): string {
@@ -52,6 +54,9 @@ export default function Timeline({
   const [type, setType] = useState<'note' | 'handoff'>('note');
   const [summary, setSummary] = useState('');
   const [posting, setPosting] = useState(false);
+  // Attachments uploaded for the comment being composed (v0.16.0); linked to the
+  // event on post via attachmentIds.
+  const [pending, setPending] = useState<AttachmentDto[]>([]);
 
   const user = (id: string | null) => users.find((u) => u.id === id);
   const userName = (id: string | null) => user(id)?.name ?? 'someone';
@@ -105,10 +110,12 @@ export default function Timeline({
         type,
         body: body.trim(),
         ...(type === 'handoff' && summary.trim() ? { meta: { summary: summary.trim() } } : {}),
+        ...(pending.length ? { attachmentIds: pending.map((a) => a.id) } : {}),
       });
       setBody('');
       setSummary('');
       setType('note');
+      setPending([]);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to post');
@@ -151,6 +158,13 @@ export default function Timeline({
           onChange={setBody}
           users={users}
           rows={4}
+        />
+        <AttachmentToolbar
+          cardId={cardId}
+          onUploaded={(a) => {
+            setBody((b) => (b ? `${b}\n` : '') + attachmentMarkdown(a));
+            setPending((p) => [...p, a]);
+          }}
         />
         {error && <div className="error-text">{error}</div>}
         <div className="composer-actions">

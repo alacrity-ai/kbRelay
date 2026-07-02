@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
-import type { CardDto, ColumnDto, UserDto, MentionSourceKind } from '@kbrelay/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { CardDto, ColumnDto, UserDto, MentionSourceKind, AttachmentDto } from '@kbrelay/shared';
 import { UNASSIGNED_COLOR } from '@kbrelay/shared';
+import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
+import { attachmentMarkdown } from '../lib/attachments';
 import Timeline from './Timeline';
 import Markdown from './Markdown';
 import MentionTextArea from './MentionTextArea';
+import AttachmentToolbar from './AttachmentToolbar';
+import AttachmentList from './AttachmentList';
 
 export interface CardScrollTarget {
   kind: MentionSourceKind;
@@ -68,6 +72,31 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
   const [assignee, setAssignee] = useState(card?.assigneeUserId ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Attachments (v0.16.0). Seeded from the card if present; (re)fetched on open
+  // and after upload/delete, since the board's card list carries only counts.
+  const [attachments, setAttachments] = useState<AttachmentDto[]>(card?.attachments ?? []);
+  const refreshAttachments = useCallback(async () => {
+    if (!card) return;
+    try {
+      const { card: full } = await api.getCard(card.id);
+      setAttachments(full.attachments ?? []);
+    } catch {
+      /* leave the last-known list on a transient error */
+    }
+  }, [card]);
+  useEffect(() => {
+    if (card) void refreshAttachments();
+  }, [card, refreshAttachments]);
+
+  async function removeAttachment(a: AttachmentDto) {
+    try {
+      await api.deleteAttachment(a.id);
+      setAttachments((list) => list.filter((x) => x.id !== a.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove attachment');
+    }
+  }
 
   const userName = (id: string | null) => users.find((u) => u.id === id)?.name ?? id ?? '—';
   const userKind = (id: string | null) => users.find((u) => u.id === id)?.kind;
@@ -179,6 +208,19 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
               <div className="field">
                 <label>Description</label>
                 <MentionTextArea value={description} onChange={setDescription} users={users} rows={5} />
+                {isNew ? (
+                  <p className="attach-hint muted-note" style={{ fontSize: '0.8rem' }}>
+                    Save the card to attach files.
+                  </p>
+                ) : (
+                  <AttachmentToolbar
+                    cardId={card!.id}
+                    onUploaded={(a) => {
+                      setDescription((d) => (d ? `${d}\n` : '') + attachmentMarkdown(a));
+                      setAttachments((list) => [...list, a]);
+                    }}
+                  />
+                )}
               </div>
               <div className="field">
                 <label>Acceptance criteria</label>
@@ -252,6 +294,12 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
                 <div className={`view-text ${card!.description ? '' : 'empty'}`}>
                   {card!.description ? <Markdown users={users}>{card!.description}</Markdown> : 'No description.'}
                 </div>
+                {attachments.length > 0 && (
+                  <div className="attach-view">
+                    <span className="attach-view-label">Attachments</span>
+                    <AttachmentList items={attachments} onDelete={removeAttachment} />
+                  </div>
+                )}
               </div>
 
               <div className="view-section" ref={acRef}>

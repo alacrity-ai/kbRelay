@@ -22,6 +22,7 @@ import type {
   CreatedWebhookSubscription,
   CreateWebhookInput,
   PatchWebhookInput,
+  AttachmentDto,
 } from '@kbrelay/shared';
 import { getToken } from './auth';
 
@@ -159,6 +160,7 @@ export interface CardInput {
 }
 export const createCard = (projectId: string, body: CardInput) =>
   request<{ card: CardDto }>('POST', `/v1/projects/${projectId}/cards`, body);
+export const getCard = (id: string) => request<{ card: CardDto }>('GET', `/v1/cards/${id}`);
 export const patchCard = (id: string, body: CardInput) =>
   request<{ card: CardDto }>('PATCH', `/v1/cards/${id}`, body);
 export const deleteCard = (id: string) => request<{ ok: true }>('DELETE', `/v1/cards/${id}`);
@@ -170,6 +172,41 @@ export const addComment = (cardId: string, body: CreateCommentInput) =>
   request<{ event: CardEventDto }>('POST', `/v1/cards/${cardId}/comments`, body);
 export const redactComment = (cardId: string, commentId: string) =>
   request<{ event: CardEventDto }>('DELETE', `/v1/cards/${cardId}/comments/${commentId}`);
+
+// ── Attachments (v0.16.0) ──
+/** Same-origin bytes URL for an attachment (append ?download=1 to force download). */
+export const attachmentBlobUrl = (id: string, download = false): string =>
+  `/api/v1/attachments/${id}/blob${download ? '?download=1' : ''}`;
+
+/** Upload one file to a card (multipart — bypasses the JSON `request` helper so
+ *  the browser sets the multipart boundary). Returns the created attachment. */
+export async function uploadAttachment(cardId: string, file: File): Promise<AttachmentDto> {
+  const token = getToken();
+  const fd = new FormData();
+  fd.set('file', file);
+  const res = await fetch(`/api/v1/cards/${cardId}/attachments`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+    body: fd,
+  });
+  if (!res.ok) {
+    let message = `Upload failed (${res.status})`;
+    try {
+      const j = (await res.json()) as { error?: string };
+      if (j.error) message = j.error;
+    } catch {
+      /* no body */
+    }
+    const err = new Error(message) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
+  return ((await res.json()) as { attachment: AttachmentDto }).attachment;
+}
+
+export const deleteAttachment = (id: string) =>
+  request<{ ok: true }>('DELETE', `/v1/attachments/${id}`);
 
 // ── Mentions / notifications (v0.8.0) ──
 export const getMentions = (status: MentionsStatus = 'unread') =>
