@@ -407,15 +407,17 @@ export const OPENAPI_SPEC = {
     '/api/v1/me': {
       get: { summary: 'Whoami for the current token', responses: { 200: { description: 'ok' } } },
       patch: {
-        summary: 'Set your own color (token is tied to a user)',
+        summary: 'Set your own color and/or profile (token is tied to a user)',
         requestBody: {
           required: true,
           content: {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['color'],
-                properties: { color: { type: 'string', description: '#rrggbb hex' } },
+                properties: {
+                  color: { type: 'string', description: '#rrggbb hex' },
+                  profile: { type: ['string', 'null'], description: 'Free-text persona/role (KBR-21)' },
+                },
               },
             },
           },

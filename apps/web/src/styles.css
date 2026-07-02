@@ -227,6 +227,11 @@ select {
 .menu-item:hover { background: var(--surface-2); }
 .menu-item.active { background: var(--accent-soft); color: #fff; font-weight: 600; }
 .menu-divider { height: 1px; background: var(--border); margin: 0.35rem 0.2rem; }
+.menu-glyph { flex: none; }
+.menu-section-label {
+  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); font-weight: 700; padding: 0.1rem 0.6rem 0.15rem;
+}
 
 /* Project switcher */
 .project-trigger { max-width: min(320px, 46vw); }

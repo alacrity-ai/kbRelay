@@ -37,7 +37,7 @@ export interface AuthContext {
 /** Wire shape of GET /api/v1/me. */
 export interface MeResponse {
   tenant: { id: string; name: string; slug: string };
-  user: { id: string; name: string; kind: UserKind; role: Role | null; color: string };
+  user: { id: string; name: string; kind: UserKind; role: Role | null; color: string; profile: string | null };
 }
 
 /** Wire shape of a tenant user (assignee pickers, /users). */
@@ -50,10 +50,13 @@ export interface UserDto {
   color: string;
   /** Unique-per-tenant @-mention handle, e.g. "leif". Null if never assigned. */
   handle: string | null;
+  /** Free-text persona/role (KBR-21) — who this user is, for agents' context. Null if unset. */
+  profile: string | null;
 }
 
-/** PATCH /api/v1/me — set your own color (the token is tied to a user). */
+/** PATCH /api/v1/me — set your own color and/or profile (the token is tied to a user). */
 export const patchMeInput = z.object({
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'color must be a #rrggbb hex'),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'color must be a #rrggbb hex').optional(),
+  profile: z.string().max(2000).nullable().optional(),
 });
 export type PatchMeInput = z.infer<typeof patchMeInput>;

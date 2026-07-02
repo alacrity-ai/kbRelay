@@ -25,7 +25,7 @@ export const allTools: Tool[] = [
   }),
   defineTool({
     name: 'list_users',
-    description: 'List the tenant\'s users (id, name, kind human/agent, @handle). Use to resolve a name to an id for assignment, or a @handle to mention.',
+    description: 'List the tenant\'s users (id, name, kind, @handle, profile). Resolve a name→id for assignment or a @handle to mention; read `profile` for who a person is (role/persona) and how to weigh their feedback.',
     inputSchema: z.object({}),
     handler: (_a, c) => c.request('GET', '/v1/users'),
   }),

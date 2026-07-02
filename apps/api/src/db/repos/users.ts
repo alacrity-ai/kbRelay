@@ -15,6 +15,7 @@ interface UserRow {
   role: string | null;
   color: string | null;
   handle: string | null;
+  profile: string | null;
 }
 
 export async function getTenant(env: Env, tenantId: string): Promise<TenantRow | null> {
@@ -37,13 +38,13 @@ export async function listUsers(
   projectId?: string,
 ): Promise<UserDto[]> {
   const sql = projectId
-    ? `SELECT u.id, u.name, u.kind, u.role, u.color, u.handle
+    ? `SELECT u.id, u.name, u.kind, u.role, u.color, u.handle, u.profile
          FROM users u
          JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
         WHERE m.role = 'admin'
            OR EXISTS (SELECT 1 FROM project_access pa WHERE pa.project_id = ? AND pa.user_id = u.id)
         ORDER BY u.name ASC`
-    : `SELECT u.id, u.name, u.kind, u.role, u.color, u.handle
+    : `SELECT u.id, u.name, u.kind, u.role, u.color, u.handle, u.profile
          FROM users u
          JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
         ORDER BY u.name ASC`;
@@ -53,16 +54,30 @@ export async function listUsers(
   return (rs.results ?? []).map(toUserDto);
 }
 
-/** Set a user's color. Returns the effective (resolved) color. */
-export async function updateUserColor(
+/** Update the caller's own settings — only the fields provided (color / profile). */
+export async function updateMe(
   env: Env,
   tenantId: string,
   userId: string,
-  color: string,
+  input: { color?: string; profile?: string | null },
 ): Promise<void> {
-  await env.db.prepare('UPDATE users SET color = ? WHERE id = ? AND tenant_id = ?')
-    .bind(color, userId, tenantId)
+  const sets: string[] = [];
+  const binds: unknown[] = [];
+  if (input.color !== undefined) { sets.push('color = ?'); binds.push(input.color); }
+  if (input.profile !== undefined) { sets.push('profile = ?'); binds.push(input.profile); }
+  if (!sets.length) return;
+  binds.push(userId, tenantId);
+  await env.db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`)
+    .bind(...binds)
     .run();
+}
+
+/** The caller's profile text (for /me, which builds its response from the auth ctx + this). */
+export async function getUserProfile(env: Env, tenantId: string, userId: string): Promise<string | null> {
+  const r = await env.db.prepare('SELECT profile FROM users WHERE id = ? AND tenant_id = ?')
+    .bind(userId, tenantId)
+    .first<{ profile: string | null }>();
+  return r?.profile ?? null;
 }
 
 /** Verify a user id belongs to the tenant (used to validate assignees). */
@@ -85,6 +100,7 @@ export function toUserDto(row: UserRow): UserDto {
     role: (row.role as Role | null) ?? null,
     color: row.color ?? colorForUser(row.id),
     handle: row.handle ?? null,
+    profile: row.profile ?? null,
   };
 }
 
