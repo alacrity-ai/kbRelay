@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { readFile } from 'node:fs/promises';
+import { basename, extname } from 'node:path';
 import { defineTool, type Tool } from '../define-tool.js';
 
 /**
@@ -14,6 +16,23 @@ const qs = (params: Record<string, string | undefined>): string => {
   return pairs.length ? '?' + pairs.map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join('&') : '';
 };
 const enc = encodeURIComponent;
+
+/** Server-side cap on POST /cards/:id/attachments — checked here too for a clear error. */
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+
+/** Extension → content type for filePath uploads, so the server classifies the
+ *  kind correctly (image ⇒ inline render). Unknown ⇒ octet-stream. */
+const MIME_BY_EXT: Record<string, string> = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.webp': 'image/webp', '.svg': 'image/svg+xml', '.pdf': 'application/pdf',
+  '.txt': 'text/plain', '.md': 'text/markdown', '.csv': 'text/csv',
+  '.json': 'application/json', '.html': 'text/html',
+  '.zip': 'application/zip', '.gz': 'application/gzip', '.tar': 'application/x-tar',
+};
+
+interface UploadedAttachment {
+  attachment: { id: string; kind: string; filename: string; url: string };
+}
 
 export const allTools: Tool[] = [
   // ── Identity ──
@@ -160,7 +179,7 @@ export const allTools: Tool[] = [
   }),
   defineTool({
     name: 'add_comment',
-    description: 'Report results ON the timeline (not by editing the description). A note or a structured handoff. Body is markdown; @handle to notify.',
+    description: 'Report results ON the timeline (not by editing the description). A note or a structured handoff. Body is markdown; @handle to notify; attachmentIds links files uploaded via add_attachment.',
     inputSchema: z.object({
       cardId: z.string(),
       type: z.enum(['note', 'handoff']).default('note'),
@@ -173,12 +192,68 @@ export const allTools: Tool[] = [
           spunOff: z.array(z.string()).optional(),
         })
         .optional(),
+      attachmentIds: z.array(z.string()).optional(),
     }),
     handler: (a, c) => {
       const { cardId, ...body } = a;
       return c.request('POST', `/v1/cards/${enc(cardId)}/comments`, body);
     },
   }),
+  // ── Attachments (v0.17.0, KBR-66) ──
+  defineTool({
+    name: 'add_attachment',
+    description:
+      'Attach a file to a card: filePath (preferred) OR contentBase64+filename. ≤25 MB. Returns the attachment + a ready-to-paste markdown snippet; link it to a note/handoff via add_comment attachmentIds.',
+    inputSchema: z
+      .object({
+        cardId: z.string(),
+        filePath: z.string().optional(),
+        contentBase64: z.string().optional(),
+        filename: z.string().optional(),
+        contentType: z.string().optional(),
+      })
+      .refine((v) => (v.filePath != null) !== (v.contentBase64 != null), {
+        message: 'Provide exactly one of filePath or contentBase64',
+      })
+      .refine((v) => v.contentBase64 == null || !!v.filename, {
+        message: 'filename is required with contentBase64',
+      }),
+    handler: async (a, c) => {
+      let data: Uint8Array;
+      let filename: string;
+      if (a.filePath != null) {
+        data = new Uint8Array(await readFile(a.filePath));
+        filename = a.filename ?? basename(a.filePath);
+      } else {
+        data = new Uint8Array(Buffer.from(a.contentBase64!, 'base64'));
+        filename = a.filename!;
+      }
+      if (data.byteLength > MAX_ATTACHMENT_BYTES) {
+        throw new Error(
+          `File too large: ${(data.byteLength / (1024 * 1024)).toFixed(1)} MB (max 25 MB)`,
+        );
+      }
+      const contentType = a.contentType ?? MIME_BY_EXT[extname(filename).toLowerCase()];
+      const res = await c.upload<UploadedAttachment>(
+        `/v1/cards/${enc(a.cardId)}/attachments`,
+        { data, filename, contentType },
+      );
+      const att = res.attachment;
+      // Same snippet convention as the web composer: images inline, else a link.
+      const markdown = att.kind === 'image'
+        ? `![${att.filename}](${att.url})`
+        : `[📎 ${att.filename}](${att.url})`;
+      return { ...res, markdown };
+    },
+  }),
+  defineTool({
+    name: 'delete_attachment',
+    description:
+      'Delete an attachment (its bytes are purged). Uploader or admin only — others get 403. Remember to edit out any markdown referencing it.',
+    inputSchema: z.object({ attachmentId: z.string() }),
+    handler: (a, c) => c.request('DELETE', `/v1/attachments/${enc(a.attachmentId)}`),
+  }),
+
   defineTool({
     name: 'redact_comment',
     description: 'Redact (soft-delete) YOUR OWN comment — leaves a tombstone. For a leaked secret / PII / wrong-card post. Author-only.',

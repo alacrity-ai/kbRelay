@@ -14,7 +14,7 @@ One central board where an agent files tasks for a human, a human files tasks fo
 
 ## How an agent uses kbRelay — the MCP is the primary pathway
 
-The recommended way to give an agent kbRelay powers is the published MCP server, **`@alacrity-ai/kbrelaymcp`** (`packages/mcp`, currently `0.4.0`). It's a thin, standalone stdio client over the HTTP API — 17 RBAC-scoped tools. **Claude in this repo already has it configured** (`claude mcp get kbrelay`), pointing at the prod deployment with the `claude-main` key from `DO_NOT_COMMIT.md`.
+The recommended way to give an agent kbRelay powers is the published MCP server, **`@alacrity-ai/kbrelaymcp`** (`packages/mcp`, currently `0.5.0`). It's a thin, standalone stdio client over the HTTP API — 20 RBAC-scoped tools. **Claude in this repo already has it configured** (`claude mcp get kbrelay`), pointing at the prod deployment with the `claude-main` key from `DO_NOT_COMMIT.md`.
 
 ```bash
 # Add it to any MCP client (one-time):
@@ -24,7 +24,7 @@ claude mcp add kbrelay --scope user \
   -- npx -y @alacrity-ai/kbrelaymcp
 ```
 
-**The 17 tools:** `whoami`, `list_users`, `list_my_queue` · `list_projects`, `get_project`, `create_project`, `update_project` · `list_cards`, `get_card`, `create_card`, `update_card`, `delete_card` · `get_timeline`, `add_comment`, `redact_comment` · `get_mentions`, `mark_mentions_read`. The token's tenant + RBAC govern exactly what each tool can see/do.
+**The 20 tools:** `whoami`, `list_users`, `list_my_queue` · `list_projects`, `get_project`, `create_project`, `update_project`, `get_project_activity` · `list_cards`, `get_card`, `create_card`, `update_card`, `delete_card` · `get_timeline`, `add_comment`, `redact_comment`, `add_attachment`, `delete_attachment` · `get_mentions`, `mark_mentions_read`. The token's tenant + RBAC govern exactly what each tool can see/do.
 
 **The core loop (the handback contract, v0.15.0):** `list_my_queue` (my actionable work: cards assigned to me in a `ready`-role column) + `get_mentions` (what was I asked?) → `get_card` (read the spec) → `update_card` (take it: move to the `in_progress`-role column) + `add_comment` (a one-line "on it") → do the work → `update_card` (→ the `review`-role column) + `add_comment` (a `handoff` on the timeline, `@`-mentioning the requester) → `mark_mentions_read`. Move to `done` **only when the human says so**; if stuck, move to `blocked` + a comment saying why. Resolve target columns **by role** (from `get_project`), never by hardcoded name. A card's status **is** its column; report results on the **timeline**, not by editing the description. Full agent playbook: the `using_kbrelay` skill (`.claude/skills/USING_KBRELAY.md`).
 
@@ -71,7 +71,7 @@ apps/web/      Vite + React 19 SPA on Pages — a pure API client
                   NotificationBell, Timeline, Markdown, …
 packages/shared/  Types + zod schemas shared by api + web
                   (auth, accounts, agents, board, team, events, mentions, colors)
-packages/mcp/     @alacrity-ai/kbrelaymcp — standalone stdio MCP server (17 tools)
+packages/mcp/     @alacrity-ai/kbrelaymcp — standalone stdio MCP server (20 tools)
 infrastructure/docker/  docker-compose.yml + .env.selfhost.example (self-host stack)
 tools/            mint-token.mjs + CI boundary guards (check-no-*.sh)
 docs/vX.Y.Z/      Per-version design docs + release notes

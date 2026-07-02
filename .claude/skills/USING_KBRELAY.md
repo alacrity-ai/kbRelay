@@ -2,7 +2,7 @@
 
 **kbRelay** is a shared kanban board where humans and agents relay work to each other. If you're an agent, this is where you pick up tasks a human filed for you, and where you file tasks back for a human. This doc takes you from knowing nothing to using it in minutes.
 
-> **The MCP is your primary pathway (since 2026-07-01).** If your runtime has the `@alacrity-ai/kbrelaymcp` MCP server configured (Claude Code in the kbRelay repo does — server name `kbrelay`), use its 17 typed tools instead of raw curl; §1.5 maps every tool to its endpoint. The HTTP surface documented below is still fully supported and accurate — it's the fallback when you have no MCP client, and the only path for the few things the MCP doesn't wrap (attachment upload/delete, webhook admin, token self-management, column management). The concepts (§2), the handback contract (§2.5), and the etiquette (§6) apply identically to both paths.
+> **The MCP is your primary pathway (since 2026-07-01).** If your runtime has the `@alacrity-ai/kbrelaymcp` MCP server configured (Claude Code in the kbRelay repo does — server name `kbrelay`), use its 20 typed tools instead of raw curl; §1.5 maps every tool to its endpoint. The HTTP surface documented below is still fully supported and accurate — it's the fallback when you have no MCP client, and the only path for the few things the MCP doesn't wrap (webhook admin, token self-management, column management). The concepts (§2), the handback contract (§2.5), and the etiquette (§6) apply identically to both paths.
 
 - **Where:** `https://kbrelay.lalalimited.com`
 - **API base:** `https://kbrelay.lalalimited.com/api`
@@ -52,7 +52,7 @@ Remember your own `user.id` (e.g. `u_claude`) — you'll use it to find work ass
 
 ## 1.5 The MCP server — the primary pathway
 
-The published MCP server **`@alacrity-ai/kbrelaymcp`** (`packages/mcp`, currently `0.4.0`) is a thin stdio client over the same HTTP API — same token, same tenant scoping, same RBAC. Add it to any MCP client once:
+The published MCP server **`@alacrity-ai/kbrelaymcp`** (`packages/mcp`, currently `0.5.0`) is a thin stdio client over the same HTTP API — same token, same tenant scoping, same RBAC. Add it to any MCP client once:
 
 ```bash
 claude mcp add kbrelay --scope user \
@@ -61,7 +61,7 @@ claude mcp add kbrelay --scope user \
   -- npx -y @alacrity-ai/kbrelaymcp
 ```
 
-The 17 tools and where they land on the API:
+The 20 tools and where they land on the API:
 
 | MCP tool | HTTP equivalent |
 |---|---|
@@ -69,11 +69,13 @@ The 17 tools and where they land on the API:
 | `list_users` | `GET /v1/users` |
 | `list_my_queue` | `GET /v1/me/queue` — **your actionable work; start here** |
 | `list_projects` · `get_project` · `create_project` · `update_project` | `GET/POST /v1/projects` · `GET/PATCH /v1/projects/{id}` (`get_project` includes columns + roles) |
+| `get_project_activity` | `GET /v1/projects/{id}/events` — the board's newest-first activity feed (v0.17.0); catch up before working a shared project |
 | `list_cards` · `get_card` · `create_card` · `update_card` · `delete_card` | `GET/POST /v1/projects/{id}/cards` · `GET/PATCH/DELETE /v1/cards/{id}` |
-| `get_timeline` · `add_comment` · `redact_comment` | `GET /v1/cards/{id}/timeline` · `POST /v1/cards/{id}/comments` · `DELETE …/comments/{commentId}` |
+| `get_timeline` · `add_comment` · `redact_comment` | `GET /v1/cards/{id}/timeline` · `POST /v1/cards/{id}/comments` (accepts `attachmentIds`) · `DELETE …/comments/{commentId}` |
+| `add_attachment` · `delete_attachment` | `POST /v1/cards/{id}/attachments` (multipart; the tool takes `filePath` or base64, ≤25 MB, returns a markdown snippet) · `DELETE /v1/attachments/{id}` (v0.17.0) |
 | `get_mentions` · `mark_mentions_read` | `GET /v1/me/mentions` · `POST /v1/me/mentions/read` |
 
-Not wrapped by the MCP (use HTTP): attachment upload/delete (`get_card` *does* surface each attachment's metadata + URL), webhook admin, `PATCH /me`, token self-management, team/agent admin, and column create/edit/delete.
+Not wrapped by the MCP (use HTTP): attachment *download* (`get_card` surfaces each attachment's URL — fetch it with your bearer token), webhook admin, `PATCH /me`, token self-management, team/agent admin, and column create/edit/delete.
 
 ---
 
@@ -346,7 +348,7 @@ kbpost POST /v1/projects '{"name":"Landlord SEO v0.2","code":"LSEO","description
 
 - **Timeline is append-only — correct by adding, not editing.** There's no comment *edit*: to fix or update something, **post a follow-up comment**. The one exception is **redaction**: `DELETE /cards/{id}/comments/{commentId}` soft-deletes **your own** comment if it contains something that must not persist (a **leaked secret/token**, PII, or a wrong-card post). Redaction removes the content but leaves a *tombstone* (who removed it, when) — it doesn't erase history. You can only redact your **own** comments; **system events can't be redacted**. Deleting a card removes its whole timeline (and mentions). System events (create/move/assign/edit) are emitted automatically — you don't post those.
 - **@-mention with `@handle`** (from `GET /v1/users` → `.handle`). An unknown handle or a mention of yourself is just text (no notification). Emails like `a@b.com` don't trigger a mention.
-- **Attachments shipped in v0.16.0** (≤25 MB per file; images render inline on the board). Upload/delete is HTTP-only for now (`POST /cards/{id}/attachments`, `DELETE /attachments/{id}`) — the MCP has no upload tool yet, but `get_card` returns every attachment's metadata + URL, and you can fetch the bytes from `GET /attachments/{id}/blob` with your bearer token.
+- **Attachments shipped in v0.16.0** (≤25 MB per file; images render inline on the board). Upload via MCP `add_attachment` (`filePath` or base64 → returns a markdown snippet to embed; link to a note/handoff via `add_comment` `attachmentIds`) or HTTP multipart (`POST /cards/{id}/attachments`). `get_card` returns every attachment's metadata + URL; fetch the bytes from `GET /attachments/{id}/blob` with your bearer token.
 - Still no checklists, due dates, or reactions.
 - No real-time board push — re-fetch to see others' changes (the web board auto-refreshes every ~20s). For agents there IS push (v0.15.x): an admin can create a **webhook subscription** (Team & access, or `POST /v1/webhooks`) that fires the instant a card becomes actionable (assign-into-ready) or an agent is @-mentioned, gated per project by `agentEventsEnabled`. Polling `/me/queue` + `/me/mentions` needs zero setup and stays correct either way — the webhook is a nudge, the queue is the source of truth.
 - Deleting a column requires it be empty (move its cards first) → otherwise `409`.

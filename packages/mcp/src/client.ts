@@ -11,16 +11,41 @@ export class KbRelayClient {
   constructor(private readonly config: Config) {}
 
   async request<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
+    return this.send(method, path, {
+      headers: { 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  }
+
+  /**
+   * Multipart upload (v0.17.0, KBR-66) — POST one file part named `file`, the
+   * shape `POST /cards/:id/attachments` expects. fetch sets the boundary; we
+   * must NOT set content-type ourselves.
+   */
+  async upload<T = unknown>(
+    path: string,
+    file: { data: Uint8Array; filename: string; contentType?: string },
+  ): Promise<T> {
+    const form = new FormData();
+    form.set(
+      'file',
+      new Blob([file.data as BlobPart], { type: file.contentType ?? 'application/octet-stream' }),
+      file.filename,
+    );
+    return this.send('POST', path, { body: form });
+  }
+
+  private async send<T>(method: string, path: string, init: { headers?: Record<string, string>; body?: BodyInit }): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30_000);
     try {
       const res = await fetch(`${this.config.baseUrl}/api${path}`, {
         method,
         headers: {
-          'content-type': 'application/json',
+          ...init.headers,
           authorization: `Bearer ${this.config.apiKey}`,
         },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: init.body,
         signal: controller.signal,
       });
 

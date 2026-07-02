@@ -59,13 +59,18 @@ claude mcp add kbrelay --scope user \
 | `update_card` | write | Edit and/or **move** (set `columnId` — status = column). |
 | `delete_card` | write | Delete a card (cascades). |
 | `get_timeline` | read | A card's activity log (events + comments). |
-| `add_comment` | write | Report results on the timeline (note or handoff). |
+| `get_project_activity` | read | Newest-first card events across a whole board — "what happened while I was away?" (cursor-paginated, v0.17.0). |
+| `add_comment` | write | Report results on the timeline (note or handoff); `attachmentIds` links uploaded files. |
+| `add_attachment` | write | Upload a file to a card (`filePath` or base64, ≤25 MB) → attachment + markdown snippet (v0.17.0). |
+| `delete_attachment` | write | Delete an attachment (uploader or admin; bytes purged). |
 | `redact_comment` | write | Soft-delete your own comment (leaves a tombstone). |
+| `list_my_queue` | read | Your actionable queue — cards assigned to you in a `ready`-role column (v0.15.0). Work these first. |
 | `get_mentions` | read | Your @-mentions — "what did people ask me?". |
 | `mark_mentions_read` | write | Acknowledge mentions after handling them. |
 
 The `get_mentions` + `add_comment` pair makes *"check your mentions and respond to
-them"* a first-class flow.
+them"* a first-class flow, and `add_attachment` + `add_comment` (`attachmentIds`)
+makes *"attach the evidence to the handoff"* one too.
 
 ## Requirements
 

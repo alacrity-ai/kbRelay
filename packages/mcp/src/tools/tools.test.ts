@@ -6,7 +6,7 @@ const byName = (n: string) => allTools.find((t) => t.name === n)!;
 
 describe('tool registry', () => {
   it('exposes the full surface with unique names and short descriptions', () => {
-    expect(allTools.length).toBe(18);
+    expect(allTools.length).toBe(20);
     const names = allTools.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length); // no duplicates
     for (const t of allTools) {
@@ -21,7 +21,7 @@ describe('tool registry', () => {
       'whoami', 'list_users', 'list_projects', 'get_project', 'create_project', 'update_project',
       'list_cards', 'get_card', 'create_card', 'update_card', 'delete_card',
       'get_timeline', 'add_comment', 'redact_comment', 'get_mentions', 'mark_mentions_read',
-      'list_my_queue', 'get_project_activity',
+      'list_my_queue', 'get_project_activity', 'add_attachment', 'delete_attachment',
     ]) {
       expect(byName(n)).toBeDefined();
     }
@@ -82,6 +82,79 @@ describe('tool input validation (zod, before any request)', () => {
     const client = { request: vi.fn(async () => ({})) };
     await byName('create_card').run({ projectId: 'prj_9', summary: 'hi' }, client as never);
     expect(client.request).toHaveBeenCalledWith('POST', '/v1/projects/prj_9/cards', { summary: 'hi' });
+  });
+
+  it('add_attachment requires exactly one of filePath | contentBase64', async () => {
+    const client = { request: vi.fn(), upload: vi.fn() } as never;
+    await expect(byName('add_attachment').run({ cardId: 'c1' }, client)).rejects.toThrow();
+    await expect(
+      byName('add_attachment').run(
+        { cardId: 'c1', filePath: '/tmp/x.png', contentBase64: 'aGk=', filename: 'x.png' },
+        client,
+      ),
+    ).rejects.toThrow();
+    // base64 without a filename is rejected too.
+    await expect(
+      byName('add_attachment').run({ cardId: 'c1', contentBase64: 'aGk=' }, client),
+    ).rejects.toThrow();
+  });
+
+  it('add_attachment uploads base64 with a derived content type + markdown snippet', async () => {
+    const upload = vi.fn(async () => ({
+      attachment: { id: 'att_1', kind: 'image', filename: 'shot.png', url: '/api/v1/attachments/att_1/blob' },
+    }));
+    const client = { request: vi.fn(), upload } as never;
+    const out = (await byName('add_attachment').run(
+      { cardId: 'card_1', contentBase64: Buffer.from('png-bytes').toString('base64'), filename: 'shot.png' },
+      client,
+    )) as { markdown: string };
+    expect(upload).toHaveBeenCalledWith('/v1/cards/card_1/attachments', {
+      data: new Uint8Array(Buffer.from('png-bytes')),
+      filename: 'shot.png',
+      contentType: 'image/png',
+    });
+    expect(out.markdown).toBe('![shot.png](/api/v1/attachments/att_1/blob)');
+  });
+
+  it('add_attachment renders non-images as a download link snippet', async () => {
+    const upload = vi.fn(async () => ({
+      attachment: { id: 'att_2', kind: 'document', filename: 'report.pdf', url: '/api/v1/attachments/att_2/blob' },
+    }));
+    const client = { request: vi.fn(), upload } as never;
+    const out = (await byName('add_attachment').run(
+      { cardId: 'card_1', contentBase64: Buffer.from('%PDF').toString('base64'), filename: 'report.pdf' },
+      client,
+    )) as { markdown: string };
+    expect(out.markdown).toBe('[📎 report.pdf](/api/v1/attachments/att_2/blob)');
+  });
+
+  it('add_attachment rejects >25 MB with a clear error before any request', async () => {
+    const upload = vi.fn();
+    const client = { request: vi.fn(), upload } as never;
+    const big = Buffer.alloc(26 * 1024 * 1024).toString('base64');
+    await expect(
+      byName('add_attachment').run({ cardId: 'c1', contentBase64: big, filename: 'big.bin' }, client),
+    ).rejects.toThrow(/max 25 MB/);
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it('delete_attachment hits the attachment path', async () => {
+    const client = { request: vi.fn(async () => ({ ok: true })) };
+    await byName('delete_attachment').run({ attachmentId: 'att_9' }, client as never);
+    expect(client.request).toHaveBeenCalledWith('DELETE', '/v1/attachments/att_9');
+  });
+
+  it('add_comment passes attachmentIds through', async () => {
+    const client = { request: vi.fn(async () => ({})) };
+    await byName('add_comment').run(
+      { cardId: 'c1', body: 'see file', attachmentIds: ['att_1'] },
+      client as never,
+    );
+    expect(client.request).toHaveBeenCalledWith('POST', '/v1/cards/c1/comments', {
+      type: 'note',
+      body: 'see file',
+      attachmentIds: ['att_1'],
+    });
   });
 
   it('update_project PATCHes only the passed fields (projectId in the path)', async () => {
