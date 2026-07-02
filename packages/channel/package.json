@@ -1,0 +1,43 @@
+{
+  "name": "@alacrity-ai/kbrelaychannel",
+  "version": "0.1.0",
+  "description": "kbRelay Claude Code channel — push kbRelay events (assign-into-Ready, @-mentions) into a running Claude Code session.",
+  "type": "module",
+  "license": "MIT",
+  "private": false,
+  "bin": {
+    "kbrelaychannel": "./bin/kbrelaychannel.mjs"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "mcp",
+    "claude-code",
+    "channel",
+    "kbrelay",
+    "webhook"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.3",
+    "vitest": "^2.1.0"
+  }
+}

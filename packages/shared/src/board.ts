@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { AttachmentDto, AttachmentCounts } from './attachments.ts';
 
 /**
  * Board domain: projects → columns → cards. Types are the wire shapes
@@ -7,6 +8,22 @@ import { z } from 'zod';
  */
 
 export type ProjectStatus = 'active' | 'archived';
+
+/**
+ * A column's semantic role (v0.15.0). Optional — a column with no role is
+ * neutral (e.g. Backlog). Roles give columns weight without hard-coding names:
+ * `ready` = fair game to work, `in_progress` = an agent has picked it up,
+ * `review` = handed back for a human, `done` = closed, `blocked` = stuck.
+ * At most one column per project may hold a given role (enforced in the repo).
+ */
+export type ColumnRole = 'ready' | 'in_progress' | 'review' | 'done' | 'blocked';
+export const COLUMN_ROLES: readonly ColumnRole[] = [
+  'ready',
+  'in_progress',
+  'review',
+  'done',
+  'blocked',
+];
 
 export interface ProjectDto {
   id: string;
@@ -19,6 +36,8 @@ export interface ProjectDto {
   createdBy: string;
   createdAt: number;
   updatedAt: number;
+  /** Per-project mute valve for agent callback events (v0.15.x). Default true. */
+  agentEventsEnabled: boolean;
   /** Total cards in the project. Present on the list endpoint (for the project
    *  browser's badges); undefined on single-project fetches. */
   cardCount?: number;
@@ -30,6 +49,8 @@ export interface ColumnDto {
   name: string;
   color: string | null;
   position: number;
+  /** Semantic role, or null for a neutral column. See {@link ColumnRole}. */
+  role: ColumnRole | null;
   createdAt: number;
 }
 
@@ -53,6 +74,20 @@ export interface CardDto {
   updatedBy: string;
   createdAt: number;
   updatedAt: number;
+  /** Attachments on the card (v0.16.0). Present on single-card GET only. */
+  attachments?: AttachmentDto[];
+  /** Per-kind attachment counts (v0.16.0). Present on the board list endpoint. */
+  attachmentCounts?: AttachmentCounts;
+}
+
+/**
+ * An actionable card in the caller's queue (GET /me/queue, v0.15.0): a card
+ * assigned to the caller that sits in a `ready`-role column. Enriched with the
+ * owning project's code + name so an agent needs no follow-up lookup.
+ */
+export interface QueueCardDto extends CardDto {
+  projectCode: string | null;
+  projectName: string;
 }
 
 // ── shared field validators ────────────────────────────────
@@ -83,14 +118,19 @@ export const patchProjectInput = z.object({
   description: longText,
   color,
   status: z.enum(['active', 'archived']).optional(),
+  agentEventsEnabled: z.boolean().optional(),
 });
 export type PatchProjectInput = z.infer<typeof patchProjectInput>;
 
 // ── Columns ────────────────────────────────────────────────
+/** Column role validator: one of the roles, or null to clear it. */
+const columnRole = z.enum(COLUMN_ROLES as [ColumnRole, ...ColumnRole[]]).nullable().optional();
+
 export const createColumnInput = z.object({
   name,
   color,
   position,
+  role: columnRole,
 });
 export type CreateColumnInput = z.infer<typeof createColumnInput>;
 
@@ -98,6 +138,7 @@ export const patchColumnInput = z.object({
   name: name.optional(),
   color,
   position,
+  role: columnRole,
 });
 export type PatchColumnInput = z.infer<typeof patchColumnInput>;
 
@@ -126,10 +167,17 @@ export const patchCardInput = z.object({
 });
 export type PatchCardInput = z.infer<typeof patchCardInput>;
 
-/** The 4 columns every new project is seeded with, in order. */
-export const DEFAULT_COLUMNS: ReadonlyArray<{ name: string; color: string }> = [
-  { name: 'Todo', color: '#64748b' },
-  { name: 'In Progress', color: '#2563eb' },
-  { name: 'In Review', color: '#d97706' },
-  { name: 'Done', color: '#16a34a' },
+/**
+ * The columns every new project is seeded with, in order, with roles pre-wired
+ * (v0.15.0). `Backlog` is intentionally role-less (a neutral staging lane); the
+ * rest carry the semantic roles that drive the human⇄agent flow. See
+ * docs/v0.15.0/2-HUMAN_AGENT_FLOWS_DESIGN.md §1.8.
+ */
+export const DEFAULT_COLUMNS: ReadonlyArray<{ name: string; color: string; role: ColumnRole | null }> = [
+  { name: 'Backlog', color: '#64748b', role: null },
+  { name: 'Blocked', color: '#dc2626', role: 'blocked' },
+  { name: 'Ready', color: '#0891b2', role: 'ready' },
+  { name: 'In Progress', color: '#2563eb', role: 'in_progress' },
+  { name: 'In Review', color: '#d97706', role: 'review' },
+  { name: 'Done', color: '#16a34a', role: 'done' },
 ];

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { mcpAddCommand } from '../lib/setupSnippets';
 
 /**
  * A small "(?)" badge that opens a KISS guide for connecting the kbRelay MCP.
@@ -25,14 +26,8 @@ export function McpGuideButton() {
 
 function McpGuideModal({ onClose }: { onClose: () => void }) {
   const [copied, setCopied] = useState(false);
-  // Same-origin API → the current origin is the right base URL (works for the
-  // hosted app AND a self-host instance without hardcoding a domain).
-  const base = typeof window !== 'undefined' ? window.location.origin : 'https://kbrelay.lalalimited.com';
-  const command =
-    `claude mcp add kbrelay --scope user \\\n` +
-    `  --env KBRELAY_BASE_URL=${base} \\\n` +
-    `  --env KBRELAY_API_KEY=<your key> \\\n` +
-    `  -- npx -y @alacrity-ai/kbrelaymcp`;
+  // Shared with the Claude Code setup guide so the command never drifts.
+  const command = mcpAddCommand();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };

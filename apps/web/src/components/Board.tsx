@@ -13,7 +13,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import type { CardDto, ColumnDto, UserDto } from '@kbrelay/shared';
+import type { CardDto, ColumnDto, ColumnRole, UserDto } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
 import Column from './Column';
@@ -204,17 +204,21 @@ export default function Board({ projectId, users, meId, reloadNonce = 0, filter 
     }
   }
 
-  async function saveCard(input: CardInput) {
+  async function saveCard(input: CardInput): Promise<CardDto> {
     if (modal?.mode === 'view') {
       // Existing card: persist, refresh the open modal with the saved card,
       // and reconcile the board behind it. Modal stays open (returns to view).
       const { card } = await api.patchCard(modal.card.id, input);
       setModal({ mode: 'view', card });
       await load();
-    } else if (modal?.mode === 'create') {
-      await api.createCard(projectId, input);
-      await load();
+      return card;
     }
+    // Create: persist, then ADOPT the new card into the modal (view mode) so it
+    // can carry attachments / further edits — instead of forcing a close+reopen.
+    const { card } = await api.createCard(projectId, input);
+    setModal({ mode: 'view', card });
+    await load();
+    return card;
   }
 
   async function deleteCard() {
@@ -228,6 +232,24 @@ export default function Board({ projectId, users, meId, reloadNonce = 0, filter 
     if (!name || name === col.name) return;
     await api.patchColumn(col.id, { name });
     await load();
+  }
+
+  async function setColumnRole(col: ColumnDto, role: ColumnRole | null) {
+    if (col.role === role) return;
+    // The API enforces one-lane-per-role: setting a role yanks it off any other
+    // lane. Optimistically clear the old holder here so the badge moves at once.
+    setColumns((prev) => prev.map((c) => {
+      if (c.id === col.id) return { ...c, role };
+      if (role && c.role === role) return { ...c, role: null };
+      return c;
+    }));
+    try {
+      await api.patchColumn(col.id, { role });
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not set role');
+      void load();
+    }
   }
 
   async function deleteColumn(col: ColumnDto) {
@@ -276,6 +298,7 @@ export default function Board({ projectId, users, meId, reloadNonce = 0, filter 
               onOpenCard={(card) => { setScrollTo(undefined); setModal({ mode: 'view', card }); }}
               onRename={renameColumn}
               onDelete={deleteColumn}
+              onSetRole={setColumnRole}
             />
           ))}
         </div>

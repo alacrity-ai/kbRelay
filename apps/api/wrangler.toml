@@ -40,6 +40,11 @@ database_name = "kbrelay"
 database_id = "d64d1ce5-7803-4fc8-96ba-8122d2d9e700"
 migrations_dir = "migrations"
 
+# Attachments object storage (v0.16.0). Bucket already provisioned.
+[[env.prod.r2_buckets]]
+binding = "BLOB"
+bucket_name = "kbrelay-attachments"
+
 # ── dev ───────────────────────────────────────────────────────
 # Provision once before the first dev deploy:
 #   wrangler d1 create kbrelay-dev     → paste id below
@@ -62,3 +67,9 @@ binding = "DB"
 database_name = "kbrelay-dev"
 database_id = "34ba981f-0655-4067-b649-131e827ca94c"
 migrations_dir = "migrations"
+
+# Attachments object storage (v0.16.0). Local `wrangler dev` simulates R2;
+# the dev bucket backs remote dev deploys.
+[[env.dev.r2_buckets]]
+binding = "BLOB"
+bucket_name = "kbrelay-attachments-dev"

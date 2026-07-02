@@ -1,8 +1,18 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import type { UserDto } from '@kbrelay/shared';
+import { isAttachmentUrl } from '../lib/authedBlob';
+import AuthedImage from './AuthedImage';
+import AuthedDownloadLink from './AuthedDownloadLink';
+
+/** Flatten markdown link/children into plain text (for a download filename). */
+function nodeText(children: ReactNode): string {
+  if (typeof children === 'string') return children;
+  if (Array.isArray(children)) return children.map(nodeText).join('');
+  return '';
+}
 
 // Open links in a new tab, safely. react-markdown renders to React elements and
 // does NOT emit raw HTML by default (no rehype-raw), so embedded HTML/scripts in
@@ -13,9 +23,24 @@ const components: Components = {
     if (href && href.startsWith('#mention-')) {
       return <span className="mention-chip">{children}</span>;
     }
+    // Attachment links are auth-gated — download via an authenticated fetch
+    // (a bare <a href> would 401; see lib/authedBlob). Filename from the link
+    // text (our injected label is "📎 filename").
+    if (isAttachmentUrl(href)) {
+      const filename = nodeText(children).replace(/^📎\s*/, '').trim() || undefined;
+      return <AuthedDownloadLink href={href!} filename={filename}>{children}</AuthedDownloadLink>;
+    }
     // `children` MUST be rendered — omitting it emits an empty <a>, which erases
     // the link text (a bare autolinked URL then vanishes entirely).
     return <a href={href} {...props} target="_blank" rel="noopener noreferrer">{children}</a>;
+  },
+  // Attachment images fetch with auth then render from an object URL (v0.16.0);
+  // other images render natively. Both scaled via .md-img.
+  img({ node: _node, src, alt, ...props }) {
+    if (isAttachmentUrl(typeof src === 'string' ? src : undefined)) {
+      return <AuthedImage src={src as string} alt={typeof alt === 'string' ? alt : undefined} />;
+    }
+    return <img src={src} alt={alt} {...props} className="md-img" loading="lazy" />;
   },
 };
 

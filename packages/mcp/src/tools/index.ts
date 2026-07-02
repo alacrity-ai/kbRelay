@@ -25,7 +25,7 @@ export const allTools: Tool[] = [
   }),
   defineTool({
     name: 'list_users',
-    description: 'List the tenant\'s users (id, name, kind human/agent, @handle). Use to resolve a name to an id for assignment, or a @handle to mention.',
+    description: 'List the tenant\'s users (id, name, kind, @handle, profile). Resolve a name→id for assignment or a @handle to mention; read `profile` for who a person is (role/persona) and how to weigh their feedback.',
     inputSchema: z.object({}),
     handler: (_a, c) => c.request('GET', '/v1/users'),
   }),
@@ -39,7 +39,7 @@ export const allTools: Tool[] = [
   }),
   defineTool({
     name: 'get_project',
-    description: 'Get one project (name, code, description, color, status) and its columns. Read `description` to learn what the project is for. Column ids are per-project — resolve by name here, never hardcode.',
+    description: 'Get a project (name, code, description, color, status) + its columns, each with an optional `role`. Read `description` for context. Resolve target columns by `role`, never by hardcoded name.',
     inputSchema: z.object({ projectId: z.string() }),
     handler: (a, c) => c.request('GET', `/v1/projects/${enc(a.projectId)}`),
   }),
@@ -108,7 +108,7 @@ export const allTools: Tool[] = [
   }),
   defineTool({
     name: 'update_card',
-    description: 'Edit a card AND/OR move it. To change status, set columnId (status = column). Rewrite the spec in place; do NOT log progress here — use add_comment.',
+    description: 'Edit a card and/or move it (status = column). Move by role: pickup → in_progress, finish → review, done only when told, stuck → blocked. Log progress via add_comment, not the description.',
     inputSchema: z.object({
       cardId: z.string(),
       summary: z.string().optional(),
@@ -163,6 +163,15 @@ export const allTools: Tool[] = [
     description: 'Redact (soft-delete) YOUR OWN comment — leaves a tombstone. For a leaked secret / PII / wrong-card post. Author-only.',
     inputSchema: z.object({ cardId: z.string(), commentId: z.string() }),
     handler: (a, c) => c.request('DELETE', `/v1/cards/${enc(a.cardId)}/comments/${enc(a.commentId)}`),
+  }),
+
+  // ── Your queue (what to work now) ──
+  defineTool({
+    name: 'list_my_queue',
+    description:
+      'Your queue: cards assigned to you in a `ready`-role column (optional projectId). Work these first. Pick up → in_progress, finish → review + handoff, done only when told.',
+    inputSchema: z.object({ projectId: z.string().optional() }),
+    handler: (a, c) => c.request('GET', `/v1/me/queue${qs({ projectId: a.projectId })}`),
   }),
 
   // ── Mentions (your inbox) ──

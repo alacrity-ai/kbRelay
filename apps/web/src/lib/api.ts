@@ -3,6 +3,7 @@ import type {
   UserDto,
   ProjectDto,
   ColumnDto,
+  ColumnRole,
   CardDto,
   CardEventDto,
   CreateCommentInput,
@@ -17,6 +18,11 @@ import type {
   TeamResponse,
   MembershipRole,
   AgentSummary,
+  WebhookSubscriptionDto,
+  CreatedWebhookSubscription,
+  CreateWebhookInput,
+  PatchWebhookInput,
+  AttachmentDto,
 } from '@kbrelay/shared';
 import { getToken } from './auth';
 
@@ -96,6 +102,16 @@ export const createAgentToken = (userId: string, label: string) =>
 export const revokeAgentToken = (userId: string, tokenId: string) =>
   request<{ ok: true }>('DELETE', `/v1/agents/${userId}/tokens/${tokenId}`);
 
+// ── Webhook subscriptions (v0.15.x) ── admin-only
+export const listWebhooks = () =>
+  request<{ webhooks: WebhookSubscriptionDto[] }>('GET', '/v1/webhooks');
+export const createWebhook = (body: CreateWebhookInput) =>
+  request<CreatedWebhookSubscription>('POST', '/v1/webhooks', body);
+export const patchWebhook = (id: string, body: PatchWebhookInput) =>
+  request<{ webhook: WebhookSubscriptionDto }>('PATCH', `/v1/webhooks/${id}`, body);
+export const deleteWebhook = (id: string) =>
+  request<{ ok: true }>('DELETE', `/v1/webhooks/${id}`);
+
 // ── Self-service API keys (v0.10.0) ──
 export const listTokens = () => request<{ tokens: TokenSummary[] }>('GET', '/v1/me/tokens');
 export const createToken = (label: string) =>
@@ -104,7 +120,8 @@ export const deleteToken = (id: string) => request<{ ok: true }>('DELETE', `/v1/
 
 // ── Identity ──
 export const getMe = () => request<MeResponse>('GET', '/v1/me');
-export const patchMe = (color: string) => request<MeResponse>('PATCH', '/v1/me', { color });
+export const patchMe = (body: { color?: string; profile?: string | null }) =>
+  request<MeResponse>('PATCH', '/v1/me', body);
 export const listUsers = (projectId?: string) =>
   request<{ users: UserDto[] }>('GET', `/v1/users${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`);
 
@@ -115,15 +132,19 @@ export const createProject = (body: { name: string; code: string; description?: 
   request<{ project: ProjectDto; columns: ColumnDto[] }>('POST', '/v1/projects', body);
 export const getProject = (id: string) =>
   request<{ project: ProjectDto; columns: ColumnDto[] }>('GET', `/v1/projects/${id}`);
-export const patchProject = (id: string, body: Partial<Pick<ProjectDto, 'name' | 'code' | 'description' | 'color' | 'status'>>) =>
+export const patchProject = (id: string, body: Partial<Pick<ProjectDto, 'name' | 'code' | 'description' | 'color' | 'status' | 'agentEventsEnabled'>>) =>
   request<{ project: ProjectDto }>('PATCH', `/v1/projects/${id}`, body);
 export const deleteProject = (id: string) => request<{ ok: true }>('DELETE', `/v1/projects/${id}`);
 
 // ── Columns ──
-export const createColumn = (projectId: string, body: { name: string; color?: string | null; position?: number }) =>
-  request<{ column: ColumnDto }>('POST', `/v1/projects/${projectId}/columns`, body);
-export const patchColumn = (id: string, body: { name?: string; color?: string | null; position?: number }) =>
-  request<{ column: ColumnDto }>('PATCH', `/v1/columns/${id}`, body);
+export const createColumn = (
+  projectId: string,
+  body: { name: string; color?: string | null; position?: number; role?: ColumnRole | null },
+) => request<{ column: ColumnDto }>('POST', `/v1/projects/${projectId}/columns`, body);
+export const patchColumn = (
+  id: string,
+  body: { name?: string; color?: string | null; position?: number; role?: ColumnRole | null },
+) => request<{ column: ColumnDto }>('PATCH', `/v1/columns/${id}`, body);
 export const deleteColumn = (id: string) => request<{ ok: true }>('DELETE', `/v1/columns/${id}`);
 
 // ── Cards ──
@@ -139,6 +160,7 @@ export interface CardInput {
 }
 export const createCard = (projectId: string, body: CardInput) =>
   request<{ card: CardDto }>('POST', `/v1/projects/${projectId}/cards`, body);
+export const getCard = (id: string) => request<{ card: CardDto }>('GET', `/v1/cards/${id}`);
 export const patchCard = (id: string, body: CardInput) =>
   request<{ card: CardDto }>('PATCH', `/v1/cards/${id}`, body);
 export const deleteCard = (id: string) => request<{ ok: true }>('DELETE', `/v1/cards/${id}`);
@@ -150,6 +172,41 @@ export const addComment = (cardId: string, body: CreateCommentInput) =>
   request<{ event: CardEventDto }>('POST', `/v1/cards/${cardId}/comments`, body);
 export const redactComment = (cardId: string, commentId: string) =>
   request<{ event: CardEventDto }>('DELETE', `/v1/cards/${cardId}/comments/${commentId}`);
+
+// ── Attachments (v0.16.0) ──
+/** Same-origin bytes URL for an attachment (append ?download=1 to force download). */
+export const attachmentBlobUrl = (id: string, download = false): string =>
+  `/api/v1/attachments/${id}/blob${download ? '?download=1' : ''}`;
+
+/** Upload one file to a card (multipart — bypasses the JSON `request` helper so
+ *  the browser sets the multipart boundary). Returns the created attachment. */
+export async function uploadAttachment(cardId: string, file: File): Promise<AttachmentDto> {
+  const token = getToken();
+  const fd = new FormData();
+  fd.set('file', file);
+  const res = await fetch(`/api/v1/cards/${cardId}/attachments`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+    body: fd,
+  });
+  if (!res.ok) {
+    let message = `Upload failed (${res.status})`;
+    try {
+      const j = (await res.json()) as { error?: string };
+      if (j.error) message = j.error;
+    } catch {
+      /* no body */
+    }
+    const err = new Error(message) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
+  return ((await res.json()) as { attachment: AttachmentDto }).attachment;
+}
+
+export const deleteAttachment = (id: string) =>
+  request<{ ok: true }>('DELETE', `/v1/attachments/${id}`);
 
 // ── Mentions / notifications (v0.8.0) ──
 export const getMentions = (status: MentionsStatus = 'unread') =>

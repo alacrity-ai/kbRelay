@@ -1,6 +1,6 @@
 import type { Env } from './env';
 import type { AuthContext } from '@kbrelay/shared';
-import { handleMe, handlePatchMe } from './routes/me';
+import { handleMe, handlePatchMe, handleMyQueue } from './routes/me';
 import { handleListMentions, handleMarkMentionsRead } from './routes/mentions';
 import { handleListUsers } from './routes/users';
 import {
@@ -53,6 +53,18 @@ import {
   handleCreateAgentToken,
   handleRevokeAgentToken,
 } from './routes/agents';
+import {
+  handleListWebhooks,
+  handleCreateWebhook,
+  handlePatchWebhook,
+  handleDeleteWebhook,
+} from './routes/webhooks';
+import {
+  handleUploadAttachment,
+  handleGetAttachment,
+  handleGetAttachmentBlob,
+  handleDeleteAttachment,
+} from './routes/attachments';
 import type { AccessScope } from './auth/access';
 import { handleOpenApi } from './openapi';
 
@@ -111,6 +123,9 @@ export const routes: Route[] = [
   // ── Identity ──
   { method: 'GET', pattern: '/api/v1/me', handler: handleMe },
   { method: 'PATCH', pattern: '/api/v1/me', handler: handlePatchMe },
+  // Actionable queue (v0.15.0): assigned-to-me cards in a `ready`-role column.
+  // Not project-scoped in the router — it filters by RBAC internally.
+  { method: 'GET', pattern: '/api/v1/me/queue', handler: handleMyQueue },
   { method: 'GET', pattern: '/api/v1/users', handler: handleListUsers },
 
   // ── Mentions / notifications (v0.8.0) ──
@@ -134,6 +149,12 @@ export const routes: Route[] = [
   { method: 'GET', pattern: '/api/v1/agents/:userId/tokens', handler: handleListAgentTokens },
   { method: 'POST', pattern: '/api/v1/agents/:userId/tokens', handler: handleCreateAgentToken },
   { method: 'DELETE', pattern: '/api/v1/agents/:userId/tokens/:tokenId', handler: handleRevokeAgentToken },
+
+  // ── Webhook subscriptions (v0.15.x) — admin-gated in-handler; not project-scoped ──
+  { method: 'GET', pattern: '/api/v1/webhooks', handler: handleListWebhooks },
+  { method: 'POST', pattern: '/api/v1/webhooks', handler: handleCreateWebhook },
+  { method: 'PATCH', pattern: '/api/v1/webhooks/:id', handler: handlePatchWebhook },
+  { method: 'DELETE', pattern: '/api/v1/webhooks/:id', handler: handleDeleteWebhook },
 
   // ── Projects ── (list filters in-handler; create auto-grants the creator)
   { method: 'GET', pattern: '/api/v1/projects', handler: handleListProjects },
@@ -159,4 +180,11 @@ export const routes: Route[] = [
   { method: 'GET', pattern: '/api/v1/cards/:id/timeline', access: { kind: 'card', param: 'id' }, handler: handleListTimeline },
   { method: 'POST', pattern: '/api/v1/cards/:id/comments', access: { kind: 'card', param: 'id' }, handler: handleAddComment },
   { method: 'DELETE', pattern: '/api/v1/cards/:id/comments/:commentId', access: { kind: 'card', param: 'id' }, handler: handleRedactComment },
+
+  // ── Attachments (v0.16.0) ── upload is card-scoped; the rest resolve
+  // attachment → card → project via the `attachment` access scope.
+  { method: 'POST', pattern: '/api/v1/cards/:id/attachments', access: { kind: 'card', param: 'id' }, handler: handleUploadAttachment },
+  { method: 'GET', pattern: '/api/v1/attachments/:id', access: { kind: 'attachment', param: 'id' }, handler: handleGetAttachment },
+  { method: 'GET', pattern: '/api/v1/attachments/:id/blob', access: { kind: 'attachment', param: 'id' }, handler: handleGetAttachmentBlob },
+  { method: 'DELETE', pattern: '/api/v1/attachments/:id', access: { kind: 'attachment', param: 'id' }, handler: handleDeleteAttachment },
 ];

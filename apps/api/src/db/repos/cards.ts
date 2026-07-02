@@ -1,6 +1,13 @@
 import type { Env } from '../../env';
 import type { DbStatement } from '../../runtime/shared/db';
-import type { CardDto, CreateCardInput, PatchCardInput, SystemEventType } from '@kbrelay/shared';
+import type {
+  CardDto,
+  QueueCardDto,
+  CreateCardInput,
+  PatchCardInput,
+  SystemEventType,
+  WebhookTrigger,
+} from '@kbrelay/shared';
 import { HttpError } from '../../http';
 import { newId } from '../ids';
 import { RANK_STEP } from '../../rank';
@@ -10,6 +17,7 @@ import { userHasProjectAccess } from '../../auth/access';
 import { projectCode, nextCardSeq } from './projects';
 import { insertEventStmt, type EventInsert } from './card_events';
 import { reconcileMentionStmts, deleteMentionsForCardStmt } from './mentions';
+import { blobKeysForCard, deleteAttachmentsForCardStmt, purgeBlobs } from './attachments';
 
 /** Look up a column's name for durable move-event snapshots. */
 async function columnName(env: Env, tenantId: string, id: string): Promise<string | null> {
@@ -17,6 +25,23 @@ async function columnName(env: Env, tenantId: string, id: string): Promise<strin
     .bind(id, tenantId)
     .first<{ name: string }>();
   return r?.name ?? null;
+}
+
+/** A column's semantic role (for the assign-into-ready callback trigger). */
+async function columnRole(env: Env, tenantId: string, id: string): Promise<string | null> {
+  const r = await env.db.prepare('SELECT role FROM columns WHERE id = ? AND tenant_id = ?')
+    .bind(id, tenantId)
+    .first<{ role: string | null }>();
+  return r?.role ?? null;
+}
+
+/** Is this user an agent? (assign-into-ready only nudges agents.) */
+async function isAgent(env: Env, tenantId: string, userId: string | null): Promise<boolean> {
+  if (!userId) return false;
+  const r = await env.db.prepare('SELECT kind FROM users WHERE id = ? AND tenant_id = ?')
+    .bind(userId, tenantId)
+    .first<{ kind: string }>();
+  return r?.kind === 'agent';
 }
 
 interface CardRow {
@@ -94,6 +119,50 @@ export async function listCards(
   return (rs.results ?? []).map((r) => toDto(r, code));
 }
 
+interface QueueRow extends CardRow {
+  project_code: string | null;
+  project_name: string;
+}
+
+/**
+ * The caller's actionable queue (v0.15.0): cards assigned to `userId` that sit
+ * in a `ready`-role column. RBAC-scoped exactly like `listMentions` — an admin
+ * sees all; a member only cards in projects they have `project_access` to.
+ * Optional `projectId` narrows to one project. Newest-updated first.
+ */
+export async function listMyQueue(
+  env: Env,
+  tenantId: string,
+  userId: string,
+  opts: { isAdmin: boolean; projectId?: string },
+): Promise<QueueCardDto[]> {
+  const clauses = ['c.tenant_id = ?', 'c.assignee_user_id = ?', "col.role = 'ready'"];
+  const binds: unknown[] = [tenantId, userId];
+  if (opts.projectId) {
+    clauses.push('c.project_id = ?');
+    binds.push(opts.projectId);
+  }
+  if (!opts.isAdmin) {
+    clauses.push('EXISTS (SELECT 1 FROM project_access pa WHERE pa.project_id = c.project_id AND pa.user_id = ?)');
+    binds.push(userId);
+  }
+  const rs = await env.db.prepare(
+    `SELECT c.*, p.code AS project_code, p.name AS project_name
+       FROM cards c
+       JOIN columns col ON col.id = c.column_id
+       JOIN projects p  ON p.id = c.project_id
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY c.updated_at DESC, c.id ASC`,
+  )
+    .bind(...binds)
+    .all<QueueRow>();
+  return (rs.results ?? []).map((r) => ({
+    ...toDto(r, r.project_code),
+    projectCode: r.project_code,
+    projectName: r.project_name,
+  }));
+}
+
 async function getCardRow(env: Env, tenantId: string, id: string): Promise<CardRow | null> {
   return env.db.prepare('SELECT * FROM cards WHERE id = ? AND tenant_id = ?')
     .bind(id, tenantId)
@@ -112,6 +181,8 @@ export async function createCard(
   projectId: string,
   userId: string,
   input: CreateCardInput,
+  /** Optional collector for callback triggers (KBR-16); the handler dispatches them. */
+  triggers?: WebhookTrigger[],
 ): Promise<CardDto> {
   // Target column: caller's choice (validated) or the project's first column.
   let columnId = input.columnId;
@@ -154,11 +225,23 @@ export async function createCard(
   const users = await mentionableUsers(env, tenantId, projectId);
   const mentionStmts = (
     await Promise.all([
-      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind: 'summary', sourceId: 'summary', text: input.summary }, users),
-      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind: 'description', sourceId: 'description', text: input.description }, users),
-      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind: 'acceptance_criteria', sourceId: 'acceptance_criteria', text: input.acceptanceCriteria }, users),
+      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind: 'summary', sourceId: 'summary', text: input.summary }, users, triggers),
+      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind: 'description', sourceId: 'description', text: input.description }, users, triggers),
+      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind: 'acceptance_criteria', sourceId: 'acceptance_criteria', text: input.acceptanceCriteria }, users, triggers),
     ])
   ).flat();
+
+  // Assign-into-ready: a card created directly into a `ready` lane with an agent
+  // assignee is immediately actionable — nudge the agent.
+  if (triggers && input.assigneeUserId) {
+    const [role, agent] = await Promise.all([
+      columnRole(env, tenantId, columnId),
+      isAgent(env, tenantId, input.assigneeUserId),
+    ]);
+    if (role === 'ready' && agent) {
+      triggers.push({ event: 'card.ready', recipientUserId: input.assigneeUserId, source: { kind: 'assign' } });
+    }
+  }
 
   // Insert the card, its 'created' timeline event, and any mentions atomically.
   await env.db.batch([
@@ -194,6 +277,8 @@ export async function patchCard(
   id: string,
   userId: string,
   input: PatchCardInput,
+  /** Optional collector for callback triggers (KBR-16); the handler dispatches them. */
+  triggers?: WebhookTrigger[],
 ): Promise<CardDto> {
   const existing = await getCardRow(env, tenantId, id);
   if (!existing) throw new HttpError(404, 'Card not found');
@@ -273,11 +358,29 @@ export async function patchCard(
     const users = await mentionableUsers(env, tenantId, existing.project_id);
     const reconcilers: Promise<DbStatement[]>[] = [];
     const rc = (sourceKind: 'summary' | 'description' | 'acceptance_criteria', text: string | null) =>
-      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind, sourceId: sourceKind, text }, users);
+      reconcileMentionStmts(env, { tenantId, cardId: id, authorId: userId, sourceKind, sourceId: sourceKind, text }, users, triggers);
     if (input.summary !== undefined) reconcilers.push(rc('summary', next.summary));
     if (input.description !== undefined) reconcilers.push(rc('description', next.description));
     if (input.acceptanceCriteria !== undefined) reconcilers.push(rc('acceptance_criteria', next.acceptance_criteria));
     mentionStmts.push(...(await Promise.all(reconcilers)).flat());
+  }
+
+  // Assign-into-ready: fire when the card is now in a `ready` lane assigned to
+  // an agent AND this patch caused it (moved into ready, or (re)assigned to the
+  // agent while in ready). A pure edit of a card already sitting actionable
+  // fires nothing.
+  if (
+    triggers &&
+    next.assignee_user_id &&
+    (next.column_id !== existing.column_id || next.assignee_user_id !== existing.assignee_user_id)
+  ) {
+    const [role, agent] = await Promise.all([
+      columnRole(env, tenantId, next.column_id),
+      isAgent(env, tenantId, next.assignee_user_id),
+    ]);
+    if (role === 'ready' && agent) {
+      triggers.push({ event: 'card.ready', recipientUserId: next.assignee_user_id, source: { kind: 'assign' } });
+    }
   }
 
   // Card update + its system event(s) + mention reconcile, atomically.
@@ -291,11 +394,15 @@ export async function patchCard(
 export async function deleteCard(env: Env, tenantId: string, id: string): Promise<void> {
   const existing = await getCardRow(env, tenantId, id);
   if (!existing) throw new HttpError(404, 'Card not found');
-  // Cascade the timeline + mentions explicitly (D1 FK enforcement is not
-  // reliably on) so no bell entries dangle at a deleted card.
+  // Grab attachment blob keys before their rows go, so we can purge the bytes.
+  const blobKeys = await blobKeysForCard(env, tenantId, id);
+  // Cascade the timeline + mentions + attachments explicitly (D1 FK enforcement
+  // is not reliably on) so nothing dangles at a deleted card.
   await env.db.batch([
     env.db.prepare('DELETE FROM card_events WHERE card_id = ? AND tenant_id = ?').bind(id, tenantId),
     deleteMentionsForCardStmt(env, tenantId, id),
+    deleteAttachmentsForCardStmt(env, tenantId, id),
     env.db.prepare('DELETE FROM cards WHERE id = ? AND tenant_id = ?').bind(id, tenantId),
   ]);
+  await purgeBlobs(env, blobKeys);
 }

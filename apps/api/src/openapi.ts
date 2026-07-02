@@ -58,6 +58,11 @@ export const OPENAPI_SPEC = {
           name: { type: 'string' },
           color: { type: ['string', 'null'] },
           position: { type: 'number' },
+          role: {
+            type: ['string', 'null'],
+            enum: ['ready', 'in_progress', 'review', 'done', 'blocked', null],
+            description: 'Semantic role (v0.15.0), or null for a neutral column. Unique within a project.',
+          },
           createdAt: { type: 'integer' },
         },
       },
@@ -79,6 +84,44 @@ export const OPENAPI_SPEC = {
           updatedBy: { type: 'string' },
           createdAt: { type: 'integer' },
           updatedAt: { type: 'integer' },
+          attachments: {
+            type: 'array',
+            description: 'All attachments on the card (v0.16.0). Present on single-card GET only.',
+            items: { $ref: '#/components/schemas/Attachment' },
+          },
+          attachmentCounts: {
+            $ref: '#/components/schemas/AttachmentCounts',
+            description: 'Per-kind attachment counts (v0.16.0). Present on the board list endpoint.',
+          },
+        },
+      },
+      Attachment: {
+        type: 'object',
+        description:
+          'A file attached to a card (v0.16.0). Hung off the card description ' +
+          '(eventId null) or a specific note/handoff (eventId set). Bytes are ' +
+          'streamed from `url` (same-origin; append ?download=1 to force download).',
+        properties: {
+          id: { type: 'string' },
+          cardId: { type: 'string' },
+          eventId: { type: ['string', 'null'], description: 'Null = on the description; set = on that timeline comment.' },
+          filename: { type: 'string' },
+          contentType: { type: 'string' },
+          sizeBytes: { type: 'integer' },
+          kind: { type: 'string', enum: ['image', 'document', 'archive', 'misc'] },
+          createdBy: { type: 'string' },
+          createdAt: { type: 'integer' },
+          url: { type: 'string', description: 'Same-origin bytes URL, e.g. /api/v1/attachments/{id}/blob.' },
+        },
+      },
+      AttachmentCounts: {
+        type: 'object',
+        description: 'Per-kind attachment counts for a card (v0.16.0 board badges).',
+        properties: {
+          image: { type: 'integer' },
+          document: { type: 'integer' },
+          archive: { type: 'integer' },
+          misc: { type: 'integer' },
         },
       },
       CardEvent: {
@@ -402,15 +445,17 @@ export const OPENAPI_SPEC = {
     '/api/v1/me': {
       get: { summary: 'Whoami for the current token', responses: { 200: { description: 'ok' } } },
       patch: {
-        summary: 'Set your own color (token is tied to a user)',
+        summary: 'Set your own color and/or profile (token is tied to a user)',
         requestBody: {
           required: true,
           content: {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['color'],
-                properties: { color: { type: 'string', description: '#rrggbb hex' } },
+                properties: {
+                  color: { type: 'string', description: '#rrggbb hex' },
+                  profile: { type: ['string', 'null'], description: 'Free-text persona/role (KBR-21)' },
+                },
               },
             },
           },
@@ -441,6 +486,15 @@ export const OPENAPI_SPEC = {
         responses: { 200: { description: 'ok' } },
       },
     },
+    '/api/v1/me/queue': {
+      get: {
+        summary: 'Your actionable queue — cards assigned to you in a `ready`-role column',
+        parameters: [
+          { name: 'projectId', in: 'query', schema: { type: 'string' }, description: 'Narrow to one project.' },
+        ],
+        responses: { 200: { description: 'ok' } },
+      },
+    },
     '/api/v1/me/mentions/read': {
       post: {
         summary: 'Acknowledge (mark read) your mentions',
@@ -461,6 +515,14 @@ export const OPENAPI_SPEC = {
         },
         responses: { 200: { description: 'ok' } },
       },
+    },
+    '/api/v1/webhooks': {
+      get: { summary: 'List webhook subscriptions (admin)', responses: { 200: { description: 'ok' } } },
+      post: { summary: 'Create a webhook subscription (admin) — returns the signing secret once', responses: { 201: { description: 'created' } } },
+    },
+    '/api/v1/webhooks/{id}': {
+      patch: { summary: 'Edit a webhook subscription (admin)', responses: { 200: { description: 'ok' } } },
+      delete: { summary: 'Delete a webhook subscription (admin)', responses: { 200: { description: 'ok' } } },
     },
     '/api/v1/projects': {
       get: {
@@ -502,7 +564,7 @@ export const OPENAPI_SPEC = {
       post: { summary: 'Add a column', responses: { 201: { description: 'created' } } },
     },
     '/api/v1/columns/{id}': {
-      patch: { summary: 'Rename / recolor / reorder a column', responses: { 200: { description: 'ok' } } },
+      patch: { summary: 'Rename / recolor / reorder / set the role of a column', responses: { 200: { description: 'ok' } } },
       delete: { summary: 'Delete an empty column', responses: { 200: { description: 'ok' } } },
     },
     '/api/v1/projects/{id}/cards': {
@@ -554,12 +616,61 @@ export const OPENAPI_SPEC = {
                       spunOff: { type: 'array', items: { type: 'string' } },
                     },
                   },
+                  attachmentIds: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Attachments (v0.16.0) uploaded for this comment; linked to it on post.',
+                  },
                 },
               },
             },
           },
         },
         responses: { 201: { description: 'created' } },
+      },
+    },
+    '/api/v1/cards/{id}/attachments': {
+      post: {
+        summary: 'Upload a file attachment to a card (multipart)',
+        description:
+          'Upload one file (multipart/form-data, part name `file`, ≤25 MB). Stored ' +
+          'card-scoped (on the description); link it to a note/handoff by passing ' +
+          'its id in the comment\'s `attachmentIds`. 503 if storage is unconfigured.',
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['file'],
+                properties: { file: { type: 'string', format: 'binary' } },
+              },
+            },
+          },
+        },
+        responses: {
+          201: { description: 'created' },
+          413: { description: 'file too large' },
+          415: { description: 'not multipart/form-data' },
+        },
+      },
+    },
+    '/api/v1/attachments/{id}': {
+      get: { summary: 'Get an attachment\'s metadata', responses: { 200: { description: 'ok' } } },
+      delete: {
+        summary: 'Delete an attachment (uploader or admin)',
+        responses: { 200: { description: 'deleted' }, 403: { description: 'not uploader/admin' } },
+      },
+    },
+    '/api/v1/attachments/{id}/blob': {
+      get: {
+        summary: 'Stream an attachment\'s bytes',
+        description:
+          'Streams the file. Images + PDFs are served inline; everything else as an ' +
+          'attachment download. Append ?download=1 to force download. Same-origin ' +
+          '(cookie/bearer authorizes it); nosniff + private cache.',
+        parameters: [{ name: 'download', in: 'query', schema: { type: 'string', enum: ['1'] } }],
+        responses: { 200: { description: 'ok' }, 404: { description: 'not found' } },
       },
     },
     '/api/v1/cards/{id}/comments/{commentId}': {

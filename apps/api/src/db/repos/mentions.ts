@@ -1,6 +1,6 @@
 import type { Env } from '../../env';
 import type { DbStatement } from '../../runtime/shared/db';
-import type { MentionDto, MentionSourceKind, MentionsStatus } from '@kbrelay/shared';
+import type { MentionDto, MentionSourceKind, MentionsStatus, WebhookTrigger } from '@kbrelay/shared';
 import { resolveMentionRecipients, diffRecipients } from '@kbrelay/shared';
 import { newId } from '../ids';
 
@@ -23,7 +23,9 @@ export async function reconcileMentionStmts(
     sourceId: string;
     text: string | null | undefined;
   },
-  users: ReadonlyArray<{ id: string; handle: string | null }>,
+  users: ReadonlyArray<{ id: string; handle: string | null; kind?: string }>,
+  /** Optional collector: a `card.mention` trigger is pushed per newly-added agent recipient (KBR-14). */
+  triggers?: WebhookTrigger[],
 ): Promise<DbStatement[]> {
   const wanted = resolveMentionRecipients(opts.text, users, opts.authorId);
 
@@ -36,6 +38,25 @@ export async function reconcileMentionStmts(
   const existing = (existingRs.results ?? []).map((r) => r.recipient_user_id);
 
   const { add, remove } = diffRecipients(wanted, existing);
+
+  // Fire a callback for each freshly-added mention whose recipient is an agent.
+  if (triggers && add.length) {
+    const agentIds = new Set(users.filter((u) => u.kind === 'agent').map((u) => u.id));
+    for (const recipientId of add) {
+      if (agentIds.has(recipientId)) {
+        triggers.push({
+          event: 'card.mention',
+          recipientUserId: recipientId,
+          source: {
+            kind: 'mention',
+            location: opts.sourceKind,
+            commentId: opts.sourceKind === 'comment' ? opts.sourceId : null,
+          },
+        });
+      }
+    }
+  }
+
   const stmts: DbStatement[] = [];
   const now = Date.now();
 

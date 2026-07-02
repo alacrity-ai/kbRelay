@@ -1,5 +1,6 @@
 import type { Env } from '../../env';
-import type { ColumnDto, CreateColumnInput, PatchColumnInput } from '@kbrelay/shared';
+import type { ColumnDto, ColumnRole, CreateColumnInput, PatchColumnInput } from '@kbrelay/shared';
+import type { DbStatement } from '../../runtime/shared/db';
 import { HttpError } from '../../http';
 import { newId } from '../ids';
 import { RANK_STEP } from '../../rank';
@@ -11,6 +12,7 @@ interface ColumnRow {
   name: string;
   color: string | null;
   position: number;
+  role: string | null;
   created_at: number;
 }
 
@@ -21,8 +23,30 @@ function toDto(r: ColumnRow): ColumnDto {
     name: r.name,
     color: r.color,
     position: r.position,
+    role: (r.role as ColumnRole | null) ?? null,
     createdAt: r.created_at,
   };
+}
+
+/**
+ * A column's role is unique within its project. Setting a non-null role on one
+ * column clears the same role off any sibling that holds it — so "make B the
+ * Ready column" atomically moves the badge off A. Returns a statement to compose
+ * into the same batch as the write (null role → no yank needed).
+ */
+function yankRoleStmt(
+  env: Env,
+  tenantId: string,
+  projectId: string,
+  role: ColumnRole | null | undefined,
+  exceptId: string,
+): DbStatement | null {
+  if (!role) return null;
+  return env.db
+    .prepare(
+      'UPDATE columns SET role = NULL WHERE tenant_id = ? AND project_id = ? AND role = ? AND id != ?',
+    )
+    .bind(tenantId, projectId, role, exceptId);
 }
 
 export async function listColumns(
@@ -61,12 +85,18 @@ export async function createColumn(
     position = (max?.m ?? 0) + RANK_STEP;
   }
   const id = newId('col');
-  await env.db.prepare(
-    `INSERT INTO columns (id, tenant_id, project_id, name, color, position, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  )
-    .bind(id, tenantId, projectId, input.name, input.color ?? null, position, Date.now())
-    .run();
+  const role = input.role ?? null;
+  // Insert the column and, if it claims a role, yank that role off any sibling —
+  // atomically, so a project never has two columns with the same role.
+  const stmts: DbStatement[] = [
+    env.db.prepare(
+      `INSERT INTO columns (id, tenant_id, project_id, name, color, position, role, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(id, tenantId, projectId, input.name, input.color ?? null, position, role, Date.now()),
+  ];
+  const yank = yankRoleStmt(env, tenantId, projectId, role, id);
+  if (yank) stmts.unshift(yank); // clear the old holder before inserting the new one
+  await env.db.batch(stmts);
   const row = await getColumnRow(env, tenantId, id);
   if (!row) throw new HttpError(500, 'Column insert did not return row');
   return toDto(row);
@@ -84,10 +114,20 @@ export async function patchColumn(
     name: input.name ?? existing.name,
     color: input.color === undefined ? existing.color : input.color,
     position: input.position ?? existing.position,
+    // role: undefined = leave as-is; null = clear; a value = set (and yank).
+    role: input.role === undefined ? ((existing.role as ColumnRole | null) ?? null) : input.role,
   };
-  await env.db.prepare('UPDATE columns SET name = ?, color = ?, position = ? WHERE id = ? AND tenant_id = ?')
-    .bind(next.name, next.color, next.position, id, tenantId)
-    .run();
+  const stmts: DbStatement[] = [
+    env.db.prepare(
+      'UPDATE columns SET name = ?, color = ?, position = ?, role = ? WHERE id = ? AND tenant_id = ?',
+    ).bind(next.name, next.color, next.position, next.role, id, tenantId),
+  ];
+  // Only yank when this patch is actually (re)claiming a role for this column.
+  if (input.role) {
+    const yank = yankRoleStmt(env, existing.tenant_id, existing.project_id, input.role, id);
+    if (yank) stmts.unshift(yank);
+  }
+  await env.db.batch(stmts);
   const row = await getColumnRow(env, tenantId, id);
   if (!row) throw new HttpError(500, 'Column update did not return row');
   return toDto(row);

@@ -54,7 +54,7 @@ claude mcp add kbrelay --scope user \
 | `create_project` | write | New project (`code` required, seeds columns). |
 | `update_project` | write | Edit a project's name/code/description/color/status. |
 | `list_cards` | read | Cards in a project (filter by column/assignee/q). |
-| `get_card` | read | One card (read the spec before working it). |
+| `get_card` | read | One card (read the spec before working it). Returns `attachments[]` — each with `filename`, `kind`, `sizeBytes`, and a same-origin `url` to fetch the bytes (v0.16.0). |
 | `create_card` | write | New card (markdown body; `@handle` to notify). |
 | `update_card` | write | Edit and/or **move** (set `columnId` — status = column). |
 | `delete_card` | write | Delete a card (cascades). |

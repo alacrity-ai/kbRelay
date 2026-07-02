@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
-import type { CardDto, ColumnDto, UserDto, MentionSourceKind } from '@kbrelay/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { CardDto, ColumnDto, UserDto, MentionSourceKind, AttachmentDto } from '@kbrelay/shared';
 import { UNASSIGNED_COLOR } from '@kbrelay/shared';
+import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
+import { attachmentMarkdown, stripAttachmentMarkdown } from '../lib/attachments';
 import Timeline from './Timeline';
 import Markdown from './Markdown';
 import MentionTextArea from './MentionTextArea';
+import AttachmentToolbar from './AttachmentToolbar';
+import AttachmentList from './AttachmentList';
+import { useDialog } from './Dialog';
 
 export interface CardScrollTarget {
   kind: MentionSourceKind;
@@ -19,7 +24,7 @@ interface Props {
   createInColumnId?: string;
   /** When opened from a notification: scroll to (and flash) this location. */
   scrollTo?: CardScrollTarget;
-  onSave: (input: CardInput) => Promise<void>;
+  onSave: (input: CardInput) => Promise<CardDto>;
   onDelete?: () => Promise<void>;
   onClose: () => void;
 }
@@ -45,6 +50,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
   const [editing, setEditing] = useState(isNew);
   const descRef = useRef<HTMLDivElement>(null);
   const acRef = useRef<HTMLDivElement>(null);
+  const dialog = useDialog();
 
   // Deep-link from a notification: flash the mentioned field. Comment targets are
   // handled inside the Timeline (which owns the comment nodes).
@@ -68,6 +74,82 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
   const [assignee, setAssignee] = useState(card?.assigneeUserId ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Attachments (v0.16.0). Seeded from the card if present; (re)fetched on open
+  // and after upload/delete, since the board's card list carries only counts.
+  const [attachments, setAttachments] = useState<AttachmentDto[]>(card?.attachments ?? []);
+  const refreshAttachments = useCallback(async () => {
+    if (!card) return;
+    try {
+      const { card: full } = await api.getCard(card.id);
+      setAttachments(full.attachments ?? []);
+    } catch {
+      /* leave the last-known list on a transient error */
+    }
+  }, [card]);
+  useEffect(() => {
+    if (card) void refreshAttachments();
+  }, [card, refreshAttachments]);
+
+  async function removeAttachment(a: AttachmentDto) {
+    const ok = await dialog.confirm({
+      title: 'Remove this attachment?',
+      message: `“${a.filename}” will be permanently deleted from the card and storage. This can't be undone.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.deleteAttachment(a.id);
+      setAttachments((list) => list.filter((x) => x.id !== a.id));
+      // Unwind a description reference so it doesn't dangle. (Note/handoff refs
+      // are append-only history; those render "🗑 Attachment removed" on reload.)
+      if (a.eventId == null && card) {
+        const current = card.description ?? '';
+        const stripped = stripAttachmentMarkdown(current, a.id);
+        if (stripped !== current) {
+          setDescription(stripped);
+          await onSave({ description: stripped || null });
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove attachment');
+    }
+  }
+
+  // A file was uploaded: inject its markdown into the description + track it.
+  function onUploaded(a: AttachmentDto) {
+    setDescription((d) => (d ? `${d}\n` : '') + attachmentMarkdown(a));
+    setAttachments((list) => (list.some((x) => x.id === a.id) ? list : [...list, a]));
+  }
+
+  // Attaching on an unsaved new card: confirm, then save it first (Board adopts
+  // the new card into this modal), and return its id so the upload can proceed.
+  async function saveNewCardForAttach(): Promise<string | null> {
+    if (!summary.trim()) {
+      setError('Add a summary before attaching a file.');
+      return null;
+    }
+    const ok = await dialog.confirm({
+      title: 'Save this card to attach?',
+      message: 'Attaching a file will save this card first, then add the file.',
+      confirmLabel: 'Save & attach',
+    });
+    if (!ok) return null;
+    try {
+      const saved = await onSave({
+        summary: summary.trim(),
+        description: description || null,
+        acceptanceCriteria: acceptance || null,
+        columnId,
+        assigneeUserId: assignee || null,
+      });
+      return saved.id;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+      return null;
+    }
+  }
 
   const userName = (id: string | null) => users.find((u) => u.id === id)?.name ?? id ?? '—';
   const userKind = (id: string | null) => users.find((u) => u.id === id)?.kind;
@@ -107,8 +189,9 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
         columnId,
         assigneeUserId: assignee || null,
       });
-      if (isNew) onClose();
-      else setEditing(false); // Board refreshed the card; drop back to view.
+      // Board adopts the saved card (new or existing) into the modal, so drop to
+      // view rather than closing — you see what you just created/edited.
+      setEditing(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed');
     } finally {
@@ -174,11 +257,21 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
             <>
               <div className="field">
                 <label>Summary{!isNew && card!.key ? ` · ${card!.key}` : ''}</label>
-                <input className="modal-title-input" value={summary} onChange={(e) => setSummary(e.target.value)} autoFocus />
+                {/* Only auto-focus when creating — clicking Edit on an existing
+                    card shouldn't pop the mobile keyboard (KBR-32). */}
+                <input className="modal-title-input" value={summary} onChange={(e) => setSummary(e.target.value)} autoFocus={isNew} />
               </div>
               <div className="field">
                 <label>Description</label>
                 <MentionTextArea value={description} onChange={setDescription} users={users} rows={5} />
+                {/* One toolbar, mounted across the create→adopt transition: for an
+                    existing card it attaches directly; for a new card it saves first. */}
+                <AttachmentToolbar
+                  cardId={card ? card.id : undefined}
+                  resolveCardId={card ? undefined : saveNewCardForAttach}
+                  onUploaded={onUploaded}
+                  hint={card ? undefined : 'attaching will save the card first'}
+                />
               </div>
               <div className="field">
                 <label>Acceptance criteria</label>
@@ -252,6 +345,12 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
                 <div className={`view-text ${card!.description ? '' : 'empty'}`}>
                   {card!.description ? <Markdown users={users}>{card!.description}</Markdown> : 'No description.'}
                 </div>
+                {attachments.length > 0 && (
+                  <div className="attach-view">
+                    <span className="attach-view-label">Attachments</span>
+                    <AttachmentList items={attachments} onDelete={removeAttachment} />
+                  </div>
+                )}
               </div>
 
               <div className="view-section" ref={acRef}>

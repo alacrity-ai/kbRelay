@@ -6,5 +6,6 @@
     "lib": ["ES2023"],
     "types": ["node"]
   },
-  "include": ["src/runtime/node", "scripts"]
+  "include": ["src/runtime/node", "scripts"],
+  "exclude": ["src/**/*.test.ts"]
 }

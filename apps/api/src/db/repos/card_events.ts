@@ -1,11 +1,17 @@
 import type { Env } from '../../env';
 import type { DbStatement } from '../../runtime/shared/db';
-import type { CardEventDto, CardEventKind, SystemEventType, CreateCommentInput } from '@kbrelay/shared';
+import type { CardEventDto, CardEventKind, SystemEventType, CreateCommentInput, WebhookTrigger } from '@kbrelay/shared';
 import { classifyRedaction } from '@kbrelay/shared';
 import { HttpError } from '../../http';
 import { newId } from '../ids';
 import { mentionableUsers } from './users';
 import { reconcileMentionStmts, deleteMentionsForCommentStmt } from './mentions';
+import {
+  linkAttachmentsToEventStmt,
+  blobKeysForEvent,
+  deleteAttachmentsForEventStmt,
+  purgeBlobs,
+} from './attachments';
 
 interface CardEventRow {
   id: string;
@@ -100,6 +106,8 @@ export async function addComment(
   cardId: string,
   userId: string,
   input: CreateCommentInput,
+  /** Optional collector for callback triggers (KBR-14); the handler dispatches them. */
+  triggers?: WebhookTrigger[],
 ): Promise<CardEventDto> {
   const id = newId('evt');
   const kind = input.type ?? 'note';
@@ -115,7 +123,11 @@ export async function addComment(
     env,
     { tenantId, cardId, authorId: userId, sourceKind: 'comment', sourceId: id, text: input.body },
     users,
+    triggers,
   );
+
+  // Link any attachments uploaded for this comment to its new event (v0.16.0).
+  const linkStmt = linkAttachmentsToEventStmt(env, tenantId, cardId, id, input.attachmentIds ?? []);
 
   await env.db.batch([
     env.db.prepare(
@@ -124,6 +136,7 @@ export async function addComment(
        VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
     ).bind(id, tenantId, cardId, userId, kind, input.body, meta, Date.now()),
     ...mentionStmts,
+    ...(linkStmt ? [linkStmt] : []),
   ]);
 
   const row = await env.db.prepare('SELECT * FROM card_events WHERE id = ? AND tenant_id = ?')
@@ -160,6 +173,11 @@ export async function redactComment(
   if (verdict.error === 'not_author') throw new HttpError(403, 'You can only redact your own comment');
   if (verdict.alreadyRedacted) return toDto(row); // idempotent no-op
 
+  // Redaction removes content that must not persist — that includes a leaked
+  // file, so hard-delete this comment's attachments (rows + bytes), not just the
+  // text. The tombstone remains; the files do not.
+  const blobKeys = await blobKeysForEvent(env, tenantId, commentId);
+
   await env.db.batch([
     env.db.prepare(
       `UPDATE card_events SET body = NULL, meta_json = NULL, deleted_at = ?, deleted_by = ?
@@ -167,7 +185,9 @@ export async function redactComment(
     ).bind(Date.now(), userId, commentId, tenantId),
     // The comment's @-mentions no longer point at live text — retract them.
     deleteMentionsForCommentStmt(env, tenantId, cardId, commentId),
+    deleteAttachmentsForEventStmt(env, tenantId, commentId),
   ]);
+  await purgeBlobs(env, blobKeys);
 
   const updated = await env.db.prepare('SELECT * FROM card_events WHERE id = ? AND tenant_id = ?')
     .bind(commentId, tenantId)

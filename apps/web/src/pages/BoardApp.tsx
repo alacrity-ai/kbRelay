@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MeResponse, ProjectDto, UserDto, MentionDto } from '@kbrelay/shared';
-import { USER_PALETTE } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { clearToken } from '../lib/auth';
 import { recordProjectView, orderByRecency } from '../lib/recentProjects';
@@ -13,7 +12,10 @@ import ProjectSettings from '../components/ProjectSettings';
 import FilterModal, { EMPTY_FILTER, isFilterActive, filterCount, type BoardFilter } from '../components/FilterModal';
 import NewProjectModal from '../components/NewProjectModal';
 import ApiKeysModal from '../components/ApiKeysModal';
+import ClaudeCodeGuide from '../components/ClaudeCodeGuide';
+import ProfileSettings from '../components/ProfileSettings';
 import TenantSettings from '../components/TenantSettings';
+import BrandMark from '../components/BrandMark';
 
 const PROJECT_KEY = 'kbrelay.selectedProject';
 
@@ -38,6 +40,25 @@ function Funnel() {
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+    </svg>
+  );
+}
+
+/** Small colored line-glyphs for the account menu (KBR-21). Not emojis. */
+const GLYPH_PATHS: Record<string, string> = {
+  profile: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8',
+  team: 'M17 21v-2a4 4 0 0 0-3-3.87 M7 21v-2a4 4 0 0 1 3-3.87 M9 3.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7 M16 3.6a3.5 3.5 0 0 1 0 6.8',
+  key: 'M7.5 20a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9 M10.6 12.4 21 2 M16 7l3 3',
+  guide: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',
+  signout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9',
+};
+
+function Glyph({ name, color }: { name: keyof typeof GLYPH_PATHS | string; color: string }) {
+  const d = GLYPH_PATHS[name] ?? '';
+  return (
+    <svg className="menu-glyph" width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {d.split(' M').map((seg, i) => <path key={i} d={i === 0 ? seg : `M${seg}`} />)}
     </svg>
   );
 }
@@ -68,6 +89,8 @@ export default function BoardApp({
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(false);
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   const [mentionCount, setMentionCount] = useState(0);
   const [nav, setNav] = useState<BoardNav | null>(null);
@@ -151,11 +174,10 @@ export default function BoardApp({
     await loadProjects(project.id);
   }
 
-  async function setMyColor(color: string) {
-    if (color === me.user.color) return;
-    const updated = await api.patchMe(color);
+  // Apply an updated /me (from the Profile modal): update the header, then
+  // re-fetch users so cards assigned to me recolor immediately.
+  async function applyMe(updated: MeResponse) {
     onMeChange(updated);
-    // Re-fetch users so cards assigned to me recolor immediately.
     const [{ users: us }, pu] = await Promise.all([
       api.listUsers(),
       selected ? api.listUsers(selected) : Promise.resolve({ users: [] as UserDto[] }),
@@ -174,7 +196,7 @@ export default function BoardApp({
   return (
     <>
       <header className="topbar">
-        <span className="brand"><span className="brand-mark">kb</span> <span className="brand-name">kbRelay</span></span>
+        <span className="brand"><BrandMark /> <span className="brand-name">kbRelay</span></span>
 
         {projects.length > 0 && (
           <ProjectSwitcher
@@ -239,27 +261,31 @@ export default function BoardApp({
             </div>
 
             <div className="menu-divider" />
-            <div className="color-picker">
-              <span className="view-label">Your color</span>
-              <div className="color-swatches">
-                {USER_PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    className={`color-swatch ${me.user.color.toLowerCase() === c.toLowerCase() ? 'active' : ''}`}
-                    style={{ background: c }}
-                    aria-label={`set color ${c}`}
-                    onClick={() => void setMyColor(c)}
-                  />
-                ))}
-              </div>
-            </div>
+            <button className="menu-item" onClick={() => setProfileOpen(true)}>
+              <Glyph name="profile" color="#7c3aed" /> Profile
+            </button>
 
             <div className="menu-divider" />
+            <span className="menu-section-label">Configuration</span>
             {me.user.role === 'admin' && (
-              <button className="menu-item" onClick={() => setTeamOpen(true)}>Team &amp; access</button>
+              <button className="menu-item" onClick={() => setTeamOpen(true)}>
+                <Glyph name="team" color="#0891b2" /> Team &amp; access
+              </button>
             )}
-            <button className="menu-item" onClick={() => setApiKeysOpen(true)}>API keys</button>
-            <button className="menu-item" onClick={signOut}>Sign out</button>
+            <button className="menu-item" onClick={() => setApiKeysOpen(true)}>
+              <Glyph name="key" color="#d97706" /> API keys
+            </button>
+
+            <div className="menu-divider" />
+            <span className="menu-section-label">Guides</span>
+            <button className="menu-item" onClick={() => setGuideOpen(true)}>
+              <Glyph name="guide" color="#16a34a" /> Claude Code setup
+            </button>
+
+            <div className="menu-divider" />
+            <button className="menu-item" onClick={signOut}>
+              <Glyph name="signout" color="#dc2626" /> Sign out
+            </button>
           </div>
         </Dropdown>
       </header>
@@ -280,7 +306,7 @@ export default function BoardApp({
       ) : (
         <div className="center">
           <div className="gate">
-            <div className="brand"><span className="brand-mark">kb</span> kbRelay</div>
+            <div className="brand"><BrandMark /> kbRelay</div>
             <h1 style={{ margin: 0, fontSize: '1.2rem' }}>No projects yet</h1>
             <p className="muted-note">Create your first board to get going.</p>
             <button className="primary" onClick={() => setNewProjectOpen(true)}>+ New project</button>
@@ -321,6 +347,8 @@ export default function BoardApp({
         />
       )}
       {apiKeysOpen && <ApiKeysModal onClose={() => setApiKeysOpen(false)} />}
+      {guideOpen && <ClaudeCodeGuide onClose={() => setGuideOpen(false)} />}
+      {profileOpen && <ProfileSettings me={me} onClose={() => setProfileOpen(false)} onSaved={applyMe} />}
       {teamOpen && (
         <TenantSettings meId={me.user.id} projects={projects} onClose={() => setTeamOpen(false)} />
       )}

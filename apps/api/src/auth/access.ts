@@ -16,7 +16,8 @@ import { HttpError } from '../http';
 export type AccessScope =
   | { kind: 'project'; param: string } // params[param] is the project id
   | { kind: 'card'; param: string } // params[param] is a card id → resolve project
-  | { kind: 'column'; param: string }; // params[param] is a column id → resolve project
+  | { kind: 'column'; param: string } // params[param] is a column id → resolve project
+  | { kind: 'attachment'; param: string }; // params[param] is an attachment id → card → project
 
 /** Resolve the owning project id for a scoped route, or null if it doesn't exist. */
 export async function resolveProjectId(
@@ -28,6 +29,16 @@ export async function resolveProjectId(
   const id = params[scope.param];
   if (!id) return null;
   if (scope.kind === 'project') return id;
+  // An attachment resolves to its card's project (attachment → card → project).
+  if (scope.kind === 'attachment') {
+    const row = await env.db.prepare(
+      `SELECT c.project_id FROM attachments a JOIN cards c ON c.id = a.card_id
+        WHERE a.id = ? AND a.tenant_id = ?`,
+    )
+      .bind(id, tenantId)
+      .first<{ project_id: string }>();
+    return row?.project_id ?? null;
+  }
   const table = scope.kind === 'card' ? 'cards' : 'columns';
   const row = await env.db.prepare(`SELECT project_id FROM ${table} WHERE id = ? AND tenant_id = ?`)
     .bind(id, tenantId)

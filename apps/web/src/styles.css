@@ -192,6 +192,9 @@ select {
   background: linear-gradient(135deg, var(--accent), #7c3aed);
   color: #fff; font-size: 0.9rem; font-weight: 800; box-shadow: var(--shadow-1);
 }
+/* KBR-20: the real kanban-tiles logo (matches favicon/OG). Artwork is rounded;
+   border-radius here just shapes the shadow to match. */
+.brand-logo { width: 28px; height: 28px; flex: none; display: block; border-radius: 24%; box-shadow: var(--shadow-1); }
 .topbar .spacer { flex: 1; }
 .kind-badge {
   font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;
@@ -227,6 +230,11 @@ select {
 .menu-item:hover { background: var(--surface-2); }
 .menu-item.active { background: var(--accent-soft); color: #fff; font-weight: 600; }
 .menu-divider { height: 1px; background: var(--border); margin: 0.35rem 0.2rem; }
+.menu-glyph { flex: none; }
+.menu-section-label {
+  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); font-weight: 700; padding: 0.1rem 0.6rem 0.15rem;
+}
 
 /* Project switcher */
 .project-trigger { max-width: min(320px, 46vw); }
@@ -280,20 +288,68 @@ select {
   max-height: 100%;
   box-shadow: var(--shadow-1);
 }
+/* Two-row header (KBR-19): identity row + role row. Fixed row heights keep every
+   column header the same height so the lanes line up. */
 .column-header {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.7rem 0.8rem;
+  display: flex; flex-direction: column; gap: 0.4rem;
+  padding: 0.6rem 0.7rem;
   border-bottom: 1px solid var(--border);
   font-weight: 600;
 }
+.column-header-top { display: flex; align-items: center; gap: 0.5rem; min-height: 1.9rem; }
+.column-header-bottom { display: flex; align-items: center; gap: 0.4rem; min-height: 1.7rem; }
 .column-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 0 0 3px rgba(255,255,255,0.04); }
-.column-name { cursor: pointer; }
+/* flex:1 + min-width:0 lets the name ellipsize instead of wrapping to two lines. */
+.column-name { cursor: pointer; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .column-count {
-  color: var(--text-dim); font-weight: 600; font-size: 0.72rem;
+  color: var(--text-dim); font-weight: 600; font-size: 0.72rem; flex: none;
   background: var(--surface-2); border-radius: var(--r-pill);
   padding: 0.05rem 0.5rem; min-width: 1.4rem; text-align: center;
 }
-.column-actions { display: flex; gap: 0.15rem; }
+/* Tight, evenly-spaced actions pinned to the right edge (matches the left padding). */
+.column-actions { display: flex; gap: 0.1rem; flex: none; }
+/* (?) role-help popover — native <details> so it toggles with no JS. */
+.role-help { position: relative; flex: none; }
+.role-help > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  width: 1.15rem; height: 1.15rem; border-radius: 50%;
+  display: grid; place-items: center; font-size: 0.72rem; font-weight: 700;
+  color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border);
+}
+.role-help > summary::-webkit-details-marker { display: none; }
+.role-help[open] > summary { color: var(--text); border-color: var(--border-strong); }
+.role-popover {
+  position: absolute; top: 1.5rem; left: 0; z-index: 20; width: 15rem;
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  border-radius: var(--r-md); padding: 0.6rem 0.7rem; box-shadow: var(--shadow-1, 0 6px 20px rgba(0,0,0,0.35));
+  display: flex; flex-direction: column; gap: 0.4rem; font-weight: 400;
+}
+.role-popover p { margin: 0; font-size: 0.8rem; line-height: 1.45; color: var(--text); }
+.role-popover .flowdemo-role { align-self: flex-start; }
+/* Semantic role chip on a column header (v0.15.0). Tinted via inline color. */
+.column-role-badge {
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  padding: 0.05rem 0.4rem; border-radius: var(--r-pill);
+  border: 1px solid currentColor; background: color-mix(in srgb, currentColor 12%, transparent);
+  flex: none; line-height: 1.4;
+}
+/* Role picker in Project Settings → Columns. */
+.toggle-row { display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer; font-size: 0.85rem; flex: none; }
+.toggle-row input { cursor: pointer; }
+/* `width:auto` overrides the global `select { width:100% }` so the role picker
+   doesn't devour the row (was squishing the name to one letter per line). */
+.col-row-role, .column-role-select {
+  width: auto; flex: none; font-size: 0.72rem; font-weight: 600;
+  background-color: var(--surface-2); color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 0.2rem 1.6rem 0.2rem 0.5rem; background-position: right 0.4rem center;
+}
+.col-row-name { min-width: 3rem; }
+/* Compact, badge-like role select in the board column header. */
+.column-role-select {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  border-radius: var(--r-pill); padding: 0.08rem 1.25rem 0.08rem 0.45rem; background-position: right 0.3rem center;
+}
 .column-body {
   padding: 0.6rem; display: flex; flex-direction: column; gap: 0.55rem;
   overflow-y: auto; flex: 1; min-height: 48px;
@@ -679,6 +735,7 @@ select {
 }
 .gate .brand { font-size: 1.6rem; }
 .gate .brand-mark { width: 36px; height: 36px; font-size: 1.1rem; }
+.gate .brand-logo { width: 40px; height: 40px; }
 .error-text { color: #fca5a5; font-size: 0.85rem; }
 .notice-text { color: var(--accent); font-size: 0.85rem; }
 .muted-note { color: var(--muted); margin: 0; font-size: 0.9rem; }
@@ -802,6 +859,58 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   font-size: 0.78rem; white-space: pre; color: var(--text);
 }
 .copy-btn { position: absolute; top: 0.4rem; right: 0.4rem; }
+
+/* ── Claude Code setup guide (paged tutorial modal, v0.15.0) ── */
+.dialog-card.cc-guide { width: min(760px, 94vw); max-width: 760px; }
+.cc-guide-body { min-height: 340px; }
+/* Role legend on the guide's first page: colored badge + description per row. */
+.guide-legend { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.2rem 0; }
+.guide-legend-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
+.guide-legend .flowdemo-role { flex: none; min-width: 5.5rem; text-align: center; }
+.cc-guide-body p:first-child { margin-top: 0; }
+.cc-guide-footer { display: flex; align-items: center; gap: 0.6rem; }
+.cc-guide-footer .primary, .cc-guide-footer .ghost { flex: none; }
+.cc-dots { display: flex; gap: 0.4rem; flex: 1; justify-content: center; }
+.cc-dot {
+  width: 8px; height: 8px; border-radius: 50%; padding: 0; border: none;
+  background: var(--surface-3); cursor: pointer; transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.cc-dot.active { background: var(--accent); transform: scale(1.3); }
+.guide-rules { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.7rem; line-height: 1.5; }
+
+/* Animated mini-board used by the tutorial (reuses the board's role palette). */
+.flowdemo {
+  margin: 0.6rem 0; border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--bg); padding: 0.6rem; overflow: hidden;
+}
+.flowdemo-lanes { display: flex; }
+.flowdemo-lane {
+  flex: 1 1 0; min-width: 0; text-align: center; padding: 0 0.25rem;
+  display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+}
+.flowdemo-lane-name { font-size: 0.68rem; font-weight: 600; color: var(--text-dim); white-space: nowrap; }
+.flowdemo-role {
+  font-size: 0.54rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  padding: 0.02rem 0.3rem; border-radius: var(--r-pill); border: 1px solid currentColor;
+  background: color-mix(in srgb, currentColor 12%, transparent); line-height: 1.5;
+}
+.flowdemo-track { position: relative; height: 58px; margin-top: 0.5rem; }
+.flowdemo-card {
+  position: absolute; top: 0; transform: translateX(-50%);
+  width: min(150px, 34%); box-sizing: border-box;
+  background: var(--surface-2); border: 1px solid var(--border); border-left: 3px solid;
+  border-radius: var(--r-sm); padding: 0.4rem 0.5rem;
+  display: flex; flex-direction: column; gap: 0.15rem;
+  transition: left 420ms var(--ease), border-left-color 420ms var(--ease);
+  box-shadow: var(--shadow-1, 0 2px 8px rgba(0,0,0,0.25));
+}
+.flowdemo-card-key { font-size: 0.6rem; font-weight: 700; color: var(--text-dim); }
+.flowdemo-card-summary { font-size: 0.72rem; font-weight: 500; line-height: 1.25; }
+.flow-caption { display: flex; gap: 0.5rem; align-items: baseline; margin-top: 0.2rem; line-height: 1.5; }
+.flow-actor { flex: none; font-weight: 700; font-size: 0.8rem; }
+.flow-text { font-size: 0.9rem; }
+.flow-stepper { display: flex; align-items: center; justify-content: center; gap: 0.8rem; margin: 0.6rem 0; }
+.flow-step-count { font-size: 0.75rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 
 /* ── Spinner / loading ── */
 .loading-wrap { display: grid; place-items: center; height: calc(100dvh - var(--topbar-h)); gap: 0.9rem; }
@@ -936,6 +1045,16 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   border-radius: var(--r-md); box-shadow: 0 16px 40px #000a;
   overflow: hidden;
 }
+/* On small screens the bell isn't at the viewport edge, so a right-anchored
+   panel overhangs. Pin it to the viewport with gutters — always in bounds. */
+@media (max-width: 520px) {
+  .notif-dropdown {
+    position: fixed;
+    top: calc(var(--topbar-h) + 6px);
+    left: 8px; right: 8px;
+    width: auto; max-width: none;
+  }
+}
 .notif-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border);
@@ -995,3 +1114,63 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   padding: 0.45rem 0.7rem;
 }
 .tl-redacted { color: var(--muted); font-size: 0.8rem; font-style: italic; }
+
+/* ── Attachments (v0.16.0) ─────────────────────────────────── */
+.markdown .md-img { max-height: 340px; height: auto; display: block; margin: 0.4rem 0; }
+
+.attach-toolbar {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  margin-top: 0.5rem; padding: 0.4rem 0.55rem;
+  border: 1px dashed var(--border); border-radius: var(--r-sm);
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.attach-toolbar.dragging { border-color: var(--accent); background: var(--accent-soft); }
+.attach-toolbar.disabled { opacity: 0.6; }
+.attach-toolbar .attach-add { font-size: 0.85rem; padding: 0.25rem 0.6rem; }
+.attach-hint { color: var(--muted); font-size: 0.8rem; }
+.attach-error { margin-left: auto; }
+
+.attach-view { margin-top: 0.7rem; }
+.attach-view-label {
+  display: block; color: var(--text-dim); font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem;
+}
+.attach-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.attach-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface);
+}
+.attach-glyph { display: inline-flex; color: var(--text-dim); }
+.attach-glyph.image { color: #60a5fa; }
+.attach-glyph.document { color: #34d399; }
+.attach-glyph.archive { color: #fbbf24; }
+.attach-glyph.misc { color: var(--muted); }
+.attach-name { color: var(--text); text-decoration: none; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-name:hover { text-decoration: underline; }
+.attach-size { margin-left: auto; color: var(--muted); font-size: 0.75rem; }
+.attach-del {
+  background: transparent; border: none; color: var(--muted); cursor: pointer;
+  font-size: 0.85rem; line-height: 1; padding: 0.15rem 0.3rem; border-radius: var(--r-sm);
+}
+.attach-del:hover { color: var(--danger); background: var(--surface-hover); }
+
+/* Board card attachment badges (KBR-28) */
+.attach-badges { display: inline-flex; align-items: center; gap: 0.4rem; margin-left: auto; }
+.attach-badge {
+  display: inline-flex; align-items: center; gap: 0.15rem;
+  color: var(--text-dim); font-size: 0.72rem; line-height: 1;
+}
+.attach-badge.image { color: #60a5fa; }
+.attach-badge.document { color: #34d399; }
+.attach-badge.archive { color: #fbbf24; }
+.attach-badge.misc { color: var(--muted); }
+
+/* Auth'd inline-image placeholder / error (bearer-only auth → fetch to object URL). */
+.md-img-status {
+  display: inline-block; margin: 0.4rem 0; padding: 0.4rem 0.7rem;
+  color: var(--muted); font-size: 0.85rem;
+  border: 1px dashed var(--border); border-radius: var(--r-sm);
+}
+.md-img-status.error { color: #fca5a5; border-color: #fca5a566; }
+.md-img-status.removed { color: var(--text-dim); }

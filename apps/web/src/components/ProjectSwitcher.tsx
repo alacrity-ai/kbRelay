@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ProjectDto } from '@kbrelay/shared';
+import { shouldAutofocusInput } from '../lib/autofocus';
 
 /**
  * The top-bar project switcher (KBR-6). A controlled popover (not the shared
@@ -31,7 +32,8 @@ export default function ProjectSwitcher({
 
   useEffect(() => {
     if (!open) { setQ(''); return; }
-    inputRef.current?.focus();
+    // Don't grab focus on touch devices — it pops the keyboard (KBR-32).
+    if (shouldAutofocusInput()) inputRef.current?.focus();
     const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', onDoc);
@@ -50,6 +52,10 @@ export default function ProjectSwitcher({
   }, [projects, q]);
 
   const pick = (id: string) => { setOpen(false); onSelect(id); };
+
+  // How many projects don't fit in the dropdown — surfaced on the Browse entry
+  // so it's clear there are more (KBR-33).
+  const moreCount = Math.max(0, projects.length - MAX);
 
   return (
     <div className="dropdown project-switcher" ref={ref}>
@@ -95,7 +101,13 @@ export default function ProjectSwitcher({
               ))
             )}
             <div className="menu-divider" />
-            <button className="menu-item" onClick={() => { setOpen(false); onBrowse(); }}>Browse projects…</button>
+            <button className="menu-item" onClick={() => { setOpen(false); onBrowse(); }}>
+              {moreCount > 0 ? (
+                <><span className="count-badge more-count">{moreCount}</span> More projects…</>
+              ) : (
+                'Browse projects…'
+              )}
+            </button>
             <button className="menu-item" onClick={() => { setOpen(false); onNew(); }}>+ New project</button>
           </div>
         </div>
