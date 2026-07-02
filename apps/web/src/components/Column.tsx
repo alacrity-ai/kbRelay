@@ -74,7 +74,7 @@ export default function Column({
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className={`column-body ${isOver ? 'drop-over' : ''}`}>
           {cards.map((c) => (
-            <CardItem key={c.id} card={c} users={users} onOpen={() => onOpenCard(c)} />
+            <CardItem key={c.id} card={c} users={users} inDoneColumn={column.role === 'done'} onOpen={() => onOpenCard(c)} />
           ))}
         </div>
       </SortableContext>

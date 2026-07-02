@@ -9,6 +9,7 @@ import type {
   SystemEventType,
   WebhookTrigger,
 } from '@kbrelay/shared';
+import { DUE_SOON_WINDOW_MS } from '@kbrelay/shared';
 import { HttpError } from '../../http';
 import { newId } from '../ids';
 import { RANK_STEP } from '../../rank';
@@ -58,6 +59,7 @@ interface CardRow {
   position: number;
   assignee_user_id: string | null;
   reviewer_user_id: string | null;
+  due_at: number | null;
   created_by: string;
   updated_by: string;
   created_at: number;
@@ -79,6 +81,7 @@ function toDto(r: CardRow, code: string | null): CardDto {
     position: r.position,
     assigneeUserId: r.assignee_user_id,
     reviewerUserId: r.reviewer_user_id,
+    dueAt: r.due_at,
     createdBy: r.created_by,
     updatedBy: r.updated_by,
     createdAt: r.created_at,
@@ -90,6 +93,11 @@ export interface CardFilters {
   columnId?: string;
   assignee?: string;
   q?: string;
+  /** Due-date convenience filter (KBR-63): `overdue` = past due, `soon` = due
+   *  within the next 48h. Both exclude cards with no due date. */
+  due?: 'overdue' | 'soon';
+  /** `due` = due-soonest first, cards without a due date last. */
+  sort?: 'due';
 }
 
 export async function listCards(
@@ -113,8 +121,21 @@ export async function listCards(
     const like = `%${filters.q}%`;
     binds.push(like, like);
   }
+  if (filters.due) {
+    const now = Date.now();
+    if (filters.due === 'overdue') {
+      clauses.push('due_at IS NOT NULL AND due_at < ?');
+      binds.push(now);
+    } else {
+      clauses.push('due_at IS NOT NULL AND due_at >= ? AND due_at < ?');
+      binds.push(now, now + DUE_SOON_WINDOW_MS);
+    }
+  }
+  const order = filters.sort === 'due'
+    ? '(due_at IS NULL) ASC, due_at ASC, position ASC'
+    : 'position ASC';
   const [rs, code] = await Promise.all([
-    env.db.prepare(`SELECT * FROM cards WHERE ${clauses.join(' AND ')} ORDER BY position ASC`)
+    env.db.prepare(`SELECT * FROM cards WHERE ${clauses.join(' AND ')} ORDER BY ${order}`)
       .bind(...binds)
       .all<CardRow>(),
     projectCode(env, tenantId, projectId),
@@ -152,7 +173,7 @@ async function queueSection(
        JOIN columns col ON col.id = c.column_id
        JOIN projects p  ON p.id = c.project_id
       WHERE ${clauses.join(' AND ')}
-      ORDER BY c.updated_at DESC, c.id ASC`,
+      ORDER BY (c.due_at IS NULL) ASC, c.due_at ASC, c.updated_at DESC, c.id ASC`,
   )
     .bind(...binds)
     .all<QueueRow>();
@@ -169,7 +190,8 @@ async function queueSection(
  *  - `review`: cards where `userId` is the reviewer sitting in a `review`-role column.
  * RBAC-scoped exactly like `listMentions` — an admin sees all; a member only
  * cards in projects they have `project_access` to. Optional `projectId`
- * narrows to one project. Newest-updated first.
+ * narrows to one project. Due-soonest first (KBR-63), then newest-updated;
+ * cards with no due date sort after every dated one.
  */
 export async function listMyQueue(
   env: Env,
@@ -275,12 +297,13 @@ export async function createCard(
     env.db.prepare(
       `INSERT INTO cards
          (id, tenant_id, project_id, column_id, seq, summary, description, acceptance_criteria,
-          color, position, assignee_user_id, reviewer_user_id, created_by, updated_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          color, position, assignee_user_id, reviewer_user_id, due_at, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       id, tenantId, projectId, columnId, seq, input.summary,
       input.description ?? null, input.acceptanceCriteria ?? null, null, // card color removed (v0.2.0)
-      position, input.assigneeUserId ?? null, input.reviewerUserId ?? null, userId, userId, now, now,
+      position, input.assigneeUserId ?? null, input.reviewerUserId ?? null, input.dueAt ?? null,
+      userId, userId, now, now,
     ),
     insertEventStmt(env, {
       tenantId, cardId: id, authorUserId: userId,
@@ -343,6 +366,7 @@ export async function patchCard(
       input.assigneeUserId === undefined ? existing.assignee_user_id : input.assigneeUserId,
     reviewer_user_id:
       input.reviewerUserId === undefined ? existing.reviewer_user_id : input.reviewerUserId,
+    due_at: input.dueAt === undefined ? existing.due_at : input.dueAt,
   };
 
   // Derive system timeline events from what actually changed. Provenance is no
@@ -369,6 +393,9 @@ export async function patchCard(
   if (next.reviewer_user_id !== existing.reviewer_user_id) {
     events.push(ev('reviewer', { from: existing.reviewer_user_id, to: next.reviewer_user_id }));
   }
+  if (next.due_at !== existing.due_at) {
+    events.push(ev('due', { from: existing.due_at, to: next.due_at }));
+  }
   const editedFields: string[] = [];
   if (next.summary !== existing.summary) editedFields.push('summary');
   if (next.description !== existing.description) editedFields.push('description');
@@ -377,11 +404,11 @@ export async function patchCard(
 
   const updateStmt = env.db.prepare(
     `UPDATE cards SET summary = ?, description = ?, acceptance_criteria = ?, color = ?,
-        column_id = ?, position = ?, assignee_user_id = ?, reviewer_user_id = ?, updated_by = ?, updated_at = ?
+        column_id = ?, position = ?, assignee_user_id = ?, reviewer_user_id = ?, due_at = ?, updated_by = ?, updated_at = ?
       WHERE id = ? AND tenant_id = ?`,
   ).bind(
     next.summary, next.description, next.acceptance_criteria, next.color,
-    next.column_id, next.position, next.assignee_user_id, next.reviewer_user_id, userId, Date.now(),
+    next.column_id, next.position, next.assignee_user_id, next.reviewer_user_id, next.due_at, userId, Date.now(),
     id, tenantId,
   );
 

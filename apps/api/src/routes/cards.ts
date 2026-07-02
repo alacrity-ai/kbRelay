@@ -13,10 +13,21 @@ export async function handleListCards(ctx: RouteContext): Promise<Response> {
   const { tenantId } = tenantScope(ctx.auth);
   const project = await getProject(ctx.env, tenantId, ctx.params.id!);
   if (!project) throw new HttpError(404, 'Project not found');
+  // Due-date conveniences (KBR-63): whitelisted values only, 400 on anything else.
+  const due = ctx.url.searchParams.get('due') ?? undefined;
+  if (due !== undefined && due !== 'overdue' && due !== 'soon') {
+    throw new HttpError(400, "due must be 'overdue' or 'soon'");
+  }
+  const sort = ctx.url.searchParams.get('sort') ?? undefined;
+  if (sort !== undefined && sort !== 'due') {
+    throw new HttpError(400, "sort must be 'due'");
+  }
   const cards = await listCards(ctx.env, tenantId, project.id, {
     columnId: ctx.url.searchParams.get('column') ?? undefined,
     assignee: ctx.url.searchParams.get('assignee') ?? undefined,
     q: ctx.url.searchParams.get('q') ?? undefined,
+    due,
+    sort,
   });
   // Enrich each card with its per-kind attachment counts for the board badges
   // (one grouped query for the whole list) and its task-list progress

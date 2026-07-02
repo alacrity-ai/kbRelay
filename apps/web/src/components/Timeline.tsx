@@ -313,6 +313,12 @@ export function systemPhrase(e: CardEventDto, userName: (id: string | null) => s
       const to = (meta.to as string | null | undefined) ?? null;
       return to ? `requested review from ${userName(to)}` : 'cleared the reviewer';
     }
+    case 'due': {
+      const to = typeof meta.to === 'number' ? meta.to : null;
+      return to != null
+        ? `set the due date to ${new Date(to).toLocaleDateString([], { month: 'short', day: 'numeric' })}`
+        : 'cleared the due date';
+    }
     case 'edited': {
       const fields = asStrings(meta.fields);
       return fields.length ? `edited the ${fields.join(', ')}` : 'edited this card';

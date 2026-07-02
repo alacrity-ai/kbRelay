@@ -4,6 +4,7 @@ import { UNASSIGNED_COLOR, toggleTaskAtLine } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
 import { attachmentMarkdown, stripAttachmentMarkdown } from '../lib/attachments';
+import { dueInputValue, dueAtFromInput, dueClass } from '../lib/due';
 import Timeline from './Timeline';
 import Markdown from './Markdown';
 import MentionTextArea from './MentionTextArea';
@@ -73,6 +74,8 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
   const [columnId, setColumnId] = useState(card?.columnId ?? createInColumnId ?? columns[0]?.id ?? '');
   const [assignee, setAssignee] = useState(card?.assigneeUserId ?? '');
   const [reviewer, setReviewer] = useState(card?.reviewerUserId ?? '');
+  const [due, setDue] = useState(dueInputValue(card?.dueAt ?? null));
+  const [now] = useState(() => Date.now()); // render-stable clock for due urgency
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -161,6 +164,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
         columnId,
         assigneeUserId: assignee || null,
         reviewerUserId: reviewer || null,
+        dueAt: dueAtFromInput(due),
       });
       return saved.id;
     } catch (err) {
@@ -183,6 +187,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
     setColumnId(card?.columnId ?? columns[0]?.id ?? '');
     setAssignee(card?.assigneeUserId ?? '');
     setReviewer(card?.reviewerUserId ?? '');
+    setDue(dueInputValue(card?.dueAt ?? null));
     setError(null);
     setEditing(true);
   }
@@ -208,6 +213,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
         columnId,
         assigneeUserId: assignee || null,
         reviewerUserId: reviewer || null,
+        dueAt: dueAtFromInput(due),
       });
       // Board adopts the saved card (new or existing) into the modal, so drop to
       // view rather than closing — you see what you just created/edited.
@@ -233,6 +239,20 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
       if (next != null) await onSave({ [field]: next });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update checklist');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Inline due-date change from view mode (KBR-63) — saves immediately.
+  async function setDueAt(next: number | null) {
+    if (!card || busy || next === card.dueAt) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onSave({ dueAt: next });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update due date');
     } finally {
       setBusy(false);
     }
@@ -345,6 +365,10 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
                     {users.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.kind})</option>)}
                   </select>
                 </div>
+                <div className="field">
+                  <label>Due date</label>
+                  <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+                </div>
               </div>
               <p className="muted-note" style={{ fontSize: '0.8rem' }}>
                 The card takes on its assignee's color.
@@ -390,6 +414,32 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
                     </span>
                   </div>
                 )}
+                {/* Inline due-date picker (KBR-63): pick to save immediately;
+                    ✕ clears. Urgency tint matches the board chip. */}
+                <div className="view-section">
+                  <span className="view-label">Due</span>
+                  <span className={`pill due-pill ${card!.dueAt != null && column?.role !== 'done' ? dueClass(card!.dueAt, now) : ''}`}>
+                    <input
+                      type="date"
+                      className="due-inline-input"
+                      aria-label="Due date"
+                      value={dueInputValue(card!.dueAt)}
+                      disabled={busy}
+                      onChange={(e) => void setDueAt(dueAtFromInput(e.target.value))}
+                    />
+                    {card!.dueAt != null && (
+                      <button
+                        className="due-clear"
+                        title="Clear due date"
+                        aria-label="Clear due date"
+                        disabled={busy}
+                        onClick={() => void setDueAt(null)}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </span>
+                </div>
               </div>
 
               <div className="view-section">

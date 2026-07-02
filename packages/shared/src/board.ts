@@ -73,6 +73,8 @@ export interface CardDto {
   /** Who a review-lane card is waiting on (v0.17.0, KBR-61). A pointer, not a
    *  workflow: set on handback (default: the card's creator), cleared freely. */
   reviewerUserId: string | null;
+  /** Optional deadline, epoch ms (v0.17.0, KBR-63). Null = no due date. */
+  dueAt: number | null;
   createdBy: string;
   updatedBy: string;
   createdAt: number;
@@ -113,6 +115,8 @@ const color = z.string().trim().max(32).nullable().optional();
 const longText = z.string().max(20_000).nullable().optional();
 const position = z.number().finite().optional();
 const idRef = z.string().min(1).max(64);
+/** Due date: epoch ms, or null to clear (KBR-63). */
+const dueAt = z.number().int().nonnegative().nullable().optional();
 /** Project code: 2–6 alphanumerics, stored uppercased. Drives ticket keys. */
 const code = z
   .string()
@@ -170,6 +174,7 @@ export const createCardInput = z.object({
   columnId: idRef.optional(), // defaults to the first column server-side
   assigneeUserId: idRef.nullable().optional(),
   reviewerUserId: idRef.nullable().optional(),
+  dueAt,
   position,
 });
 export type CreateCardInput = z.infer<typeof createCardInput>;
@@ -182,6 +187,7 @@ export const patchCardInput = z.object({
   columnId: idRef.optional(),
   assigneeUserId: idRef.nullable().optional(),
   reviewerUserId: idRef.nullable().optional(),
+  dueAt,
   position,
 });
 export type PatchCardInput = z.infer<typeof patchCardInput>;

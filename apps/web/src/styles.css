@@ -1073,6 +1073,46 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 /* "Needs me" badge anchor on the My Work button (badge itself = .notif-badge). */
 .mywork-btn { position: relative; }
 
+/* Due-date chip on a board card (v0.17.0, KBR-63). Neutral by default; amber
+   when due within 48h, red when overdue. Hidden in done-role columns. */
+.due-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28em;
+  padding: 0.05em 0.45em;
+  border: 1px solid var(--border-strong, #334155);
+  border-radius: var(--r-pill);
+  font-size: 0.72rem;
+  color: var(--muted, #94a3b8);
+  white-space: nowrap;
+}
+.due-chip.soon { color: #fbbf24; border-color: #fbbf2466; }
+.due-chip.overdue { color: #f87171; border-color: #f8717166; }
+
+/* Inline due picker in the card modal's view mode (KBR-63). */
+.due-pill { gap: 0.3em; }
+.due-pill.soon { color: #fbbf24; }
+.due-pill.overdue { color: #f87171; }
+.due-inline-input {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  color-scheme: dark;
+  cursor: pointer;
+}
+.due-clear {
+  background: transparent;
+  border: 0;
+  padding: 0 0.15em;
+  color: var(--muted, #94a3b8);
+  font-size: 0.8rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.due-clear:hover { color: #f87171; }
+
 /* Interactive checklists (v0.17.0, KBR-59). */
 .task-chip {
   display: inline-flex;

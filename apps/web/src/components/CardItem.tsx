@@ -1,19 +1,23 @@
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { CardDto, UserDto } from '@kbrelay/shared';
 import { UNASSIGNED_COLOR } from '@kbrelay/shared';
 import AttachmentBadges from './AttachmentBadges';
+import { formatDue, dueClass } from '../lib/due';
 
 type CardBodyProps = {
   card: CardDto;
   users: UserDto[];
   className?: string;
+  /** True when the card sits in a `done`-role column: the due chip is hidden
+   *  there — finished work is never "overdue" (KBR-63). */
+  inDoneColumn?: boolean;
 } & React.HTMLAttributes<HTMLDivElement>;
 
 /** Presentational card body — reused by the sortable card and the DragOverlay. */
 export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardBody(
-  { card, users, className = '', style, ...rest },
+  { card, users, className = '', inDoneColumn = false, style, ...rest },
   ref,
 ) {
   const assignee = users.find((u) => u.id === card.assigneeUserId);
@@ -23,6 +27,10 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
   const counts = card.attachmentCounts;
   const hasBadges = !!counts && counts.image + counts.document + counts.archive + counts.misc > 0;
   const tasks = card.taskCounts;
+  const showDue = card.dueAt != null && !inDoneColumn;
+  // Captured once per mount — fresh enough for day-granular urgency, and the
+  // board refetches (remounting cards) far more often than the 48h window moves.
+  const [now] = useState(() => Date.now());
   return (
     <div
       ref={ref}
@@ -32,7 +40,7 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
     >
       {card.key && <div className="card-key">{card.key}</div>}
       <div className="card-title">{card.summary}</div>
-      {(assignee || reviewer || hasBadges || (tasks && tasks.total > 0)) && (
+      {(assignee || reviewer || hasBadges || showDue || (tasks && tasks.total > 0)) && (
         <div className="card-meta">
           {assignee ? (
             <span className="assignee-chip">
@@ -51,6 +59,19 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
                 <circle cx="12" cy="12" r="3" />
               </svg>
               {reviewer.name}
+            </span>
+          )}
+          {showDue && (
+            <span
+              className={`due-chip ${dueClass(card.dueAt!, now)}`}
+              title={`Due ${new Date(card.dueAt!).toLocaleDateString([], { dateStyle: 'medium' })}`}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 3" />
+              </svg>
+              {formatDue(card.dueAt!, now)}
             </span>
           )}
           {tasks && tasks.total > 0 && (
@@ -72,10 +93,12 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
 export default function CardItem({
   card,
   users,
+  inDoneColumn,
   onOpen,
 }: {
   card: CardDto;
   users: UserDto[];
+  inDoneColumn?: boolean;
   onOpen: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -87,6 +110,7 @@ export default function CardItem({
       ref={setNodeRef}
       card={card}
       users={users}
+      inDoneColumn={inDoneColumn}
       className={isDragging ? 'dragging' : ''}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       onClick={onOpen}

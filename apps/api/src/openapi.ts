@@ -84,6 +84,10 @@ export const OPENAPI_SPEC = {
             type: ['string', 'null'],
             description: 'Who a review-lane card is waiting on (v0.17.0). Set on handback; a pointer, not an approval workflow.',
           },
+          dueAt: {
+            type: ['integer', 'null'],
+            description: 'Optional deadline, epoch ms (v0.17.0). Null = no due date. No reminders — a display + ordering signal only.',
+          },
           createdBy: { type: 'string' },
           updatedBy: { type: 'string' },
           createdAt: { type: 'integer' },
@@ -503,7 +507,7 @@ export const OPENAPI_SPEC = {
         description:
           'Two typed sections: `work` = cards assigned to you in a `ready`-role column ' +
           '(do these); `review` = cards where you are the reviewer in a `review`-role ' +
-          'column (verify these). Both RBAC-scoped, newest-updated first.',
+          'column (verify these). Both RBAC-scoped, due-soonest first (undated last), then newest-updated.',
         parameters: [
           { name: 'projectId', in: 'query', schema: { type: 'string' }, description: 'Narrow to one project.' },
         ],
@@ -589,6 +593,8 @@ export const OPENAPI_SPEC = {
           { name: 'column', in: 'query', schema: { type: 'string' } },
           { name: 'assignee', in: 'query', schema: { type: 'string' } },
           { name: 'q', in: 'query', schema: { type: 'string' } },
+          { name: 'due', in: 'query', schema: { type: 'string', enum: ['overdue', 'soon'] }, description: 'Due-date filter: overdue, or due within 48h (KBR-63).' },
+          { name: 'sort', in: 'query', schema: { type: 'string', enum: ['due'] }, description: 'due = due-soonest first, undated cards last.' },
         ],
         responses: { 200: { description: 'ok' } },
       },

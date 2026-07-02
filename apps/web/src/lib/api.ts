@@ -160,6 +160,7 @@ export interface CardInput {
   columnId?: string;
   assigneeUserId?: string | null;
   reviewerUserId?: string | null;
+  dueAt?: number | null;
   position?: number;
 }
 export const createCard = (projectId: string, body: CardInput) =>

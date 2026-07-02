@@ -111,7 +111,7 @@ export const allTools: Tool[] = [
   }),
   defineTool({
     name: 'create_card',
-    description: 'Create a card (defaults to the first column). Write summary plain; description/acceptanceCriteria in markdown; @handle to notify.',
+    description: 'Create a card (defaults to the first column). Write summary plain; description/acceptanceCriteria in markdown; @handle to notify. dueAt = optional deadline, epoch ms.',
     inputSchema: z.object({
       projectId: z.string(),
       summary: z.string(),
@@ -120,6 +120,7 @@ export const allTools: Tool[] = [
       columnId: z.string().optional(),
       assigneeUserId: z.string().nullish(),
       reviewerUserId: z.string().nullish(),
+      dueAt: z.number().nullish(),
     }),
     handler: (a, c) => {
       const { projectId, ...body } = a;
@@ -137,6 +138,7 @@ export const allTools: Tool[] = [
       columnId: z.string().optional(),
       assigneeUserId: z.string().nullish(),
       reviewerUserId: z.string().nullish(),
+      dueAt: z.number().nullish(),
       position: z.number().optional(),
     }),
     handler: (a, c) => {
@@ -267,7 +269,7 @@ export const allTools: Tool[] = [
   defineTool({
     name: 'list_my_queue',
     description:
-      'Your queue, two sections: work = assigned to you in a ready column (do these); review = you are the reviewer in a review column (verify these). Pickup → in_progress; finish → review + handoff.',
+      'Your queue, two sections: work = assigned to you in a ready column (do these); review = you are the reviewer in a review column (verify these). Due-soonest first; finish → review + handoff.',
     inputSchema: z.object({ projectId: z.string().optional() }),
     handler: (a, c) => c.request('GET', `/v1/me/queue${qs({ projectId: a.projectId })}`),
   }),
