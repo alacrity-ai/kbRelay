@@ -955,9 +955,12 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   .user-name { display: none; }
   .project-switcher { flex: 1; min-width: 0; }
   .project-trigger { max-width: none; width: 100%; }
-  /* Collapse the tool buttons into the kebab menu (KBR-70). */
+  /* Collapse the tool buttons into the kebab menu (KBR-70). Selector is
+     .topbar-scoped for specificity: the base `.topbar-tools-menu {display:none}`
+     lives LATER in this file, and at equal specificity it would win over this
+     media rule regardless of the query (cascade order, not media, decides). */
   .topbar .topbar-tool { display: none; }
-  .topbar-tools-menu { display: block; }
+  .topbar .topbar-tools-menu { display: block; }
 
   /* Board: one column fills the screen; horizontal snap between columns */
   .board {
