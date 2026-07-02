@@ -103,6 +103,19 @@ export function deleteMentionsForCardStmt(
   );
 }
 
+/** Delete every mention on any of a project's cards — for project deletion, so
+ *  mentions don't dangle at cards that no longer exist (KBR-43). */
+export function deleteMentionsForProjectStmt(
+  env: Env,
+  tenantId: string,
+  projectId: string,
+): DbStatement {
+  return env.db.prepare(
+    `DELETE FROM card_mentions
+      WHERE tenant_id = ? AND card_id IN (SELECT id FROM cards WHERE project_id = ? AND tenant_id = ?)`,
+  ).bind(tenantId, projectId, tenantId);
+}
+
 /** Delete a single comment's mentions — for the (upcoming) comment-delete path. */
 export function deleteMentionsForCommentStmt(
   env: Env,

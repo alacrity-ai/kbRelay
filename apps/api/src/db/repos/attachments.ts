@@ -220,18 +220,65 @@ export function deleteAttachmentsForEventStmt(env: Env, tenantId: string, eventI
   return env.db.prepare('DELETE FROM attachments WHERE tenant_id = ? AND event_id = ?').bind(tenantId, eventId);
 }
 
+/** All blob keys for a whole project's cards — gather BEFORE deleting rows so the
+ *  bytes can be purged afterwards (KBR-43). */
+export async function blobKeysForProject(env: Env, tenantId: string, projectId: string): Promise<string[]> {
+  const rs = await env.db.prepare(
+    `SELECT blob_key FROM attachments
+      WHERE tenant_id = ? AND card_id IN (SELECT id FROM cards WHERE project_id = ? AND tenant_id = ?)`,
+  ).bind(tenantId, projectId, tenantId).all<{ blob_key: string }>();
+  return (rs.results ?? []).map((r) => r.blob_key);
+}
+
+export function deleteAttachmentsForProjectStmt(env: Env, tenantId: string, projectId: string): DbStatement {
+  return env.db.prepare(
+    `DELETE FROM attachments
+      WHERE tenant_id = ? AND card_id IN (SELECT id FROM cards WHERE project_id = ? AND tenant_id = ?)`,
+  ).bind(tenantId, projectId, tenantId);
+}
+
 export function deleteAttachmentStmt(env: Env, tenantId: string, id: string): DbStatement {
   return env.db.prepare('DELETE FROM attachments WHERE tenant_id = ? AND id = ?').bind(tenantId, id);
 }
 
-/** Best-effort purge of blob bytes (idempotent; a missing key is not an error). */
+/**
+ * Purge blob bytes for a set of keys (idempotent — a missing key is not an
+ * error). The DB rows are already gone by the time this runs, so callers should
+ * run it OFF the response path via `ctx.waitUntil` (KBR-41): it never blocks the
+ * delete, and a big card/board doesn't stall the request.
+ *
+ * Hardening: deletes run with bounded concurrency (not one-at-a-time) with a
+ * single retry per key. Any keys that still fail are logged with a stable prefix
+ * so orphaned bytes are recoverable (grep logs / future reconciliation sweep) —
+ * a dead-letter table would be the next step if leaks prove common, but that's a
+ * schema change we don't need for this best-effort cleanup.
+ */
+const PURGE_CONCURRENCY = 12;
 export async function purgeBlobs(env: Env, keys: string[]): Promise<void> {
   if (!env.blob || !keys.length) return;
-  for (const key of keys) {
-    try {
-      await env.blob.delete(key);
-    } catch {
-      /* best-effort — the DB row is already gone */
+  const blob = env.blob;
+  const queue = [...keys];
+  const failed: string[] = [];
+
+  async function worker(): Promise<void> {
+    for (let key = queue.pop(); key !== undefined; key = queue.pop()) {
+      let ok = false;
+      for (let attempt = 0; attempt < 2 && !ok; attempt++) {
+        try {
+          await blob.delete(key);
+          ok = true;
+        } catch {
+          /* retry once, then give up on this key */
+        }
+      }
+      if (!ok) failed.push(key);
     }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(PURGE_CONCURRENCY, keys.length) }, () => worker()),
+  );
+  if (failed.length) {
+    console.error(`[purgeBlobs] orphaned ${failed.length}/${keys.length} blob(s) after retry:`, failed.join(', '));
   }
 }

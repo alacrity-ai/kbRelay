@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { createLibsqlDb } from '../../runtime/node/libsql-db';
 import type { Env } from '../../env';
 import { registerTenant } from './auth';
-import { createProject } from './projects';
+import { createProject, deleteProject } from './projects';
 import { createCard, deleteCard } from './cards';
 import { addComment, redactComment, listTimeline } from './card_events';
 import {
@@ -18,6 +18,7 @@ import {
   listCardAttachments,
   attachmentCountsForCard,
   attachmentCountsForCards,
+  purgeBlobs,
   type AttachmentInsert,
 } from './attachments';
 
@@ -196,5 +197,74 @@ describe('cascade', () => {
 
     await redactComment(env, tenantId, cardId, note.id, userId);
     expect(await getAttachment(env, tenantId, a.id)).toBeNull(); // bytes+row gone
+  });
+});
+
+/**
+ * KBR-41 (harden blob purge, run off the response path) + KBR-43 (project delete
+ * must cascade attachments + mentions, not just cards). deleteCard/deleteProject
+ * now RETURN the blob keys so the route can purge via ctx.waitUntil.
+ */
+describe('KBR-41/43: complete cascades + hardened off-path purge', () => {
+  it('deleteCard returns the blob keys to purge (rows already gone)', async () => {
+    const cardId = await makeCard('return keys');
+    const ins = insert(cardId, 'a.png', 'image/png');
+    await createAttachment(env, ins);
+    const keys = await deleteCard(env, tenantId, cardId);
+    expect(keys).toEqual([ins.blobKey]);
+    expect(await getAttachment(env, tenantId, ins.id)).toBeNull();
+  });
+
+  it('deleteProject cascades attachments + mentions and returns every blob key', async () => {
+    const project = await createProject(env, tenantId, userId, { name: 'Doomed', code: 'DOOM' });
+    const c1 = (await createCard(env, tenantId, project.id, userId, { summary: 'c1' })).id;
+    const c2 = (await createCard(env, tenantId, project.id, userId, { summary: 'c2' })).id;
+    const a1 = insert(c1, 'x.png', 'image/png');
+    const a2 = insert(c2, 'y.zip', 'application/zip');
+    await createAttachment(env, a1);
+    await createAttachment(env, a2);
+    // A mention on one of the cards (inserted directly — we're testing the cascade).
+    await env.db.batch([
+      env.db.prepare(
+        `INSERT INTO card_mentions
+           (id, tenant_id, card_id, recipient_user_id, author_user_id, source_kind, source_id, created_at)
+         VALUES (?, ?, ?, ?, ?, 'description', 'description', ?)`,
+      ).bind('men_kbr43', tenantId, c1, userId, userId, Date.now()),
+    ]);
+
+    const keys = await deleteProject(env, tenantId, project.id);
+    expect(new Set(keys)).toEqual(new Set([a1.blobKey, a2.blobKey]));
+
+    // Every child row for the board is gone — no orphans.
+    expect(await getAttachment(env, tenantId, a1.id)).toBeNull();
+    expect(await getAttachment(env, tenantId, a2.id)).toBeNull();
+    const count = async (sql: string, ...binds: unknown[]) =>
+      (await env.db.prepare(sql).bind(...binds).first<{ n: number }>())?.n ?? -1;
+    expect(await count('SELECT COUNT(*) AS n FROM card_mentions WHERE tenant_id = ? AND card_id IN (?, ?)', tenantId, c1, c2)).toBe(0);
+    expect(await count('SELECT COUNT(*) AS n FROM attachments WHERE tenant_id = ? AND card_id IN (?, ?)', tenantId, c1, c2)).toBe(0);
+    expect(await count('SELECT COUNT(*) AS n FROM cards WHERE project_id = ?', project.id)).toBe(0);
+  });
+
+  it('purgeBlobs deletes all keys, retries once, and a permanent failure does not abort the rest', async () => {
+    const deleted: string[] = [];
+    const failOnce = new Set(['flaky']);
+    const failAlways = new Set(['broken']);
+    const blob = {
+      put: async () => {},
+      get: async () => null,
+      delete: async (key: string) => {
+        if (failAlways.has(key)) throw new Error('permanent');
+        if (failOnce.has(key)) { failOnce.delete(key); throw new Error('transient'); }
+        deleted.push(key);
+      },
+    };
+    await expect(purgeBlobs({ blob } as unknown as Env, ['a', 'b', 'flaky', 'broken', 'c'])).resolves.toBeUndefined();
+    // 'broken' stays orphaned (logged); everything else deleted, 'flaky' on retry.
+    expect(new Set(deleted)).toEqual(new Set(['a', 'b', 'flaky', 'c']));
+  });
+
+  it('purgeBlobs no-ops with no blob store or no keys', async () => {
+    await expect(purgeBlobs({} as unknown as Env, ['x'])).resolves.toBeUndefined();
+    await expect(purgeBlobs({ blob: {} } as unknown as Env, [])).resolves.toBeUndefined();
   });
 });

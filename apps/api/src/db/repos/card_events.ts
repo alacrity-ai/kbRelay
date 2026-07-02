@@ -10,7 +10,6 @@ import {
   linkAttachmentsToEventStmt,
   blobKeysForEvent,
   deleteAttachmentsForEventStmt,
-  purgeBlobs,
 } from './attachments';
 
 interface CardEventRow {
@@ -151,13 +150,16 @@ export async function addComment(
  * tombstone, and retract the mentions it authored. Append-only-safe — only the
  * author may redact, system events are refused, and it's idempotent.
  */
+/** Redact a comment. Returns the tombstone DTO plus the attachment blob keys to
+ *  purge — the caller runs the purge OFF the response path via `ctx.waitUntil`
+ *  (KBR-41). The rows are hard-deleted regardless of the purge outcome. */
 export async function redactComment(
   env: Env,
   tenantId: string,
   cardId: string,
   commentId: string,
   userId: string,
-): Promise<CardEventDto> {
+): Promise<{ event: CardEventDto; blobKeys: string[] }> {
   const row = await env.db.prepare(
     'SELECT * FROM card_events WHERE id = ? AND card_id = ? AND tenant_id = ?',
   )
@@ -171,7 +173,7 @@ export async function redactComment(
   );
   if (verdict.error === 'not_comment') throw new HttpError(400, 'System events cannot be redacted');
   if (verdict.error === 'not_author') throw new HttpError(403, 'You can only redact your own comment');
-  if (verdict.alreadyRedacted) return toDto(row); // idempotent no-op
+  if (verdict.alreadyRedacted) return { event: toDto(row), blobKeys: [] }; // idempotent no-op
 
   // Redaction removes content that must not persist — that includes a leaked
   // file, so hard-delete this comment's attachments (rows + bytes), not just the
@@ -187,11 +189,10 @@ export async function redactComment(
     deleteMentionsForCommentStmt(env, tenantId, cardId, commentId),
     deleteAttachmentsForEventStmt(env, tenantId, commentId),
   ]);
-  await purgeBlobs(env, blobKeys);
 
   const updated = await env.db.prepare('SELECT * FROM card_events WHERE id = ? AND tenant_id = ?')
     .bind(commentId, tenantId)
     .first<CardEventRow>();
   if (!updated) throw new HttpError(500, 'Redaction did not return row');
-  return toDto(updated);
+  return { event: toDto(updated), blobKeys };
 }

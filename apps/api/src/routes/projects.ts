@@ -13,6 +13,7 @@ import {
   deleteProject,
 } from '../db/repos/projects';
 import { listColumns } from '../db/repos/columns';
+import { purgeBlobs } from '../db/repos/attachments';
 
 export async function handleListProjects(ctx: RouteContext): Promise<Response> {
   const { tenantId, userId } = tenantScope(ctx.auth);
@@ -55,6 +56,8 @@ export async function handleDeleteProject(ctx: RouteContext): Promise<Response> 
   // Deleting a project is destructive and irreversible → admin-only (v0.14.0).
   requireAdmin(ctx.auth);
   const { tenantId } = tenantScope(ctx.auth);
-  await deleteProject(ctx.env, tenantId, ctx.params.id!);
+  const blobKeys = await deleteProject(ctx.env, tenantId, ctx.params.id!);
+  // Purge the whole board's attachment bytes after responding (KBR-43).
+  ctx.waitUntil(purgeBlobs(ctx.env, blobKeys));
   return jsonResponse(200, { ok: true }, ctx.cors);
 }

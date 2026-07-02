@@ -6,7 +6,7 @@ import { tenantScope } from '../auth/tenant-scope';
 import { getProject } from '../db/repos/projects';
 import { listCards, getCard, createCard, patchCard, deleteCard } from '../db/repos/cards';
 import { listTimeline, addComment, redactComment } from '../db/repos/card_events';
-import { listCardAttachments, attachmentCountsForCards } from '../db/repos/attachments';
+import { listCardAttachments, attachmentCountsForCards, purgeBlobs } from '../db/repos/attachments';
 import { dispatchTriggers } from '../services/webhooks';
 
 export async function handleListCards(ctx: RouteContext): Promise<Response> {
@@ -55,7 +55,9 @@ export async function handlePatchCard(ctx: RouteContext): Promise<Response> {
 
 export async function handleDeleteCard(ctx: RouteContext): Promise<Response> {
   const { tenantId } = tenantScope(ctx.auth);
-  await deleteCard(ctx.env, tenantId, ctx.params.id!);
+  const blobKeys = await deleteCard(ctx.env, tenantId, ctx.params.id!);
+  // Purge the bytes after responding — rows are already gone (KBR-41).
+  ctx.waitUntil(purgeBlobs(ctx.env, blobKeys));
   return jsonResponse(200, { ok: true }, ctx.cors);
 }
 
@@ -85,6 +87,7 @@ export async function handleRedactComment(ctx: RouteContext): Promise<Response> 
   const { tenantId, userId } = tenantScope(ctx.auth);
   const card = await getCard(ctx.env, tenantId, ctx.params.id!);
   if (!card) throw new HttpError(404, 'Card not found');
-  const event = await redactComment(ctx.env, tenantId, card.id, ctx.params.commentId!, userId);
+  const { event, blobKeys } = await redactComment(ctx.env, tenantId, card.id, ctx.params.commentId!, userId);
+  ctx.waitUntil(purgeBlobs(ctx.env, blobKeys)); // purge redacted files off the response path (KBR-41)
   return jsonResponse(200, { event }, ctx.cors);
 }

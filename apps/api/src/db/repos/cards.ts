@@ -17,7 +17,7 @@ import { userHasProjectAccess } from '../../auth/access';
 import { projectCode, nextCardSeq } from './projects';
 import { insertEventStmt, type EventInsert } from './card_events';
 import { reconcileMentionStmts, deleteMentionsForCardStmt } from './mentions';
-import { blobKeysForCard, deleteAttachmentsForCardStmt, purgeBlobs } from './attachments';
+import { blobKeysForCard, deleteAttachmentsForCardStmt } from './attachments';
 
 /** Look up a column's name for durable move-event snapshots. */
 async function columnName(env: Env, tenantId: string, id: string): Promise<string | null> {
@@ -391,7 +391,10 @@ export async function patchCard(
   return toDto(row, await projectCode(env, tenantId, existing.project_id));
 }
 
-export async function deleteCard(env: Env, tenantId: string, id: string): Promise<void> {
+/** Delete a card + its children (timeline, mentions, attachment rows). Returns
+ *  the attachment blob keys so the caller can purge the bytes OFF the response
+ *  path via `ctx.waitUntil` (KBR-41) — the rows are already gone regardless. */
+export async function deleteCard(env: Env, tenantId: string, id: string): Promise<string[]> {
   const existing = await getCardRow(env, tenantId, id);
   if (!existing) throw new HttpError(404, 'Card not found');
   // Grab attachment blob keys before their rows go, so we can purge the bytes.
@@ -404,5 +407,5 @@ export async function deleteCard(env: Env, tenantId: string, id: string): Promis
     deleteAttachmentsForCardStmt(env, tenantId, id),
     env.db.prepare('DELETE FROM cards WHERE id = ? AND tenant_id = ?').bind(id, tenantId),
   ]);
-  await purgeBlobs(env, blobKeys);
+  return blobKeys;
 }

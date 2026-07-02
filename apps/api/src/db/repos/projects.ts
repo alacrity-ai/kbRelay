@@ -5,6 +5,8 @@ import { HttpError } from '../../http';
 import { newId } from '../ids';
 import { RANK_STEP } from '../../rank';
 import { grantProjectAccessStmt } from './team';
+import { deleteMentionsForProjectStmt } from './mentions';
+import { blobKeysForProject, deleteAttachmentsForProjectStmt } from './attachments';
 
 interface ProjectRow {
   id: string;
@@ -183,18 +185,30 @@ export async function patchProject(
 /**
  * Delete a project and everything under it. We cascade explicitly rather
  * than trusting D1's FK enforcement (which is not reliably on).
+ *
+ * Returns the attachment blob keys for the whole board so the caller can purge
+ * the bytes OFF the response path via `ctx.waitUntil` (KBR-43). The child-table
+ * deletes that reference the project's cards by subquery (card_events, mentions,
+ * attachments) MUST run before `DELETE FROM cards`, so they come first.
  */
-export async function deleteProject(env: Env, tenantId: string, id: string): Promise<void> {
+export async function deleteProject(env: Env, tenantId: string, id: string): Promise<string[]> {
   const existing = await getProject(env, tenantId, id);
   if (!existing) throw new HttpError(404, 'Project not found');
+  // Gather blob keys before the rows are deleted.
+  const blobKeys = await blobKeysForProject(env, tenantId, id);
   await env.db.batch([
     env.db.prepare(
       `DELETE FROM card_events WHERE tenant_id = ?
          AND card_id IN (SELECT id FROM cards WHERE project_id = ? AND tenant_id = ?)`,
     ).bind(tenantId, id, tenantId),
+    // Mentions + attachment rows for the project's cards — previously orphaned
+    // by project deletion (KBR-43). Both reference cards by subquery, so before cards.
+    deleteMentionsForProjectStmt(env, tenantId, id),
+    deleteAttachmentsForProjectStmt(env, tenantId, id),
     env.db.prepare('DELETE FROM cards WHERE project_id = ? AND tenant_id = ?').bind(id, tenantId),
     env.db.prepare('DELETE FROM columns WHERE project_id = ? AND tenant_id = ?').bind(id, tenantId),
     env.db.prepare('DELETE FROM project_access WHERE project_id = ? AND tenant_id = ?').bind(id, tenantId),
     env.db.prepare('DELETE FROM projects WHERE id = ? AND tenant_id = ?').bind(id, tenantId),
   ]);
+  return blobKeys;
 }

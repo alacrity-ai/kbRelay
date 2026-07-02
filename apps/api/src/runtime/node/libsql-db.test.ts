@@ -112,7 +112,7 @@ describe('libsql adapter — repo parity', () => {
     expect(timeline.some((e) => e.kind === 'note')).toBe(true);
 
     // Redact the comment → its mention retracts, tombstone remains.
-    const redacted = await redactComment(env, tenantId, card.id, comment.id, ownerId);
+    const { event: redacted } = await redactComment(env, tenantId, card.id, comment.id, ownerId);
     expect(redacted.deletedAt).not.toBeNull();
     expect(redacted.body).toBeNull();
     agentMentions = await listMentions(env, tenantId, agentId, 'all', false);
