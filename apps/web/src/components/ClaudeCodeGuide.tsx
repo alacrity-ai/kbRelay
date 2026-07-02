@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { ColumnRole } from '@kbrelay/shared';
-import { ROLE_META } from '../lib/roles';
+import { ROLE_META, ROLE_ORDER } from '../lib/roles';
 import { mcpAddCommand, LOOP_COMMAND, CHANNELS_HINT, CHANNEL_MCP_JSON, channelRunCommand } from '../lib/setupSnippets';
 
 /**
@@ -27,6 +27,31 @@ function CopyBlock({ code }: { code: string }) {
     <div className="code-block">
       <pre><code>{code}</code></pre>
       <button className="ghost sm copy-btn" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
+    </div>
+  );
+}
+
+const ROLE_BLURB: Record<ColumnRole, string> = {
+  ready: 'Fair game — an agent works it now',
+  in_progress: 'An agent has picked it up',
+  review: 'Handed back for you to check',
+  done: 'Closed',
+  blocked: 'Stuck — needs you',
+};
+
+/** The role legend on page 1 — the real colored badges + a one-liner each. */
+function RoleLegend() {
+  return (
+    <div className="guide-legend">
+      {ROLE_ORDER.map((r) => (
+        <div className="guide-legend-row" key={r}>
+          <span className="flowdemo-role" style={{ color: ROLE_META[r].color, borderColor: ROLE_META[r].color }}>
+            {ROLE_META[r].label}
+          </span>
+          <span>{ROLE_BLURB[r]}</span>
+        </div>
+      ))}
+      <p className="muted-note">Lanes without a role (like Backlog) are neutral — nothing automatic happens there.</p>
     </div>
   );
 }
@@ -105,12 +130,8 @@ export default function ClaudeCodeGuide({ onClose }: { onClose: () => void }) {
             tickets, Claude works them, and everything is audited on the timeline. Your board has
             lanes; some carry a <strong>role</strong> that gives them meaning for you and your agents.
           </p>
-          <FlowDemo lane={0} />
-          <p className="muted-note">
-            <strong>Ready</strong> = fair game to work · <strong>In Progress</strong> = an agent has it ·
-            <strong> In Review</strong> = handed back for you · <strong>Done</strong> = closed ·
-            <strong> Blocked</strong> = stuck. Other lanes (like Backlog) are neutral.
-          </p>
+          <FlowDemo lane={-1} />
+          <RoleLegend />
         </>
       ),
     },
@@ -217,6 +238,11 @@ export default function ClaudeCodeGuide({ onClose }: { onClose: () => void }) {
           <CopyBlock code={command} />
           <p className="muted-note">Work the queue on a loop:</p>
           <CopyBlock code={LOOP_COMMAND} />
+          <p className="muted-note">
+            <code>/loop</code> is flexible — scope it to a project, or point it at your mentions instead:
+          </p>
+          <CopyBlock code={'/loop 10m work my kbRelay queue in project "XYZ"'} />
+          <CopyBlock code={'/loop 10m respond to and action any mentions'} />
           <p className="muted-note">
             <strong>Assign to Claude + move to Ready = go.</strong> Claude → In Progress → In Review, then you
             close it. That’s the whole loop.

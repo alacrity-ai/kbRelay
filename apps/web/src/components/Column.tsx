@@ -1,8 +1,8 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import type { CardDto, ColumnDto, UserDto } from '@kbrelay/shared';
+import type { CardDto, ColumnDto, ColumnRole, UserDto } from '@kbrelay/shared';
 import CardItem from './CardItem';
-import { ROLE_META } from '../lib/roles';
+import { ROLE_META, ROLE_ORDER } from '../lib/roles';
 
 /** A board lane: droppable body + a vertical sortable context of cards. */
 export default function Column({
@@ -13,6 +13,7 @@ export default function Column({
   onOpenCard,
   onRename,
   onDelete,
+  onSetRole,
 }: {
   column: ColumnDto;
   cards: CardDto[];
@@ -21,6 +22,7 @@ export default function Column({
   onOpenCard: (card: CardDto) => void;
   onRename: (column: ColumnDto) => void;
   onDelete: (column: ColumnDto) => void;
+  onSetRole: (column: ColumnDto, role: ColumnRole | null) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const role = column.role ? ROLE_META[column.role] : null;
@@ -36,15 +38,19 @@ export default function Column({
         >
           {column.name}
         </span>
-        {role && (
-          <span
-            className="column-role-badge"
-            style={{ color: role.color, borderColor: role.color }}
-            title={`This column carries the "${role.label}" role`}
-          >
-            {role.label}
-          </span>
-        )}
+        <select
+          className="column-role-select"
+          value={column.role ?? ''}
+          title="Set this lane's role — one lane per role (reassigning moves it)"
+          aria-label={`Role for ${column.name}`}
+          style={role ? { color: role.color, borderColor: role.color } : undefined}
+          onChange={(e) => onSetRole(column, (e.target.value || null) as ColumnRole | null)}
+        >
+          <option value="">No role</option>
+          {ROLE_ORDER.map((r) => (
+            <option key={r} value={r}>{ROLE_META[r].label}</option>
+          ))}
+        </select>
         <span className="column-count">{cards.length}</span>
         <div style={{ flex: 1 }} />
         <div className="column-actions">

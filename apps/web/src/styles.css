@@ -304,11 +304,19 @@ select {
 /* Role picker in Project Settings → Columns. */
 .toggle-row { display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer; font-size: 0.85rem; flex: none; }
 .toggle-row input { cursor: pointer; }
-.col-row-role {
-  flex: none; font-size: 0.75rem; font-weight: 600;
-  background: var(--surface-2); color: var(--text-dim);
+/* `width:auto` overrides the global `select { width:100% }` so the role picker
+   doesn't devour the row (was squishing the name to one letter per line). */
+.col-row-role, .column-role-select {
+  width: auto; flex: none; font-size: 0.72rem; font-weight: 600;
+  background-color: var(--surface-2); color: var(--text-dim);
   border: 1px solid var(--border); border-radius: var(--r-sm);
-  padding: 0.2rem 0.4rem;
+  padding: 0.2rem 1.6rem 0.2rem 0.5rem; background-position: right 0.4rem center;
+}
+.col-row-name { min-width: 3rem; }
+/* Compact, badge-like role select in the board column header. */
+.column-role-select {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  border-radius: var(--r-pill); padding: 0.08rem 1.25rem 0.08rem 0.45rem; background-position: right 0.3rem center;
 }
 .column-body {
   padding: 0.6rem; display: flex; flex-direction: column; gap: 0.55rem;
@@ -820,8 +828,12 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 .copy-btn { position: absolute; top: 0.4rem; right: 0.4rem; }
 
 /* ── Claude Code setup guide (paged tutorial modal, v0.15.0) ── */
-.dialog-card.cc-guide { width: min(600px, 94vw); max-width: 600px; }
-.cc-guide-body { min-height: 300px; }
+.dialog-card.cc-guide { width: min(760px, 94vw); max-width: 760px; }
+.cc-guide-body { min-height: 340px; }
+/* Role legend on the guide's first page: colored badge + description per row. */
+.guide-legend { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.2rem 0; }
+.guide-legend-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
+.guide-legend .flowdemo-role { flex: none; min-width: 5.5rem; text-align: center; }
 .cc-guide-body p:first-child { margin-top: 0; }
 .cc-guide-footer { display: flex; align-items: center; gap: 0.6rem; }
 .cc-guide-footer .primary, .cc-guide-footer .ghost { flex: none; }

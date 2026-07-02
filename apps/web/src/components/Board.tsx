@@ -13,7 +13,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import type { CardDto, ColumnDto, UserDto } from '@kbrelay/shared';
+import type { CardDto, ColumnDto, ColumnRole, UserDto } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
 import Column from './Column';
@@ -230,6 +230,24 @@ export default function Board({ projectId, users, meId, reloadNonce = 0, filter 
     await load();
   }
 
+  async function setColumnRole(col: ColumnDto, role: ColumnRole | null) {
+    if (col.role === role) return;
+    // The API enforces one-lane-per-role: setting a role yanks it off any other
+    // lane. Optimistically clear the old holder here so the badge moves at once.
+    setColumns((prev) => prev.map((c) => {
+      if (c.id === col.id) return { ...c, role };
+      if (role && c.role === role) return { ...c, role: null };
+      return c;
+    }));
+    try {
+      await api.patchColumn(col.id, { role });
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not set role');
+      void load();
+    }
+  }
+
   async function deleteColumn(col: ColumnDto) {
     const ok = await dialog.confirm({
       title: 'Delete column?',
@@ -276,6 +294,7 @@ export default function Board({ projectId, users, meId, reloadNonce = 0, filter 
               onOpenCard={(card) => { setScrollTo(undefined); setModal({ mode: 'view', card }); }}
               onRename={renameColumn}
               onDelete={deleteColumn}
+              onSetRole={setColumnRole}
             />
           ))}
         </div>
