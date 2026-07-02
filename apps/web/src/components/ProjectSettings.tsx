@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { CardDto, ColumnDto, ColumnRole, ProjectDto } from '@kbrelay/shared';
-import { USER_PALETTE } from '@kbrelay/shared';
+import type { CardDto, ColumnDto, ColumnRole, LabelDto, ProjectDto } from '@kbrelay/shared';
+import { USER_PALETTE, MAX_LABELS_PER_PROJECT } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { ROLE_META, ROLE_ORDER } from '../lib/roles';
 import { useDialog } from './Dialog';
@@ -14,10 +14,11 @@ function rankBetween(before: number | null, after: number | null): number {
   return (before + after) / 2;
 }
 
-type Tab = 'general' | 'columns' | 'archive';
+type Tab = 'general' | 'columns' | 'labels' | 'archive';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'columns', label: 'Columns' },
+  { id: 'labels', label: 'Labels' },
   { id: 'archive', label: 'Archive' },
 ];
 
@@ -289,6 +290,10 @@ export default function ProjectSettings({
             </>
           )}
 
+          {tab === 'labels' && (
+            <LabelsPanel projectId={projectId} onChanged={onChanged} />
+          )}
+
           {tab === 'archive' && (
             <ArchivePanel projectId={projectId} onChanged={onChanged} />
           )}
@@ -328,6 +333,121 @@ export default function ProjectSettings({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Label management (KBR-62): the project's palette — add (name + color),
+ * rename, recolor (native color input), delete (unlinks from cards). Capped
+ * at 12; the cap and duplicate names surface as API 409s.
+ */
+function LabelsPanel({ projectId, onChanged }: { projectId: string; onChanged: () => void }) {
+  const dialog = useDialog();
+  const [labels, setLabels] = useState<LabelDto[] | null>(null);
+  const [name, setName] = useState('');
+  const [color, setColor] = useState<string>(USER_PALETTE[0]!);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const { labels: ls } = await api.listLabels(projectId);
+      setLabels(ls);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load labels');
+    }
+  }, [projectId]);
+  useEffect(() => { void load(); }, [load]);
+
+  async function guarded(fn: () => Promise<unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      await load();
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Label change failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const add = () => {
+    const n = name.trim();
+    if (!n) return;
+    void guarded(async () => {
+      await api.createLabel(projectId, { name: n, color });
+      setName('');
+    });
+  };
+
+  const rename = async (l: LabelDto) => {
+    const n = await dialog.prompt({ title: 'Rename label', label: 'Label name', defaultValue: l.name, confirmLabel: 'Save' });
+    if (n && n.trim() && n.trim() !== l.name) void guarded(() => api.patchLabel(l.id, { name: n.trim() }));
+  };
+
+  const remove = async (l: LabelDto) => {
+    const yes = await dialog.confirm({
+      title: `Delete “${l.name}”?`,
+      message: 'It is removed from every card that carries it. Card history is unaffected.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (yes) void guarded(() => api.deleteLabel(l.id));
+  };
+
+  return (
+    <>
+      {error && <div className="error-text">{error}</div>}
+      <p className="muted-note">
+        A flat palette, up to {MAX_LABELS_PER_PROJECT} per project — think “bug / feature / chore”,
+        not a taxonomy. Agents can set them by name.
+      </p>
+      <div className="label-add-row">
+        <input
+          value={name}
+          placeholder="e.g. bug"
+          maxLength={32}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') add(); }}
+        />
+        <input
+          type="color"
+          className="label-color-input"
+          value={color}
+          aria-label="New label color"
+          onChange={(e) => setColor(e.target.value)}
+        />
+        <button className="primary" disabled={busy || !name.trim()} onClick={add}>Add</button>
+      </div>
+      {labels === null ? (
+        <div className="muted-note">Loading…</div>
+      ) : labels.length === 0 ? (
+        <p className="muted-note">No labels yet.</p>
+      ) : (
+        <div className="archive-list">
+          {labels.map((l) => (
+            <div className="archive-row" key={l.id}>
+              <span className="label-chip" style={{ background: `${l.color}2b`, color: l.color, borderColor: `${l.color}66` }}>
+                {l.name}
+              </span>
+              <div className="spacer" style={{ flex: 1 }} />
+              <input
+                type="color"
+                className="label-color-input"
+                value={l.color}
+                aria-label={`Color for ${l.name}`}
+                disabled={busy}
+                onChange={(e) => void guarded(() => api.patchLabel(l.id, { color: e.target.value }))}
+              />
+              <button className="ghost sm" disabled={busy} onClick={() => void rename(l)}>Rename</button>
+              <button className="ghost sm danger-text" disabled={busy} onClick={() => void remove(l)}>Delete</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 

@@ -13,7 +13,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import type { CardDto, ColumnDto, ColumnRole, UserDto } from '@kbrelay/shared';
+import type { CardDto, ColumnDto, ColumnRole, LabelDto, UserDto } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
 import Column from './Column';
@@ -41,7 +41,7 @@ type ModalState =
   | { mode: 'view'; card: CardDto } // open an existing card (modal toggles view/edit itself)
   | null;
 
-export default function Board({ projectId, users, meId, reloadNonce = 0, filter = EMPTY_FILTER, nav = null, onNavHandled }: { projectId: string; users: UserDto[]; meId: string; reloadNonce?: number; filter?: BoardFilter; nav?: BoardNav | null; onNavHandled?: () => void }) {
+export default function Board({ projectId, users, meId, reloadNonce = 0, filter = EMPTY_FILTER, projectLabels = [], nav = null, onNavHandled }: { projectId: string; users: UserDto[]; meId: string; reloadNonce?: number; filter?: BoardFilter; projectLabels?: LabelDto[]; nav?: BoardNav | null; onNavHandled?: () => void }) {
   const [columns, setColumns] = useState<ColumnDto[]>([]);
   const [items, setItems] = useState<Record<string, string[]>>({});
   const [cardsById, setCardsById] = useState<Record<string, CardDto>>({});
@@ -342,6 +342,7 @@ export default function Board({ projectId, users, meId, reloadNonce = 0, filter 
           columns={columns}
           users={users}
           meId={meId}
+          projectLabels={projectLabels}
           scrollTo={modal.mode === 'view' ? scrollTo : undefined}
           onSave={saveCard}
           onDelete={modal.mode === 'view' ? deleteCard : undefined}

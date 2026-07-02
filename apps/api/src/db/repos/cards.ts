@@ -20,6 +20,7 @@ import { projectCode, nextCardSeq } from './projects';
 import { insertEventStmt, type EventInsert } from './card_events';
 import { reconcileMentionStmts, deleteMentionsForCardStmt } from './mentions';
 import { blobKeysForCard, deleteAttachmentsForCardStmt } from './attachments';
+import { resolveLabelSelection, setCardLabelStmts, labelIdsForCard, deleteCardLabelsStmt } from './labels';
 
 /** Look up a column's name for durable move-event snapshots. */
 async function columnName(env: Env, tenantId: string, id: string): Promise<string | null> {
@@ -102,6 +103,8 @@ export interface CardFilters {
   sort?: 'due';
   /** true = ONLY archived cards, newest-archived first; default excludes them (KBR-60). */
   archived?: boolean;
+  /** Only cards carrying this label id (KBR-62). */
+  label?: string;
 }
 
 export async function listCards(
@@ -125,6 +128,10 @@ export async function listCards(
     clauses.push('(summary LIKE ? OR description LIKE ?)');
     const like = `%${filters.q}%`;
     binds.push(like, like);
+  }
+  if (filters.label) {
+    clauses.push('EXISTS (SELECT 1 FROM card_labels cl WHERE cl.card_id = cards.id AND cl.label_id = ?)');
+    binds.push(filters.label);
   }
   if (filters.due) {
     const now = Date.now();
@@ -270,6 +277,9 @@ export async function createCard(
     position = (max?.m ?? 0) + RANK_STEP;
   }
 
+  // Labels at birth (KBR-62): resolve ids/names to rows (400 on unknown).
+  const labels = await resolveLabelSelection(env, tenantId, projectId, input);
+
   // Assign the next per-project sequence number (monotonic; never reused).
   const seq = await nextCardSeq(env, tenantId, projectId);
 
@@ -316,6 +326,7 @@ export async function createCard(
       tenantId, cardId: id, authorUserId: userId,
       kind: 'system', eventType: 'created', meta: { columnId },
     }),
+    ...(labels && labels.length ? setCardLabelStmts(env, tenantId, id, labels.map((l) => l.id)) : []),
     ...mentionStmts,
   ]);
 
@@ -414,6 +425,26 @@ export async function patchCard(
   if (next.archived_at !== existing.archived_at) {
     events.push(ev(next.archived_at != null ? 'archived' : 'restored', {}));
   }
+
+  // Label set replace (KBR-62): resolve the selection, diff against the current
+  // set, and log added/removed BY NAME so the timeline reads without lookups.
+  const labelStmts: DbStatement[] = [];
+  const labelSelection = await resolveLabelSelection(env, tenantId, existing.project_id, input);
+  if (labelSelection !== null) {
+    const currentIds = new Set(await labelIdsForCard(env, tenantId, id));
+    const nextIds = new Set(labelSelection.map((l) => l.id));
+    const changed = currentIds.size !== nextIds.size || [...nextIds].some((x) => !currentIds.has(x));
+    if (changed) {
+      const byId = new Map(labelSelection.map((l) => [l.id, l.name]));
+      // Removed names need a lookup against the project's full label list.
+      const all = new Map((await resolveLabelSelection(env, tenantId, existing.project_id, { labelIds: [...currentIds] }) ?? []).map((l) => [l.id, l.name]));
+      events.push(ev('labels', {
+        added: [...nextIds].filter((x) => !currentIds.has(x)).map((x) => byId.get(x)),
+        removed: [...currentIds].filter((x) => !nextIds.has(x)).map((x) => all.get(x)),
+      }));
+      labelStmts.push(...setCardLabelStmts(env, tenantId, id, [...nextIds]));
+    }
+  }
   const editedFields: string[] = [];
   if (next.summary !== existing.summary) editedFields.push('summary');
   if (next.description !== existing.description) editedFields.push('description');
@@ -481,8 +512,8 @@ export async function patchCard(
     }
   }
 
-  // Card update + its system event(s) + mention reconcile, atomically.
-  await env.db.batch([updateStmt, ...events.map((e) => insertEventStmt(env, e)), ...mentionStmts]);
+  // Card update + its system event(s) + label replace + mention reconcile, atomically.
+  await env.db.batch([updateStmt, ...events.map((e) => insertEventStmt(env, e)), ...labelStmts, ...mentionStmts]);
 
   const row = await getCardRow(env, tenantId, id);
   if (!row) throw new HttpError(500, 'Card update did not return row');
@@ -543,6 +574,7 @@ export async function deleteCard(env: Env, tenantId: string, id: string): Promis
     env.db.prepare('DELETE FROM card_events WHERE card_id = ? AND tenant_id = ?').bind(id, tenantId),
     deleteMentionsForCardStmt(env, tenantId, id),
     deleteAttachmentsForCardStmt(env, tenantId, id),
+    deleteCardLabelsStmt(env, tenantId, id),
     env.db.prepare('DELETE FROM cards WHERE id = ? AND tenant_id = ?').bind(id, tenantId),
   ]);
   return blobKeys;

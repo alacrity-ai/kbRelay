@@ -7,6 +7,7 @@ import { RANK_STEP } from '../../rank';
 import { grantProjectAccessStmt } from './team';
 import { deleteMentionsForProjectStmt } from './mentions';
 import { blobKeysForProject, deleteAttachmentsForProjectStmt } from './attachments';
+import { deleteLabelsForProjectStmts } from './labels';
 
 interface ProjectRow {
   id: string;
@@ -209,6 +210,7 @@ export async function deleteProject(env: Env, tenantId: string, id: string): Pro
     // by project deletion (KBR-43). Both reference cards by subquery, so before cards.
     deleteMentionsForProjectStmt(env, tenantId, id),
     deleteAttachmentsForProjectStmt(env, tenantId, id),
+    ...deleteLabelsForProjectStmts(env, tenantId, id),
     env.db.prepare('DELETE FROM cards WHERE project_id = ? AND tenant_id = ?').bind(id, tenantId),
     env.db.prepare('DELETE FROM columns WHERE project_id = ? AND tenant_id = ?').bind(id, tenantId),
     env.db.prepare('DELETE FROM project_access WHERE project_id = ? AND tenant_id = ?').bind(id, tenantId),

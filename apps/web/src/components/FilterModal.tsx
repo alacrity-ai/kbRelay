@@ -1,22 +1,23 @@
 import { useEffect, useState } from 'react';
-import type { CardDto, UserDto } from '@kbrelay/shared';
+import type { CardDto, LabelDto, UserDto } from '@kbrelay/shared';
 
 /** A client-side board filter. Empty facets mean "show all". */
 export interface BoardFilter {
   assignees: string[]; // show only cards assigned to these users; [] = all
   reviewers: string[]; // show only cards awaiting review by these users (v0.17.0); [] = all
+  labels: string[]; // show only cards carrying ANY of these label ids (OR, KBR-62); [] = all
   query: string; // show only cards whose summary/key contains this (case-insensitive); '' = all
 }
 
-export const EMPTY_FILTER: BoardFilter = { assignees: [], reviewers: [], query: '' };
+export const EMPTY_FILTER: BoardFilter = { assignees: [], reviewers: [], labels: [], query: '' };
 
 export function isFilterActive(f: BoardFilter): boolean {
-  return f.assignees.length > 0 || f.reviewers.length > 0 || f.query.trim() !== '';
+  return f.assignees.length > 0 || f.reviewers.length > 0 || f.labels.length > 0 || f.query.trim() !== '';
 }
 
 /** How many facets are active — shown as a badge on the filter button. */
 export function filterCount(f: BoardFilter): number {
-  return f.assignees.length + f.reviewers.length + (f.query.trim() ? 1 : 0);
+  return f.assignees.length + f.reviewers.length + f.labels.length + (f.query.trim() ? 1 : 0);
 }
 
 export function cardMatchesFilter(card: CardDto, f: BoardFilter): boolean {
@@ -24,6 +25,9 @@ export function cardMatchesFilter(card: CardDto, f: BoardFilter): boolean {
     return false;
   }
   if (f.reviewers.length > 0 && (!card.reviewerUserId || !f.reviewers.includes(card.reviewerUserId))) {
+    return false;
+  }
+  if (f.labels.length > 0 && !(card.labels ?? []).some((l) => f.labels.includes(l.id))) {
     return false;
   }
   const q = f.query.trim().toLowerCase();
@@ -38,27 +42,30 @@ export function cardMatchesFilter(card: CardDto, f: BoardFilter): boolean {
 export default function FilterModal({
   users,
   meId,
+  projectLabels = [],
   initial,
   onApply,
   onClear,
 }: {
   users: UserDto[];
   meId: string;
+  projectLabels?: LabelDto[];
   initial: BoardFilter;
   onApply: (f: BoardFilter) => void;
   onClear: () => void;
 }) {
   const [assignees, setAssignees] = useState<string[]>(initial.assignees);
   const [reviewers, setReviewers] = useState<string[]>(initial.reviewers);
+  const [labels, setLabels] = useState<string[]>(initial.labels);
   const [query, setQuery] = useState(initial.query);
 
-  const apply = () => onApply({ assignees, reviewers, query: query.trim() });
+  const apply = () => onApply({ assignees, reviewers, labels, query: query.trim() });
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onApply({ assignees, reviewers, query: query.trim() }); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onApply({ assignees, reviewers, labels, query: query.trim() }); };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [assignees, reviewers, query, onApply]);
+  }, [assignees, reviewers, labels, query, onApply]);
 
   function toggle(id: string) {
     setAssignees((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
@@ -66,6 +73,10 @@ export default function FilterModal({
 
   function toggleReviewer(id: string) {
     setReviewers((r) => (r.includes(id) ? r.filter((x) => x !== id) : [...r, id]));
+  }
+
+  function toggleLabel(id: string) {
+    setLabels((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]));
   }
 
   return (
@@ -114,6 +125,26 @@ export default function FilterModal({
               ))}
             </div>
           </div>
+
+          {projectLabels.length > 0 && (
+            <div className="view-section">
+              <span className="view-label">Labels</span>
+              <div className="filter-labels">
+                {projectLabels.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    className={`label-chip selectable ${labels.includes(l.id) ? 'active' : ''}`}
+                    style={{ background: `${l.color}2b`, color: l.color, borderColor: labels.includes(l.id) ? l.color : `${l.color}66` }}
+                    onClick={() => toggleLabel(l.id)}
+                  >
+                    {l.name}
+                  </button>
+                ))}
+              </div>
+              <p className="muted-note">Cards carrying any selected label are shown.</p>
+            </div>
+          )}
 
           <div className="field">
             <label>Summary or key contains</label>

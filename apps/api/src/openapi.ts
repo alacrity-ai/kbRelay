@@ -112,6 +112,31 @@ export const OPENAPI_SPEC = {
               'Present on the board list endpoint when the card has any task items.',
             properties: { done: { type: 'integer' }, total: { type: 'integer' } },
           },
+          labels: {
+            type: 'array',
+            description:
+              'The card\'s labels (v0.17.0, KBR-62) — set via PATCH with labelIds ' +
+              '(web) or labelNames (agents; resolved case-insensitively, 400 on unknown). ' +
+              'Present on list, single GET, and queue payloads.',
+            items: {
+              type: 'object',
+              properties: { id: { type: 'string' }, name: { type: 'string' }, color: { type: 'string' } },
+            },
+          },
+        },
+      },
+      Label: {
+        type: 'object',
+        description:
+          'A per-project label (v0.17.0, KBR-62): flat, capped at 12 per project, ' +
+          'unique name (case-insensitive). A palette, not a taxonomy — no nesting, ' +
+          'no descriptions, no rules.',
+        properties: {
+          id: { type: 'string' },
+          projectId: { type: 'string' },
+          name: { type: 'string' },
+          color: { type: 'string' },
+          createdAt: { type: 'integer' },
         },
       },
       Attachment: {
@@ -601,10 +626,23 @@ export const OPENAPI_SPEC = {
           { name: 'due', in: 'query', schema: { type: 'string', enum: ['overdue', 'soon'] }, description: 'Due-date filter: overdue, or due within 48h (KBR-63).' },
           { name: 'sort', in: 'query', schema: { type: 'string', enum: ['due'] }, description: 'due = due-soonest first, undated cards last.' },
           { name: 'archived', in: 'query', schema: { type: 'string', enum: ['1'] }, description: '1 = ONLY archived cards, newest-archived first (KBR-60). Default excludes archived.' },
+          { name: 'label', in: 'query', schema: { type: 'string' }, description: 'Only cards carrying this label id (KBR-62).' },
         ],
         responses: { 200: { description: 'ok' } },
       },
       post: { summary: 'Create a card', responses: { 201: { description: 'created' } } },
+    },
+    '/api/v1/projects/{id}/labels': {
+      get: { summary: 'List a project\'s labels (max 12)', responses: { 200: { description: 'ok' } } },
+      post: {
+        summary: 'Create a label (name + #rrggbb color)',
+        description: 'Unique name per project (case-insensitive); capped at 12 labels per project — 409 over the cap or on a duplicate name.',
+        responses: { 201: { description: 'created' }, 409: { description: 'cap reached or duplicate name' } },
+      },
+    },
+    '/api/v1/labels/{id}': {
+      patch: { summary: 'Rename / recolor a label', responses: { 200: { description: 'ok' } } },
+      delete: { summary: 'Delete a label (unlinks it from all cards)', responses: { 200: { description: 'ok' } } },
     },
     '/api/v1/cards/{id}': {
       get: { summary: 'Get a card', responses: { 200: { description: 'ok' } } },

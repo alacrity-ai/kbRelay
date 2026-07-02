@@ -7,6 +7,7 @@ import { getProject } from '../db/repos/projects';
 import { listCards, getCard, createCard, patchCard, deleteCard, autoArchiveDone } from '../db/repos/cards';
 import { listTimeline, addComment, redactComment } from '../db/repos/card_events';
 import { listCardAttachments, attachmentCountsForCards, purgeBlobs } from '../db/repos/attachments';
+import { labelsForCards } from '../db/repos/labels';
 import { dispatchTriggers } from '../services/webhooks';
 
 export async function handleListCards(ctx: RouteContext): Promise<Response> {
@@ -33,14 +34,23 @@ export async function handleListCards(ctx: RouteContext): Promise<Response> {
     due,
     sort,
     archived: ctx.url.searchParams.get('archived') === '1',
+    label: ctx.url.searchParams.get('label') ?? undefined,
   });
-  // Enrich each card with its per-kind attachment counts for the board badges
-  // (one grouped query for the whole list) and its task-list progress
-  // (v0.17.0, KBR-59 — computed here so the web never parses every body).
-  const counts = await attachmentCountsForCards(ctx.env, tenantId, cards.map((c) => c.id));
+  // Enrich each card with its per-kind attachment counts for the board badges,
+  // its task-list progress (v0.17.0, KBR-59 — computed here so the web never
+  // parses every body), and its labels (KBR-62) — one grouped query each.
+  const [counts, labels] = await Promise.all([
+    attachmentCountsForCards(ctx.env, tenantId, cards.map((c) => c.id)),
+    labelsForCards(ctx.env, tenantId, cards.map((c) => c.id)),
+  ]);
   const withCounts = cards.map((c) => {
     const tasks = countCardTasks(c.description, c.acceptanceCriteria);
-    return { ...c, attachmentCounts: counts[c.id], ...(tasks.total > 0 ? { taskCounts: tasks } : {}) };
+    return {
+      ...c,
+      attachmentCounts: counts[c.id],
+      labels: labels[c.id] ?? [],
+      ...(tasks.total > 0 ? { taskCounts: tasks } : {}),
+    };
   });
   return jsonResponse(200, { cards: withCounts }, ctx.cors);
 }
@@ -60,8 +70,11 @@ export async function handleGetCard(ctx: RouteContext): Promise<Response> {
   const { tenantId } = tenantScope(ctx.auth);
   const card = await getCard(ctx.env, tenantId, ctx.params.id!);
   if (!card) throw new HttpError(404, 'Card not found');
-  const attachments = await listCardAttachments(ctx.env, tenantId, card.id);
-  return jsonResponse(200, { card: { ...card, attachments } }, ctx.cors);
+  const [attachments, labels] = await Promise.all([
+    listCardAttachments(ctx.env, tenantId, card.id),
+    labelsForCards(ctx.env, tenantId, [card.id]),
+  ]);
+  return jsonResponse(200, { card: { ...card, attachments, labels: labels[card.id] ?? [] } }, ctx.cors);
 }
 
 export async function handlePatchCard(ctx: RouteContext): Promise<Response> {

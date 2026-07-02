@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CardDto, ColumnDto, UserDto, MentionSourceKind, AttachmentDto } from '@kbrelay/shared';
+import type { CardDto, ColumnDto, LabelDto, UserDto, MentionSourceKind, AttachmentDto } from '@kbrelay/shared';
 import { UNASSIGNED_COLOR, toggleTaskAtLine } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
@@ -23,6 +23,8 @@ interface Props {
   columns: ColumnDto[];
   users: UserDto[];
   meId: string;
+  /** The project's label palette (KBR-62) — empty hides the picker. */
+  projectLabels?: LabelDto[];
   createInColumnId?: string;
   /** When opened from a notification: scroll to (and flash) this location. */
   scrollTo?: CardScrollTarget;
@@ -57,7 +59,7 @@ function Pencil() {
  *  - Edit: the form. Reached via the Edit button, or immediately when creating.
  * Saving an existing card returns to View; creating closes the modal.
  */
-export default function CardModal({ card, columns, users, meId, createInColumnId, scrollTo, onSave, onDelete, onClose }: Props) {
+export default function CardModal({ card, columns, users, meId, projectLabels = [], createInColumnId, scrollTo, onSave, onDelete, onClose }: Props) {
   const isNew = !card;
   const [editing, setEditing] = useState(isNew);
   const descRef = useRef<HTMLDivElement>(null);
@@ -86,6 +88,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
   const [assignee, setAssignee] = useState(card?.assigneeUserId ?? '');
   const [reviewer, setReviewer] = useState(card?.reviewerUserId ?? '');
   const [due, setDue] = useState(dueInputValue(card?.dueAt ?? null));
+  const [labelIds, setLabelIds] = useState<string[]>((card?.labels ?? []).map((l) => l.id));
   const [now] = useState(() => Date.now()); // render-stable clock for due urgency
   const [linkCopied, setLinkCopied] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -177,6 +180,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
         assigneeUserId: assignee || null,
         reviewerUserId: reviewer || null,
         dueAt: dueAtFromInput(due),
+        labelIds,
       });
       return saved.id;
     } catch (err) {
@@ -200,6 +204,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
     setAssignee(card?.assigneeUserId ?? '');
     setReviewer(card?.reviewerUserId ?? '');
     setDue(dueInputValue(card?.dueAt ?? null));
+    setLabelIds((card?.labels ?? []).map((l) => l.id));
     setError(null);
     setEditing(true);
   }
@@ -226,6 +231,7 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
         assigneeUserId: assignee || null,
         reviewerUserId: reviewer || null,
         dueAt: dueAtFromInput(due),
+        labelIds,
       });
       // Board adopts the saved card (new or existing) into the modal, so drop to
       // view rather than closing — you see what you just created/edited.
@@ -422,6 +428,25 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
                   <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
                 </div>
               </div>
+              {/* Label picker (KBR-62): toggleable chips from the project palette. */}
+              {projectLabels.length > 0 && (
+                <div className="field">
+                  <label>Labels</label>
+                  <div className="filter-labels">
+                    {projectLabels.map((l) => (
+                      <button
+                        key={l.id}
+                        type="button"
+                        className={`label-chip selectable ${labelIds.includes(l.id) ? 'active' : ''}`}
+                        style={{ background: `${l.color}2b`, color: l.color, borderColor: labelIds.includes(l.id) ? l.color : `${l.color}66` }}
+                        onClick={() => setLabelIds((ids) => ids.includes(l.id) ? ids.filter((x) => x !== l.id) : [...ids, l.id])}
+                      >
+                        {l.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <p className="muted-note" style={{ fontSize: '0.8rem' }}>
                 The card takes on its assignee's color.
               </p>
@@ -492,6 +517,18 @@ export default function CardModal({ card, columns, users, meId, createInColumnId
                     )}
                   </span>
                 </div>
+                {(card!.labels ?? []).length > 0 && (
+                  <div className="view-section">
+                    <span className="view-label">Labels</span>
+                    <div className="filter-labels">
+                      {card!.labels!.map((l) => (
+                        <span key={l.id} className="label-chip" style={{ background: `${l.color}2b`, color: l.color, borderColor: `${l.color}66` }}>
+                          {l.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="view-section">

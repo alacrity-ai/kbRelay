@@ -360,6 +360,14 @@ export function systemPhrase(e: CardEventDto, userName: (id: string | null) => s
         ? `updated the checklist (${done}/${total} done)`
         : 'updated the checklist';
     }
+    case 'labels': {
+      const added = asStrings(meta.added);
+      const removed = asStrings(meta.removed);
+      const parts: string[] = [];
+      if (added.length) parts.push(`added ${added.map((n) => `“${n}”`).join(', ')}`);
+      if (removed.length) parts.push(`removed ${removed.map((n) => `“${n}”`).join(', ')}`);
+      return parts.length ? `${parts.join(' and ')} label${added.length + removed.length === 1 ? '' : 's'}` : 'changed the labels';
+    }
     case 'archived':
       return meta.auto === true
         ? `auto-archived this card (in Done past the project's ${typeof meta.days === 'number' ? `${meta.days}-day ` : ''}limit)`

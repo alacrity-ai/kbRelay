@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { MeResponse, ProjectDto, UserDto, MentionDto } from '@kbrelay/shared';
+import type { MeResponse, ProjectDto, UserDto, MentionDto, LabelDto } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { clearToken } from '../lib/auth';
 import { CardLinksContext, parseCardDeepLink, type CardLinks } from '../lib/cardLinks';
@@ -215,6 +215,16 @@ export default function BoardApp({
     void api.listUsers(selected).then(({ users: us }) => { if (alive) setProjectUsers(us); }).catch(() => {});
     return () => { alive = false; };
   }, [selected]);
+
+  // Project labels (KBR-62) for the card picker + board filter. boardNonce is a
+  // dep so edits in Project Settings → Labels show up without a reload.
+  const [projectLabels, setProjectLabels] = useState<LabelDto[]>([]);
+  useEffect(() => {
+    if (!selected) { setProjectLabels([]); return; }
+    let alive = true;
+    void api.listLabels(selected).then(({ labels }) => { if (alive) setProjectLabels(labels); }).catch(() => {});
+    return () => { alive = false; };
+  }, [selected, boardNonce]);
 
   // Projects ordered most-recently-viewed first, for the switcher + browser.
   // `selected` is a dep on purpose: selecting a project updates the recency store
@@ -513,6 +523,7 @@ export default function BoardApp({
           meId={me.user.id}
           reloadNonce={boardNonce}
           filter={filter}
+          projectLabels={projectLabels}
           nav={nav && nav.cardId ? nav : null}
           onNavHandled={() => setNav(null)}
         />
@@ -540,6 +551,7 @@ export default function BoardApp({
         <FilterModal
           users={projectUsers}
           meId={me.user.id}
+          projectLabels={projectLabels}
           initial={filter}
           onApply={applyFilter}
           onClear={clearFilter}

@@ -13,6 +13,12 @@ import {
 } from './routes/projects';
 import { handleSearch } from './routes/search';
 import {
+  handleListLabels,
+  handleCreateLabel,
+  handlePatchLabel,
+  handleDeleteLabel,
+} from './routes/labels';
+import {
   handleListColumns,
   handleCreateColumn,
   handlePatchColumn,
@@ -175,6 +181,12 @@ export const routes: Route[] = [
   { method: 'POST', pattern: '/api/v1/projects/:id/columns', access: { kind: 'project', param: 'id' }, handler: handleCreateColumn },
   { method: 'PATCH', pattern: '/api/v1/columns/:id', access: { kind: 'column', param: 'id' }, handler: handlePatchColumn },
   { method: 'DELETE', pattern: '/api/v1/columns/:id', access: { kind: 'column', param: 'id' }, handler: handleDeleteColumn },
+
+  // ── Labels (v0.17.0, KBR-62) ──
+  { method: 'GET', pattern: '/api/v1/projects/:id/labels', access: { kind: 'project', param: 'id' }, handler: handleListLabels },
+  { method: 'POST', pattern: '/api/v1/projects/:id/labels', access: { kind: 'project', param: 'id' }, handler: handleCreateLabel },
+  { method: 'PATCH', pattern: '/api/v1/labels/:id', access: { kind: 'label', param: 'id' }, handler: handlePatchLabel },
+  { method: 'DELETE', pattern: '/api/v1/labels/:id', access: { kind: 'label', param: 'id' }, handler: handleDeleteLabel },
 
   // ── Cards ──
   { method: 'GET', pattern: '/api/v1/projects/:id/cards', access: { kind: 'project', param: 'id' }, handler: handleListCards },

@@ -16,10 +16,11 @@ export type CardEventKind = 'system' | 'note' | 'handoff';
  *  Quieter than `edited`; feed/timeline collapse consecutive runs of these. */
 /** `archived`/`restored` (v0.17.0, KBR-60): visibility flag flips — meta may
  *  carry {auto: true} when the project's done-column policy did it lazily
- *  (those have a null author). */
+ *  (those have a null author).
+ *  `labels` (v0.17.0, KBR-62): label set changed — meta {added, removed} names. */
 export type SystemEventType =
   | 'created' | 'moved' | 'assigned' | 'edited' | 'reviewer' | 'due' | 'task'
-  | 'archived' | 'restored';
+  | 'archived' | 'restored' | 'labels';
 
 /** Wire shape of a timeline entry (GET /cards/:id/timeline). */
 export interface CardEventDto {

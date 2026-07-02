@@ -6,6 +6,7 @@ import { parseJson } from '../validate';
 import { tenantScope } from '../auth/tenant-scope';
 import { getTenant, updateMe, getUserProfile } from '../db/repos/users';
 import { listMyQueue } from '../db/repos/cards';
+import { labelsForCards } from '../db/repos/labels';
 
 /** GET /api/v1/me — whoami for the authenticated token. */
 export async function handleMe(ctx: RouteContext): Promise<Response> {
@@ -39,7 +40,12 @@ export async function handleMyQueue(ctx: RouteContext): Promise<Response> {
     isAdmin: ctx.auth?.role === 'admin',
     projectId,
   });
-  return jsonResponse(200, queue, ctx.cors);
+  // Labels ride along (KBR-62) so agents can triage by name without lookups.
+  const labels = await labelsForCards(
+    ctx.env, tenantId, [...queue.work, ...queue.review].map((c) => c.id),
+  );
+  const withLabels = <T extends { id: string }>(cs: T[]) => cs.map((c) => ({ ...c, labels: labels[c.id] ?? [] }));
+  return jsonResponse(200, { work: withLabels(queue.work), review: withLabels(queue.review) }, ctx.cors);
 }
 
 /**

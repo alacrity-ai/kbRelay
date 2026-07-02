@@ -22,6 +22,7 @@ import type {
   MembershipRole,
   AgentSummary,
   WebhookSubscriptionDto,
+  LabelDto,
   CreatedWebhookSubscription,
   CreateWebhookInput,
   PatchWebhookInput,
@@ -166,6 +167,8 @@ export interface CardInput {
   dueAt?: number | null;
   /** true archives, false restores to the retained column (KBR-60). */
   archived?: boolean;
+  /** Full replace of the card's label set, by label id (KBR-62). */
+  labelIds?: string[];
   position?: number;
 }
 export const createCard = (projectId: string, body: CardInput) =>
@@ -174,6 +177,15 @@ export const getCard = (id: string) => request<{ card: CardDto }>('GET', `/v1/ca
 export const patchCard = (id: string, body: CardInput) =>
   request<{ card: CardDto }>('PATCH', `/v1/cards/${id}`, body);
 export const deleteCard = (id: string) => request<{ ok: true }>('DELETE', `/v1/cards/${id}`);
+
+// ── Labels (v0.17.0, KBR-62) ──
+export const listLabels = (projectId: string) =>
+  request<{ labels: LabelDto[] }>('GET', `/v1/projects/${projectId}/labels`);
+export const createLabel = (projectId: string, body: { name: string; color: string }) =>
+  request<{ label: LabelDto }>('POST', `/v1/projects/${projectId}/labels`, body);
+export const patchLabel = (id: string, body: { name?: string; color?: string }) =>
+  request<{ label: LabelDto }>('PATCH', `/v1/labels/${id}`, body);
+export const deleteLabel = (id: string) => request<{ ok: true }>('DELETE', `/v1/labels/${id}`);
 
 // ── My queue (v0.15.0; { work, review } sections since v0.17.0) ──
 export const getMyQueue = (projectId?: string) =>

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AttachmentDto, AttachmentCounts } from './attachments.ts';
+import type { CardLabel } from './labels.ts';
 
 /**
  * Board domain: projects → columns → cards. Types are the wire shapes
@@ -92,6 +93,9 @@ export interface CardDto {
   /** Task-list progress across description + acceptanceCriteria (v0.17.0,
    *  KBR-59). Present on the board list endpoint when the card has any. */
   taskCounts?: { done: number; total: number };
+  /** The card's labels (v0.17.0, KBR-62) — id + name + color, so web renders
+   *  chips and agents reason by name. Present on list, single GET, and queue. */
+  labels?: CardLabel[];
 }
 
 /**
@@ -174,6 +178,11 @@ export type PatchColumnInput = z.infer<typeof patchColumnInput>;
 // `summary` is the descriptive text (was `title` before v0.7.0). The ticket key
 // (CODE-N) is auto-assigned server-side and not settable. Card color is derived
 // from the assignee (v0.2.0).
+/** Labels on card create/patch (KBR-62): full replace. Web sends ids;
+ *  agents send names (resolved server-side, 400 on unknown). Not both. */
+const labelIds = z.array(idRef).max(12).optional();
+const labelNames = z.array(z.string().trim().min(1).max(32)).max(12).optional();
+
 export const createCardInput = z.object({
   summary: name,
   description: longText,
@@ -182,6 +191,8 @@ export const createCardInput = z.object({
   assigneeUserId: idRef.nullable().optional(),
   reviewerUserId: idRef.nullable().optional(),
   dueAt,
+  labelIds,
+  labelNames,
   position,
 });
 export type CreateCardInput = z.infer<typeof createCardInput>;
@@ -197,6 +208,8 @@ export const patchCardInput = z.object({
   dueAt,
   /** true archives (card leaves the board), false restores to its retained column (KBR-60). */
   archived: z.boolean().optional(),
+  labelIds,
+  labelNames,
   position,
 });
 export type PatchCardInput = z.infer<typeof patchCardInput>;

@@ -112,7 +112,7 @@ export const allTools: Tool[] = [
   }),
   defineTool({
     name: 'create_card',
-    description: 'Create a card (defaults to the first column). Write summary plain; description/acceptanceCriteria in markdown; @handle to notify. dueAt = optional deadline, epoch ms.',
+    description: 'Create a card (defaults to the first column). Write summary plain; description/acceptanceCriteria in markdown; @handle to notify. dueAt = epoch-ms deadline; labels = names (400 on unknown).',
     inputSchema: z.object({
       projectId: z.string(),
       summary: z.string(),
@@ -122,10 +122,14 @@ export const allTools: Tool[] = [
       assigneeUserId: z.string().nullish(),
       reviewerUserId: z.string().nullish(),
       dueAt: z.number().nullish(),
+      labels: z.array(z.string()).optional(),
     }),
     handler: (a, c) => {
-      const { projectId, ...body } = a;
-      return c.request('POST', `/v1/projects/${enc(projectId)}/cards`, body);
+      const { projectId, labels, ...body } = a;
+      return c.request('POST', `/v1/projects/${enc(projectId)}/cards`, {
+        ...body,
+        ...(labels !== undefined ? { labelNames: labels } : {}),
+      });
     },
   }),
   defineTool({
@@ -141,11 +145,15 @@ export const allTools: Tool[] = [
       reviewerUserId: z.string().nullish(),
       dueAt: z.number().nullish(),
       archived: z.boolean().optional(),
+      labels: z.array(z.string()).optional(),
       position: z.number().optional(),
     }),
     handler: (a, c) => {
-      const { cardId, ...body } = a;
-      return c.request('PATCH', `/v1/cards/${enc(cardId)}`, body);
+      const { cardId, labels, ...body } = a;
+      return c.request('PATCH', `/v1/cards/${enc(cardId)}`, {
+        ...body,
+        ...(labels !== undefined ? { labelNames: labels } : {}),
+      });
     },
   }),
   defineTool({

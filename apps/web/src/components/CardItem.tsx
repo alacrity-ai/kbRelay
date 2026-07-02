@@ -39,6 +39,16 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
       {...rest}
     >
       {card.key && <div className="card-key">{card.key}</div>}
+      {/* Label chips (KBR-62): tinted pills above the title, Trello-style. */}
+      {card.labels && card.labels.length > 0 && (
+        <div className="card-labels">
+          {card.labels.map((l) => (
+            <span key={l.id} className="label-chip" style={{ background: `${l.color}2b`, color: l.color, borderColor: `${l.color}66` }}>
+              {l.name}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="card-title">{card.summary}</div>
       {(assignee || reviewer || hasBadges || showDue || (tasks && tasks.total > 0)) && (
         <div className="card-meta">
