@@ -974,6 +974,9 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
      lives LATER in this file, and at equal specificity it would win over this
      media rule regardless of the query (cascade order, not media, decides). */
   .topbar .topbar-tool { display: none; }
+  /* ...except the primary My Work/Board toggle, which stays a standalone button
+     on mobile just like on desktop (KBR-79). Later + equal specificity = wins. */
+  .topbar .topbar-tool-primary { display: inline-grid; }
   .topbar .topbar-tools-menu { display: block; }
 
   /* Board: one column fills the screen; horizontal snap between columns */

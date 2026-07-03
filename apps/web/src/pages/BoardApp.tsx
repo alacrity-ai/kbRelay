@@ -370,10 +370,12 @@ export default function BoardApp({
         <span className="brand"><BrandMark /> <span className="brand-name">kbRelay</span></span>
 
         {/* Primary view toggle (KBR-79): in My Work this is a "Board" button
-            back to the current project; on the board/activity it's "My Work". */}
+            back to the current project; on the board/activity it's "My Work".
+            `topbar-tool-primary` keeps it a standalone button on mobile too —
+            it's not folded into the "…" tools menu like the other tools. */}
         {view === 'mywork' ? (
           <button
-            className="icon-btn subtle topbar-tool board-btn"
+            className="icon-btn subtle topbar-tool topbar-tool-primary board-btn"
             onClick={() => setView('board')}
             aria-label="Board"
             title="Back to the board"
@@ -382,7 +384,7 @@ export default function BoardApp({
           </button>
         ) : (
           <button
-            className="icon-btn subtle topbar-tool mywork-btn"
+            className="icon-btn subtle topbar-tool topbar-tool-primary mywork-btn"
             onClick={() => setView('mywork')}
             aria-label={`My Work${needsMe > 0 ? ` (${needsMe} items)` : ''}`}
             title="My Work — your queue, reviews, and mentions"
@@ -446,26 +448,11 @@ export default function BoardApp({
           className="topbar-tools-menu"
           triggerClassName="icon-btn subtle"
           label="Tools menu"
-          trigger={
-            <>
-              <Kebab />
-              {/* The needs-me badge only nudges you TOWARD My Work — drop it once
-                  you're already there (the menu shows "Board" then). */}
-              {view !== 'mywork' && needsMe > 0 && <span className="notif-badge">{needsMe > 99 ? '99+' : needsMe}</span>}
-            </>
-          }
+          trigger={<Kebab />}
         >
           <div className="menu-list">
-            {/* Same view toggle as the desktop button (KBR-79). */}
-            {view === 'mywork' ? (
-              <button className="menu-item" onClick={() => setView('board')}>
-                <Columns /> Board
-              </button>
-            ) : (
-              <button className="menu-item" onClick={() => setView('mywork')}>
-                <Inbox /> My Work{needsMe > 0 ? ` (${needsMe})` : ''}
-              </button>
-            )}
+            {/* The My Work/Board toggle is now its own standalone button on mobile
+                (topbar-tool-primary), so it's no longer duplicated in here (KBR-79). */}
             <button className="menu-item" onClick={() => setFindOpen(true)}>
               <Magnifier /> Quick find
             </button>
