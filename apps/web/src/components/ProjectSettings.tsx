@@ -481,6 +481,11 @@ function ArchivePanel({
   // Guards against out-of-order responses when the user types quickly.
   const reqRef = useRef(0);
 
+  // On the deep-link path (Done-lane badge → initialTab='archive') the panel mounts
+  // before getProject resolves, so totalArchived starts at 0; sync it once the real
+  // count arrives so the search bar + "N of M" note appear (KBR-80).
+  useEffect(() => { setTotal(totalArchived); }, [totalArchived]);
+
   const load = useCallback(async (q: string) => {
     const my = ++reqRef.current;
     try {
