@@ -7,7 +7,7 @@ import type { Env } from '../../env';
 import { registerTenant } from './auth';
 import { createProject, patchProject, getProject } from './projects';
 import { listColumns } from './columns';
-import { createCard, patchCard, listCards, listMyQueue, autoArchiveDone, countArchivedCards } from './cards';
+import { createCard, patchCard, listCards, listMyQueue, autoArchiveDone, countArchivedCards, ARCHIVE_LIST_LIMIT } from './cards';
 import { listTimeline, addComment } from './card_events';
 
 /**
@@ -134,5 +134,50 @@ describe('card archiving', () => {
 
     await patchCard(env, tenantId, a.id, ownerId, { archived: false });
     expect(await countArchivedCards(env, tenantId, proj.id)).toBe(1);
+  });
+});
+
+/**
+ * Archive tab search + safety cap (KBR-80). `q` matches summary/description and,
+ * for a trailing integer, the ticket seq (so `ARC-3`/`3` find a card by key).
+ * The archived lens is hard-capped at ARCHIVE_LIST_LIMIT so a huge archive can't
+ * be streamed in one read; countArchivedCards still reports the true total.
+ */
+describe('archive search + cap (KBR-80)', () => {
+  it('q matches summary words, and a trailing integer matches the ticket seq', async () => {
+    const proj = await createProject(env, tenantId, ownerId, { name: 'Search', code: 'SRC' });
+    const zebra = await createCard(env, tenantId, proj.id, ownerId, { summary: 'Zebra migration plan' });
+    const other = await createCard(env, tenantId, proj.id, ownerId, { summary: 'Unrelated widget' });
+    for (const c of [zebra, other]) await patchCard(env, tenantId, c.id, ownerId, { archived: true });
+
+    // Summary word.
+    const byWord = await listCards(env, tenantId, proj.id, { archived: true, q: 'zebra' });
+    expect(byWord.map((c) => c.id)).toEqual([zebra.id]);
+
+    // Ticket key ("SRC-<seq>") and bare seq both resolve by seq.
+    const byKey = await listCards(env, tenantId, proj.id, { archived: true, q: `SRC-${zebra.seq}` });
+    expect(byKey.some((c) => c.id === zebra.id)).toBe(true);
+    const bySeq = await listCards(env, tenantId, proj.id, { archived: true, q: String(other.seq) });
+    expect(bySeq.some((c) => c.id === other.id)).toBe(true);
+
+    // A word that matches neither summary nor seq returns nothing.
+    expect(await listCards(env, tenantId, proj.id, { archived: true, q: 'nonesuch' })).toHaveLength(0);
+  });
+
+  it('the archived lens is capped at ARCHIVE_LIST_LIMIT while the true count is higher', async () => {
+    const proj = await createProject(env, tenantId, ownerId, { name: 'Bulk', code: 'BLK' });
+    const n = ARCHIVE_LIST_LIMIT + 3;
+    for (let i = 0; i < n; i++) {
+      await createCard(env, tenantId, proj.id, ownerId, { summary: `bulk ${i}` });
+    }
+    // Archive them all in one shot (faster than n patch round-trips).
+    await env.db
+      .prepare('UPDATE cards SET archived_at = ? WHERE tenant_id = ? AND project_id = ?')
+      .bind(Date.now(), tenantId, proj.id)
+      .run();
+
+    const arch = await listCards(env, tenantId, proj.id, { archived: true });
+    expect(arch).toHaveLength(ARCHIVE_LIST_LIMIT); // bounded read
+    expect(await countArchivedCards(env, tenantId, proj.id)).toBe(n); // true total unbounded
   });
 });

@@ -152,11 +152,16 @@ export const patchColumn = (
 export const deleteColumn = (id: string) => request<{ ok: true }>('DELETE', `/v1/columns/${id}`);
 
 // ── Cards ──
-export const listCards = (projectId: string, opts: { archived?: boolean } = {}) =>
-  request<{ cards: CardDto[] }>(
+export const listCards = (projectId: string, opts: { archived?: boolean; q?: string } = {}) => {
+  const params = new URLSearchParams();
+  if (opts.archived) params.set('archived', '1');
+  if (opts.q) params.set('q', opts.q);
+  const qs = params.toString();
+  return request<{ cards: CardDto[] }>(
     'GET',
-    `/v1/projects/${projectId}/cards${opts.archived ? '?archived=1' : ''}`,
+    `/v1/projects/${projectId}/cards${qs ? `?${qs}` : ''}`,
   );
+};
 export interface CardInput {
   summary?: string;
   description?: string | null;

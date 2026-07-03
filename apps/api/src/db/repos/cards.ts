@@ -107,6 +107,11 @@ export interface CardFilters {
   label?: string;
 }
 
+/** Safety cap on the archived listing (web Archive tab + MCP `list_cards(archived=true)`)
+ *  so an unbounded archive can never be read in one query / one payload. Search (`q`)
+ *  narrows within it; the true archived total is `countArchived` (KBR-80). */
+export const ARCHIVE_LIST_LIMIT = 200;
+
 export async function listCards(
   env: Env,
   tenantId: string,
@@ -125,9 +130,19 @@ export async function listCards(
     binds.push(filters.assignee);
   }
   if (filters.q) {
-    clauses.push('(summary LIKE ? OR description LIKE ?)');
     const like = `%${filters.q}%`;
-    binds.push(like, like);
+    // A trailing integer ("KBR-12", "kbr 12", or a bare "12") also matches the card's
+    // per-project seq, so search finds cards by ticket key — the human key `CODE-seq`
+    // isn't a stored column (KBR-80).
+    const seqDigits = filters.q.match(/(\d+)\s*$/)?.[1];
+    const seq = seqDigits !== undefined ? Number(seqDigits) : NaN;
+    if (Number.isSafeInteger(seq)) {
+      clauses.push('(summary LIKE ? OR description LIKE ? OR seq = ?)');
+      binds.push(like, like, seq);
+    } else {
+      clauses.push('(summary LIKE ? OR description LIKE ?)');
+      binds.push(like, like);
+    }
   }
   if (filters.label) {
     clauses.push('EXISTS (SELECT 1 FROM card_labels cl WHERE cl.card_id = cards.id AND cl.label_id = ?)');
@@ -148,8 +163,11 @@ export async function listCards(
     : filters.sort === 'due'
       ? '(due_at IS NULL) ASC, due_at ASC, position ASC'
       : 'position ASC';
+  // Bound the archived lens so a huge archive can't be streamed in one read (KBR-80).
+  // ARCHIVE_LIST_LIMIT is a module constant (not user input) — safe to inline.
+  const limit = filters.archived ? ` LIMIT ${ARCHIVE_LIST_LIMIT}` : '';
   const [rs, code] = await Promise.all([
-    env.db.prepare(`SELECT * FROM cards WHERE ${clauses.join(' AND ')} ORDER BY ${order}`)
+    env.db.prepare(`SELECT * FROM cards WHERE ${clauses.join(' AND ')} ORDER BY ${order}${limit}`)
       .bind(...binds)
       .all<CardRow>(),
     projectCode(env, tenantId, projectId),

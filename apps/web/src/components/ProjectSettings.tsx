@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CardDto, ColumnDto, ColumnRole, LabelDto, ProjectDto } from '@kbrelay/shared';
 import { USER_PALETTE, MAX_LABELS_PER_PROJECT } from '@kbrelay/shared';
 import * as api from '../lib/api';
@@ -57,12 +57,15 @@ export default function ProjectSettings({
   const [agentEvents, setAgentEvents] = useState(true);
   // Auto-archive knob (KBR-60): '' = off, else days as a string for the input.
   const [autoArchive, setAutoArchive] = useState('');
+  // True archived total (from getProject) so the Archive tab can show "N of M" (KBR-80).
+  const [archivedCount, setArchivedCount] = useState(0);
 
   const load = useCallback(async () => {
     try {
-      const { project: p, columns } = await api.getProject(projectId);
+      const { project: p, columns, archivedCardCount } = await api.getProject(projectId);
       setProject(p);
       setCols(columns);
+      setArchivedCount(archivedCardCount);
       setName(p.name);
       setDescription(p.description ?? '');
       setColor(p.color);
@@ -299,7 +302,7 @@ export default function ProjectSettings({
           )}
 
           {tab === 'archive' && (
-            <ArchivePanel projectId={projectId} onChanged={onChanged} />
+            <ArchivePanel projectId={projectId} totalArchived={archivedCount} onChanged={onChanged} />
           )}
 
           {tab === 'columns' && (
@@ -461,27 +464,49 @@ function LabelsPanel({ projectId, onChanged }: { projectId: string; onChanged: (
  * column id, nothing to recompute. Owns its own busy/error state so a restore
  * can't wedge the General tab's save button.
  */
-function ArchivePanel({ projectId, onChanged }: { projectId: string; onChanged: () => void }) {
+/** Mirrors the server's ARCHIVE_LIST_LIMIT (KBR-80): the archived listing is capped
+ *  so a huge archive can't be read at once. Search reaches beyond the cap. */
+const ARCHIVE_CAP = 200;
+
+function ArchivePanel({
+  projectId,
+  totalArchived,
+  onChanged,
+}: { projectId: string; totalArchived: number; onChanged: () => void }) {
   const [cards, setCards] = useState<CardDto[] | null>(null);
+  const [total, setTotal] = useState(totalArchived);
+  const [query, setQuery] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Guards against out-of-order responses when the user types quickly.
+  const reqRef = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (q: string) => {
+    const my = ++reqRef.current;
     try {
-      const { cards: cs } = await api.listCards(projectId, { archived: true });
-      setCards(cs);
+      const { cards: cs } = await api.listCards(projectId, {
+        archived: true,
+        q: q.trim() || undefined,
+      });
+      if (my === reqRef.current) setCards(cs);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load archive');
+      if (my === reqRef.current) setError(err instanceof Error ? err.message : 'Failed to load archive');
     }
   }, [projectId]);
-  useEffect(() => { void load(); }, [load]);
+
+  // Debounced search; the initial (empty) load fires immediately.
+  useEffect(() => {
+    const t = setTimeout(() => { void load(query); }, query ? 250 : 0);
+    return () => clearTimeout(t);
+  }, [query, load]);
 
   async function restore(card: CardDto) {
     setBusyId(card.id);
     setError(null);
     try {
       await api.patchCard(card.id, { archived: false });
-      await load();
+      setTotal((n) => Math.max(0, n - 1));
+      await load(query);
       onChanged(); // the card is back on the board behind this modal
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Restore failed');
@@ -491,34 +516,61 @@ function ArchivePanel({ projectId, onChanged }: { projectId: string; onChanged: 
   }
 
   const fmt = (ms: number) => new Date(ms).toLocaleDateString([], { dateStyle: 'medium' });
+  const searching = query.trim().length > 0;
 
   return (
     <>
       {error && <div className="error-text">{error}</div>}
+      {(total > 0 || searching) && (
+        <div className="archive-search">
+          <input
+            value={query}
+            placeholder="Search archive by ticket key or title…"
+            aria-label="Search archived cards"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+      )}
       {cards === null ? (
         <div className="muted-note">Loading…</div>
       ) : cards.length === 0 ? (
         <p className="muted-note">
-          Nothing archived. Archive finished cards from the Done lane's header, a card's
-          Archive button, or the auto-archive setting under General.
+          {searching
+            ? 'No archived cards match your search.'
+            : "Nothing archived. Archive finished cards from the Done lane's header, a card's Archive button, or the auto-archive setting under General."}
         </p>
       ) : (
-        <div className="archive-list">
-          {cards.map((c) => (
-            <div className="archive-row" key={c.id}>
-              <div className="archive-ident">
-                {c.key && <span className="view-eyebrow">{c.key}</span>}
-                <span className="archive-summary">{c.summary}</span>
+        <>
+          <div className="archive-list">
+            {cards.map((c) => (
+              <div className="archive-row" key={c.id}>
+                <div className="archive-ident">
+                  {c.key && <span className="view-eyebrow">{c.key}</span>}
+                  <span className="archive-summary">{c.summary}</span>
+                </div>
+                <span className="archive-date" title="Archived on">
+                  {c.archivedAt != null ? fmt(c.archivedAt) : '—'}
+                </span>
+                <button className="ghost sm" disabled={busyId === c.id} onClick={() => void restore(c)}>
+                  {busyId === c.id ? 'Restoring…' : 'Restore'}
+                </button>
               </div>
-              <span className="archive-date" title="Archived on">
-                {c.archivedAt != null ? fmt(c.archivedAt) : '—'}
-              </span>
-              <button className="ghost sm" disabled={busyId === c.id} onClick={() => void restore(c)}>
-                {busyId === c.id ? 'Restoring…' : 'Restore'}
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          {cards.length >= ARCHIVE_CAP ? (
+            <p className="muted-note archive-more">
+              {searching
+                ? `Showing the first ${ARCHIVE_CAP} matches — narrow your search.`
+                : `Showing the ${ARCHIVE_CAP} most recently archived${total > cards.length ? ` of ${total}` : ''}. Search by ticket key or title to find older cards.`}
+            </p>
+          ) : (
+            !searching && total > cards.length && (
+              <p className="muted-note archive-more">
+                Showing the {cards.length} most recently archived of {total}. Search by ticket key or title to find older cards.
+              </p>
+            )
+          )}
+        </>
       )}
     </>
   );
