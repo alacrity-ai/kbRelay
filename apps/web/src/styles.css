@@ -838,7 +838,8 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 .agent-keys { padding-top: 0.6rem; }
 .agent-keys .key-create-row { margin-top: 0.2rem; }
 .agent-keys .key-list { margin-top: 0.6rem; }
-.project-checks { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.5rem 0; }
+.project-checks { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.5rem 0; max-height: 40vh; overflow-y: auto; }
+.project-checks-filter { width: 100%; height: 34px; margin-top: 0.4rem; }
 .project-check { display: flex; align-items: center; gap: 0.45rem; font-size: 0.9rem; cursor: pointer; }
 .project-check input { width: auto; }
 .member-projects-actions { display: flex; justify-content: flex-end; }
