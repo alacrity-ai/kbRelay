@@ -976,6 +976,13 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   .topbar .spacer { display: none; }
   .project-switcher { flex: 1; min-width: 0; }
   .project-trigger { max-width: none; width: 100%; }
+  /* KBR-86: the now-wide trigger would push its open panel off the right edge.
+     Pin the panel to the viewport with gutters — spans the screen, always in
+     bounds — the same treatment as the alerts dropdown. */
+  .project-switcher .dropdown-panel {
+    position: fixed; top: calc(var(--topbar-h) + 6px);
+    left: 8px; right: 8px; min-width: 0;
+  }
   /* Collapse the tool buttons into the kebab menu (KBR-70). Selector is
      .topbar-scoped for specificity: the base `.topbar-tools-menu {display:none}`
      lives LATER in this file, and at equal specificity it would win over this
