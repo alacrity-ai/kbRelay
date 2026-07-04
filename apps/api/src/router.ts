@@ -19,6 +19,13 @@ import {
   handleDeleteLabel,
 } from './routes/labels';
 import {
+  handleListProjectLabels,
+  handleCreateProjectLabel,
+  handlePatchProjectLabel,
+  handleDeleteProjectLabel,
+  handleSetProjectLabels,
+} from './routes/projectLabels';
+import {
   handleListColumns,
   handleCreateColumn,
   handlePatchColumn,
@@ -187,6 +194,15 @@ export const routes: Route[] = [
   { method: 'POST', pattern: '/api/v1/projects/:id/labels', access: { kind: 'project', param: 'id' }, handler: handleCreateLabel },
   { method: 'PATCH', pattern: '/api/v1/labels/:id', access: { kind: 'label', param: 'id' }, handler: handlePatchLabel },
   { method: 'DELETE', pattern: '/api/v1/labels/:id', access: { kind: 'label', param: 'id' }, handler: handleDeleteLabel },
+
+  // ── Project labels (KBR-84) ── tenant-scoped bucket definitions (no project
+  // gate); attaching to a project IS project-scoped (distinct path to avoid
+  // colliding with the card-label routes above).
+  { method: 'GET', pattern: '/api/v1/project-labels', handler: handleListProjectLabels },
+  { method: 'POST', pattern: '/api/v1/project-labels', handler: handleCreateProjectLabel },
+  { method: 'PATCH', pattern: '/api/v1/project-labels/:id', handler: handlePatchProjectLabel },
+  { method: 'DELETE', pattern: '/api/v1/project-labels/:id', handler: handleDeleteProjectLabel },
+  { method: 'PUT', pattern: '/api/v1/projects/:id/project-labels', access: { kind: 'project', param: 'id' }, handler: handleSetProjectLabels },
 
   // ── Cards ──
   { method: 'GET', pattern: '/api/v1/projects/:id/cards', access: { kind: 'project', param: 'id' }, handler: handleListCards },

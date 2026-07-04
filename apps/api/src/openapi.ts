@@ -139,6 +139,20 @@ export const OPENAPI_SPEC = {
           createdAt: { type: 'integer' },
         },
       },
+      ProjectLabel: {
+        type: 'object',
+        description:
+          'A tenant-scoped project label (KBR-84): a bucket a project can carry ' +
+          'several of ("Side gigs", "Day Job"). Unlike card labels these span the ' +
+          'whole tenant. Flat, capped per tenant, unique name (case-insensitive). ' +
+          'Embedded on project payloads as `labels[]`.',
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+          color: { type: 'string' },
+          createdAt: { type: 'integer' },
+        },
+      },
       Attachment: {
         type: 'object',
         description:
@@ -643,6 +657,25 @@ export const OPENAPI_SPEC = {
     '/api/v1/labels/{id}': {
       patch: { summary: 'Rename / recolor a label', responses: { 200: { description: 'ok' } } },
       delete: { summary: 'Delete a label (unlinks it from all cards)', responses: { 200: { description: 'ok' } } },
+    },
+    '/api/v1/project-labels': {
+      get: { summary: 'List the tenant\'s project labels (KBR-84)', responses: { 200: { description: 'ok' } } },
+      post: {
+        summary: 'Create a project label (name + #rrggbb color)',
+        description: 'Tenant-scoped; unique name per tenant (case-insensitive); capped per tenant — 409 over the cap or on a duplicate name.',
+        responses: { 201: { description: 'created' }, 409: { description: 'cap reached or duplicate name' } },
+      },
+    },
+    '/api/v1/project-labels/{id}': {
+      patch: { summary: 'Rename / recolor a project label', responses: { 200: { description: 'ok' } } },
+      delete: { summary: 'Delete a project label (unlinks it from all projects)', responses: { 200: { description: 'ok' } } },
+    },
+    '/api/v1/projects/{id}/project-labels': {
+      put: {
+        summary: 'Replace a project\'s label set (KBR-84)',
+        description: 'Body: `{ labelIds }` (web) or `{ labelNames }` (agents, case-insensitive). `{ labelIds: [] }` clears all. Returns the project\'s resulting labels.',
+        responses: { 200: { description: 'ok' }, 400: { description: 'unknown label, or both id/name lists provided' } },
+      },
     },
     '/api/v1/cards/{id}': {
       get: { summary: 'Get a card', responses: { 200: { description: 'ok' } } },

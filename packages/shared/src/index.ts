@@ -8,6 +8,7 @@ export * from './due.ts';
 export * from './colors.ts';
 export * from './events.ts';
 export * from './labels.ts';
+export * from './projectLabels.ts';
 export * from './mentions.ts';
 export * from './search.ts';
 export * from './team.ts';

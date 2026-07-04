@@ -23,6 +23,7 @@ import type {
   AgentSummary,
   WebhookSubscriptionDto,
   LabelDto,
+  ProjectLabelDto,
   CreatedWebhookSubscription,
   CreateWebhookInput,
   PatchWebhookInput,
@@ -191,6 +192,19 @@ export const createLabel = (projectId: string, body: { name: string; color: stri
 export const patchLabel = (id: string, body: { name?: string; color?: string }) =>
   request<{ label: LabelDto }>('PATCH', `/v1/labels/${id}`, body);
 export const deleteLabel = (id: string) => request<{ ok: true }>('DELETE', `/v1/labels/${id}`);
+
+// ── Project labels (KBR-84) — tenant-scoped organising buckets ──
+export const listProjectLabels = () =>
+  request<{ labels: ProjectLabelDto[] }>('GET', '/v1/project-labels');
+export const createProjectLabel = (body: { name: string; color: string }) =>
+  request<{ label: ProjectLabelDto }>('POST', '/v1/project-labels', body);
+export const patchProjectLabel = (id: string, body: { name?: string; color?: string }) =>
+  request<{ label: ProjectLabelDto }>('PATCH', `/v1/project-labels/${id}`, body);
+export const deleteProjectLabel = (id: string) =>
+  request<{ ok: true }>('DELETE', `/v1/project-labels/${id}`);
+/** Full replace of a project's label set, by label id (KBR-84). */
+export const setProjectLabels = (projectId: string, labelIds: string[]) =>
+  request<{ labels: ProjectLabelDto[] }>('PUT', `/v1/projects/${projectId}/project-labels`, { labelIds });
 
 // ── My queue (v0.15.0; { work, review } sections since v0.17.0) ──
 export const getMyQueue = (projectId?: string) =>

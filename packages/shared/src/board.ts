@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { AttachmentDto, AttachmentCounts } from './attachments.ts';
 import type { CardLabel } from './labels.ts';
+import type { ProjectLabelDto } from './projectLabels.ts';
 
 /**
  * Board domain: projects → columns → cards. Types are the wire shapes
@@ -45,6 +46,9 @@ export interface ProjectDto {
   /** Total cards in the project. Present on the list endpoint (for the project
    *  browser's badges); undefined on single-project fetches. */
   cardCount?: number;
+  /** Tenant-scoped organising labels attached to this project (KBR-84).
+   *  Embedded on the list + single-project GET; absent means none/not loaded. */
+  labels?: ProjectLabelDto[];
 }
 
 export interface ColumnDto {
