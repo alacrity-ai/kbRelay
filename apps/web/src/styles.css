@@ -968,13 +968,14 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   .topbar { gap: var(--space-2); padding-left: calc(var(--space-3) + var(--safe-l)); padding-right: calc(var(--space-3) + var(--safe-r)); }
   .brand-name { display: none; }
   .user-name { display: none; }
+  /* KBR-86: give the switcher the topbar's free space on mobile. The topbar
+     spacer is ALSO flex:1, so it otherwise splits the free width 50/50 with the
+     switcher — neutralising it here roughly doubles the switcher's width. The
+     code chip is flex:none so it never crops; the name ellipsizes in whatever
+     room is left (now plenty). */
+  .topbar .spacer { display: none; }
   .project-switcher { flex: 1; min-width: 0; }
   .project-trigger { max-width: none; width: 100%; }
-  /* KBR-86: on mobile the compact code IS the identifier — show it in full and
-     drop the (cropped) name from the collapsed trigger, so a 7-char code never
-     crops. Projects without a code keep their name (the :has guard); full names
-     still appear in the opened dropdown. */
-  .project-trigger:has(.project-code) .project-current { display: none; }
   /* Collapse the tool buttons into the kebab menu (KBR-70). Selector is
      .topbar-scoped for specificity: the base `.topbar-tools-menu {display:none}`
      lives LATER in this file, and at equal specificity it would win over this
