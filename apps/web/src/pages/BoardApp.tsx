@@ -399,7 +399,7 @@ export default function BoardApp({
             projects={orderedProjects}
             currentId={selected}
             onSelect={(id) => { selectProject(id); setView('board'); }}
-            onBrowse={() => setBrowseOpen(true)}
+            onBrowse={() => { setBrowseOpen(true); void loadProjects(); }}
             onNew={() => setNewProjectOpen(true)}
           />
         )}
