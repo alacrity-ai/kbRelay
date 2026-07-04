@@ -627,7 +627,7 @@ export default function BoardApp({
       {guideOpen && <ClaudeCodeGuide onClose={() => setGuideOpen(false)} />}
       {profileOpen && <ProfileSettings me={me} onClose={() => setProfileOpen(false)} onSaved={applyMe} />}
       {teamOpen && (
-        <TenantSettings meId={me.user.id} projects={projects} onClose={() => setTeamOpen(false)} />
+        <TenantSettings meId={me.user.id} projects={projects} onClose={() => setTeamOpen(false)} onChanged={() => void loadProjects(selected ?? undefined)} />
       )}
     </CardLinksContext.Provider>
   );

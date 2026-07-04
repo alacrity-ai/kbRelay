@@ -1157,6 +1157,11 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   line-height: 1.5;
 }
 .filter-labels { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+/* KBR-85: project-label facet filters in the switcher + Browse modal, and the
+   per-row chips on Browse rows. Reuse the .label-chip / .filter-labels styles. */
+.switcher-labels { padding: 0.1rem 0.15rem 0.45rem; }
+.browse-label-filter { margin-bottom: 0.7rem; }
+.browse-row-labels { flex: none; }
 .label-chip.selectable { cursor: pointer; font-size: 0.78rem; opacity: 0.75; }
 .label-chip.selectable:hover { opacity: 1; }
 .label-chip.selectable.active { opacity: 1; box-shadow: 0 0 0 1px currentColor inset; }

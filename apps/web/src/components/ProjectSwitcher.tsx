@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ProjectDto } from '@kbrelay/shared';
+import type { ProjectDto, ProjectLabelDto } from '@kbrelay/shared';
 import { shouldAutofocusInput } from '../lib/autofocus';
 
 /**
@@ -26,12 +26,13 @@ export default function ProjectSwitcher({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
+  const [labelSel, setLabelSel] = useState<Set<string>>(new Set());
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const current = projects.find((p) => p.id === currentId);
 
   useEffect(() => {
-    if (!open) { setQ(''); return; }
+    if (!open) { setQ(''); setLabelSel(new Set()); return; }
     // Don't grab focus on touch devices — it pops the keyboard (KBR-32).
     if (shouldAutofocusInput()) inputRef.current?.focus();
     const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
@@ -41,15 +42,24 @@ export default function ProjectSwitcher({
     return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
   }, [open]);
 
+  // Distinct labels present across the projects (the facet filter options).
+  const allLabels = useMemo(() => {
+    const m = new Map<string, ProjectLabelDto>();
+    for (const p of projects) for (const l of p.labels ?? []) if (!m.has(l.id)) m.set(l.id, l);
+    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [projects]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const list = needle
-      ? projects.filter(
-          (p) => p.name.toLowerCase().includes(needle) || (p.code ?? '').toLowerCase().includes(needle),
-        )
-      : projects;
+    let list = projects;
+    if (needle) {
+      list = list.filter(
+        (p) => p.name.toLowerCase().includes(needle) || (p.code ?? '').toLowerCase().includes(needle),
+      );
+    }
+    if (labelSel.size) list = list.filter((p) => (p.labels ?? []).some((l) => labelSel.has(l.id)));
     return list.slice(0, MAX);
-  }, [projects, q]);
+  }, [projects, q, labelSel]);
 
   const pick = (id: string) => { setOpen(false); onSelect(id); };
 
@@ -83,6 +93,24 @@ export default function ProjectSwitcher({
               onKeyDown={(e) => { if (e.key === 'Enter' && filtered[0]) pick(filtered[0].id); }}
             />
           </div>
+          {allLabels.length > 0 && (
+            <div className="switcher-labels filter-labels">
+              {allLabels.map((l) => {
+                const on = labelSel.has(l.id);
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    className={`label-chip selectable ${on ? 'active' : ''}`}
+                    style={{ background: `${l.color}2b`, color: l.color, borderColor: on ? l.color : `${l.color}66` }}
+                    onClick={() => setLabelSel((s) => { const n = new Set(s); if (n.has(l.id)) n.delete(l.id); else n.add(l.id); return n; })}
+                  >
+                    {l.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="menu-list">
             {filtered.length === 0 ? (
               <div className="muted-note switcher-empty">No matches</div>

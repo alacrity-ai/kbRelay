@@ -1,19 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   TeamMember,
   PendingInvite,
   ProjectDto,
+  ProjectLabelDto,
   MembershipRole,
   AgentSummary,
   TokenSummary,
   WebhookSubscriptionDto,
 } from '@kbrelay/shared';
-import { USER_PALETTE, colorForUser } from '@kbrelay/shared';
+import { USER_PALETTE, colorForUser, MAX_PROJECT_LABELS_PER_TENANT } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { useDialog } from './Dialog';
 import { McpGuideButton } from './McpGuide';
 
-type Tab = 'people' | 'agents' | 'webhooks';
+type Tab = 'people' | 'agents' | 'webhooks' | 'labels';
 
 /**
  * Tenant Settings — admin-only. Three tabs:
@@ -29,10 +30,13 @@ export default function TenantSettings({
   meId,
   projects,
   onClose,
+  onChanged,
 }: {
   meId: string;
   projects: ProjectDto[];
   onClose: () => void;
+  /** Fired after project-label edits so the board can refresh embedded labels. */
+  onChanged?: () => void;
 }) {
   const dialog = useDialog();
   const [tab, setTab] = useState<Tab>('people');
@@ -133,6 +137,7 @@ export default function TenantSettings({
           <button className={`tab ${tab === 'people' ? 'active' : ''}`} onClick={() => { setTab('people'); setExpanded(null); }}>People</button>
           <button className={`tab ${tab === 'agents' ? 'active' : ''}`} onClick={() => { setTab('agents'); setExpanded(null); }}>Agents</button>
           <button className={`tab ${tab === 'webhooks' ? 'active' : ''}`} onClick={() => { setTab('webhooks'); setExpanded(null); }}>Channel events</button>
+          <button className={`tab ${tab === 'labels' ? 'active' : ''}`} onClick={() => { setTab('labels'); setExpanded(null); }}>Project labels</button>
         </div>
 
         <div className="modal-body">
@@ -279,6 +284,8 @@ export default function TenantSettings({
           )}
 
           {tab === 'webhooks' && <WebhooksPanel agents={agents} />}
+
+          {tab === 'labels' && <ProjectLabelsPanel onChanged={() => onChanged?.()} />}
         </div>
 
         <div className="modal-footer">
@@ -287,6 +294,121 @@ export default function TenantSettings({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Project-labels manager (KBR-85): tenant-wide buckets ("Side gigs", "Day Job")
+ * a project can carry several of. Mirrors the per-project card-label manager,
+ * but scoped to the whole tenant. Attach labels to a board in its settings.
+ */
+function ProjectLabelsPanel({ onChanged }: { onChanged: () => void }) {
+  const dialog = useDialog();
+  const [labels, setLabels] = useState<ProjectLabelDto[] | null>(null);
+  const [name, setName] = useState('');
+  const [color, setColor] = useState<string>(USER_PALETTE[0]!);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const { labels: ls } = await api.listProjectLabels();
+      setLabels(ls);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load project labels');
+    }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  async function guarded(fn: () => Promise<unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      await load();
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Label change failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const add = () => {
+    const n = name.trim();
+    if (!n) return;
+    void guarded(async () => {
+      await api.createProjectLabel({ name: n, color });
+      setName('');
+    });
+  };
+
+  const rename = async (l: ProjectLabelDto) => {
+    const n = await dialog.prompt({ title: 'Rename project label', label: 'Label name', defaultValue: l.name, confirmLabel: 'Save' });
+    if (n && n.trim() && n.trim() !== l.name) void guarded(() => api.patchProjectLabel(l.id, { name: n.trim() }));
+  };
+
+  const remove = async (l: ProjectLabelDto) => {
+    const yes = await dialog.confirm({
+      title: `Delete "${l.name}"?`,
+      message: 'It is removed from every project that carries it. The projects themselves are unaffected.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (yes) void guarded(() => api.deleteProjectLabel(l.id));
+  };
+
+  return (
+    <>
+      {error && <div className="error-text">{error}</div>}
+      <p className="muted-note">
+        Tenant-wide buckets to organise boards — e.g. “Side gigs”, “Day Job”, “Home”. Up to {MAX_PROJECT_LABELS_PER_TENANT}.
+        Attach them to a board in its <em>Project settings</em>, then filter the switcher and Browse list by label.
+      </p>
+      <div className="label-add-row">
+        <input
+          value={name}
+          placeholder="e.g. Side gigs"
+          maxLength={32}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') add(); }}
+        />
+        <input
+          type="color"
+          className="label-color-input"
+          value={color}
+          aria-label="New label color"
+          onChange={(e) => setColor(e.target.value)}
+        />
+        <button className="primary" disabled={busy || !name.trim()} onClick={add}>Add</button>
+      </div>
+      {labels === null ? (
+        <div className="muted-note">Loading…</div>
+      ) : labels.length === 0 ? (
+        <p className="muted-note">No project labels yet.</p>
+      ) : (
+        <div className="archive-list">
+          {labels.map((l) => (
+            <div className="archive-row" key={l.id}>
+              <span className="label-chip" style={{ background: `${l.color}2b`, color: l.color, borderColor: `${l.color}66` }}>
+                {l.name}
+              </span>
+              <div className="spacer" style={{ flex: 1 }} />
+              <input
+                type="color"
+                className="label-color-input"
+                value={l.color}
+                aria-label={`Color for ${l.name}`}
+                disabled={busy}
+                onChange={(e) => void guarded(() => api.patchProjectLabel(l.id, { color: e.target.value }))}
+              />
+              <button className="ghost sm" disabled={busy} onClick={() => void rename(l)}>Rename</button>
+              <button className="ghost sm danger-text" disabled={busy} onClick={() => void remove(l)}>Delete</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 

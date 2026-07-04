@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CardDto, ColumnDto, ColumnRole, LabelDto, ProjectDto } from '@kbrelay/shared';
+import type { CardDto, ColumnDto, ColumnRole, LabelDto, ProjectDto, ProjectLabelDto } from '@kbrelay/shared';
 import { USER_PALETTE, MAX_LABELS_PER_PROJECT } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { ROLE_META, ROLE_ORDER } from '../lib/roles';
@@ -255,6 +255,15 @@ export default function ProjectSettings({
                 </div>
               </div>
 
+              {project && (
+                <ProjectLabelAssign
+                  key={project.id}
+                  projectId={project.id}
+                  initialSelected={project.labels ?? []}
+                  onChanged={() => { onProjectChanged?.(); onChanged(); }}
+                />
+              )}
+
               <div className="field notify-field">
                 <label className="notify-toggle">
                   <input
@@ -348,6 +357,86 @@ export default function ProjectSettings({
  * rename, recolor (native color input), delete (unlinks from cards). Capped
  * at 12; the cap and duplicate names surface as API 409s.
  */
+/**
+ * Assign tenant project-labels (KBR-85) to this board. Toggle chips from the
+ * tenant palette; each toggle persists immediately via setProjectLabels. The
+ * palette itself is managed in Team & access → Project labels.
+ */
+function ProjectLabelAssign({
+  projectId,
+  initialSelected,
+  onChanged,
+}: {
+  projectId: string;
+  initialSelected: ProjectLabelDto[];
+  onChanged: () => void;
+}) {
+  const [palette, setPalette] = useState<ProjectLabelDto[] | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set(initialSelected.map((l) => l.id)));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void api.listProjectLabels()
+      .then(({ labels }) => { if (alive) setPalette(labels); })
+      .catch((e) => { if (alive) setError(e instanceof Error ? e.message : 'Failed to load project labels'); });
+    return () => { alive = false; };
+  }, []);
+
+  async function toggle(id: string) {
+    if (busy) return;
+    const prev = selected;
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+    setBusy(true);
+    setError(null);
+    try {
+      await api.setProjectLabels(projectId, [...next]);
+      onChanged();
+    } catch (e) {
+      setSelected(prev); // revert on failure
+      setError(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="field">
+      <label>Project labels</label>
+      {error && <div className="error-text">{error}</div>}
+      {palette === null ? (
+        <p className="muted-note">Loading…</p>
+      ) : palette.length === 0 ? (
+        <p className="muted-note">
+          No project labels yet — create them in <em>Team &amp; access → Project labels</em>.
+        </p>
+      ) : (
+        <div className="filter-labels">
+          {palette.map((l) => {
+            const on = selected.has(l.id);
+            return (
+              <button
+                key={l.id}
+                type="button"
+                className={`label-chip selectable ${on ? 'active' : ''}`}
+                style={{ background: `${l.color}2b`, color: l.color, borderColor: on ? l.color : `${l.color}66` }}
+                disabled={busy}
+                onClick={() => void toggle(l.id)}
+              >
+                {l.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <p className="muted-note">Tenant-wide buckets to group boards; filter the switcher &amp; Browse list by these.</p>
+    </div>
+  );
+}
+
 function LabelsPanel({ projectId, onChanged }: { projectId: string; onChanged: () => void }) {
   const dialog = useDialog();
   const [labels, setLabels] = useState<LabelDto[] | null>(null);

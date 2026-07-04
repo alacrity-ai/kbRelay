@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ProjectDto } from '@kbrelay/shared';
+import type { ProjectDto, ProjectLabelDto } from '@kbrelay/shared';
 import { shouldAutofocusInput } from '../lib/autofocus';
 
 /**
@@ -24,6 +24,7 @@ export default function BrowseProjectsModal({
   onClose: () => void;
 }) {
   const [q, setQ] = useState('');
+  const [labelSel, setLabelSel] = useState<Set<string>>(new Set());
   const [sel, setSel] = useState<string | null>(currentId);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState('');
@@ -36,12 +37,19 @@ export default function BrowseProjectsModal({
     return () => document.removeEventListener('keydown', onKey);
   }, [busy, onClose]);
 
+  const allLabels = useMemo(() => {
+    const m = new Map<string, ProjectLabelDto>();
+    for (const p of projects) for (const l of p.labels ?? []) if (!m.has(l.id)) m.set(l.id, l);
+    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [projects]);
+
   const filtered = useMemo(() => {
     const n = q.trim().toLowerCase();
-    return n
-      ? projects.filter((p) => p.name.toLowerCase().includes(n) || (p.code ?? '').toLowerCase().includes(n))
-      : projects;
-  }, [projects, q]);
+    let list = projects;
+    if (n) list = list.filter((p) => p.name.toLowerCase().includes(n) || (p.code ?? '').toLowerCase().includes(n));
+    if (labelSel.size) list = list.filter((p) => (p.labels ?? []).some((l) => labelSel.has(l.id)));
+    return list;
+  }, [projects, q, labelSel]);
 
   const target = projects.find((p) => p.id === confirmingId) ?? null;
 
@@ -85,6 +93,25 @@ export default function BrowseProjectsModal({
             onChange={(e) => setQ(e.target.value)}
           />
 
+          {allLabels.length > 0 && (
+            <div className="browse-label-filter filter-labels">
+              {allLabels.map((l) => {
+                const on = labelSel.has(l.id);
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    className={`label-chip selectable ${on ? 'active' : ''}`}
+                    style={{ background: `${l.color}2b`, color: l.color, borderColor: on ? l.color : `${l.color}66` }}
+                    onClick={() => setLabelSel((s) => { const n = new Set(s); if (n.has(l.id)) n.delete(l.id); else n.add(l.id); return n; })}
+                  >
+                    {l.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div className="browse-list">
             {filtered.length === 0 ? (
               <div className="muted-note">No matches.</div>
@@ -102,6 +129,15 @@ export default function BrowseProjectsModal({
                     {p.name}
                     {p.id === currentId && <span className="current-tag"> · current</span>}
                   </span>
+                  {(p.labels ?? []).length > 0 && (
+                    <span className="browse-row-labels filter-labels">
+                      {p.labels!.map((l) => (
+                        <span key={l.id} className="label-chip" style={{ background: `${l.color}2b`, color: l.color, borderColor: `${l.color}66` }}>
+                          {l.name}
+                        </span>
+                      ))}
+                    </span>
+                  )}
                   <span className="count-badge" title="cards in this project">
                     {p.cardCount ?? 0} {p.cardCount === 1 ? 'card' : 'cards'}
                   </span>
