@@ -6,7 +6,8 @@ import AttachmentList from './AttachmentList';
 // The lightbox fetches the image bytes with the bearer token; stub the hook so
 // the test exercises the UI, not the network.
 vi.mock('../lib/authedBlob', () => ({
-  useAuthedObjectUrl: vi.fn(() => ({ objectUrl: 'blob:fake', loading: false, error: false })),
+  useAuthedObjectUrl: vi.fn((url?: string) => (url ? { objectUrl: 'blob:fake', loading: false, error: false } : { loading: false, error: false })),
+  useAuthedText: vi.fn((url?: string) => (url ? { text: '# Design Notes\n\nHello **world**', loading: false, error: false } : { loading: false, error: false })),
   fetchBlobObjectUrl: vi.fn(),
   isAttachmentUrl: () => false,
 }));
@@ -24,6 +25,8 @@ const image = attachment({ id: 'att_img', filename: 'cat.jpg', contentType: 'ima
 const image2 = attachment({ id: 'att_img2', filename: 'dog.png', contentType: 'image/png', kind: 'image' });
 const image3 = attachment({ id: 'att_img3', filename: 'bird.png', contentType: 'image/png', kind: 'image' });
 const zip = attachment({ id: 'att_zip', filename: 'a.zip', contentType: 'application/zip', kind: 'archive' });
+const md = attachment({ id: 'att_md', filename: 'notes.md', contentType: 'text/markdown', kind: 'document' });
+const txt = attachment({ id: 'att_txt', filename: 'log.txt', contentType: 'text/plain', kind: 'document' });
 
 beforeEach(() => cleanup());
 
@@ -61,9 +64,9 @@ describe('KBR-93: attachment image preview', () => {
     expect(screen.getByRole('dialog', { name: 'Preview of dog.png' })).toBeTruthy();
     expect(screen.getByText('2 / 3')).toBeTruthy();
 
-    fireEvent.click(screen.getByLabelText('Next image'));
+    fireEvent.click(screen.getByLabelText('Next preview'));
     expect(screen.getByRole('dialog', { name: 'Preview of bird.png' })).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('Next image')); // wraps to the first
+    fireEvent.click(screen.getByLabelText('Next preview')); // wraps to the first
     expect(screen.getByRole('dialog', { name: 'Preview of cat.jpg' })).toBeTruthy();
     expect(screen.getByText('1 / 3')).toBeTruthy();
 
@@ -78,15 +81,15 @@ describe('KBR-93: attachment image preview', () => {
     fireEvent.click(screen.getByLabelText('Preview cat.jpg'));
     fireEvent.click(screen.getByLabelText('Zoom in'));
     expect(screen.getByText('140%')).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('Next image'));
+    fireEvent.click(screen.getByLabelText('Next preview'));
     expect(screen.getByText('100%')).toBeTruthy();
   });
 
   it('hides slideshow arrows and counter when there is a single image', () => {
     render(<AttachmentList items={[image, zip]} />);
     fireEvent.click(screen.getByLabelText('Preview cat.jpg'));
-    expect(screen.queryByLabelText('Next image')).toBeNull();
-    expect(screen.queryByLabelText('Previous image')).toBeNull();
+    expect(screen.queryByLabelText('Next preview')).toBeNull();
+    expect(screen.queryByLabelText('Previous preview')).toBeNull();
     expect(screen.queryByText('1 / 1')).toBeNull();
   });
 
@@ -101,5 +104,42 @@ describe('KBR-93: attachment image preview', () => {
     // Zoom out below 100% is clamped at the floor.
     fireEvent.click(screen.getByLabelText('Zoom out'));
     expect(screen.getByText('100%')).toBeTruthy();
+  });
+});
+
+describe('KBR-95: markdown / txt preview', () => {
+  it('markdown and txt rows get Preview buttons; archives still do not', () => {
+    render(<AttachmentList items={[md, txt, zip]} />);
+    expect(screen.getByLabelText('Preview notes.md')).toBeTruthy();
+    expect(screen.getByLabelText('Preview log.txt')).toBeTruthy();
+    expect(screen.queryByLabelText('Preview a.zip')).toBeNull();
+  });
+
+  it('markdown renders as rich GFM; txt renders preformatted', () => {
+    render(<AttachmentList items={[md, txt]} />);
+    fireEvent.click(screen.getByLabelText('Preview notes.md'));
+    // '# Design Notes' becomes a real heading, '**world**' becomes <strong>.
+    expect(screen.getByRole('heading', { name: 'Design Notes' })).toBeTruthy();
+    expect(document.querySelector('.imgprev-textpane strong')?.textContent).toBe('world');
+    // No zoom controls for text; reading hint instead.
+    expect(screen.queryByLabelText('Zoom in')).toBeNull();
+    expect(screen.getByText(/Scroll to read/)).toBeTruthy();
+    // Cycle to the txt file — preformatted, raw text.
+    fireEvent.click(screen.getByLabelText('Next preview'));
+    expect(screen.getByRole('dialog', { name: 'Preview of log.txt' })).toBeTruthy();
+    expect(document.querySelector('pre.imgprev-plaintext')).toBeTruthy();
+  });
+
+  it("cycles through mixed types in row order (Leif's md→img→img→img→md example)", () => {
+    render(<AttachmentList items={[md, image, image2, image3, txt]} />);
+    fireEvent.click(screen.getByLabelText('Preview notes.md'));
+    expect(screen.getByText('1 / 5')).toBeTruthy();
+    const names = ['cat.jpg', 'dog.png', 'bird.png', 'log.txt', 'notes.md'];
+    for (const name of names) {
+      fireEvent.keyDown(document, { key: 'ArrowRight' });
+      expect(screen.getByRole('dialog', { name: `Preview of ${name}` })).toBeTruthy();
+    }
+    // Images got the zoom UI mid-cycle; back on markdown there is none.
+    expect(screen.queryByLabelText('Zoom in')).toBeNull();
   });
 });

@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import type { AttachmentDto } from '@kbrelay/shared';
 import { attachmentBlobUrl } from '../lib/api';
-import { formatBytes } from '../lib/attachments';
+import { formatBytes, isPreviewableAttachment } from '../lib/attachments';
 import AttachmentIcon from './AttachmentIcon';
 import AuthedDownloadLink from './AuthedDownloadLink';
-import ImagePreviewModal from './ImagePreviewModal';
+import AttachmentPreviewModal from './AttachmentPreviewModal';
 
 /** A card's attachments as a compact list of download links, with an optional
- *  remove (✕) affordance. Image rows get a Preview button that opens a
- *  zoom/pan lightbox (KBR-93). */
+ *  remove (✕) affordance. Image (KBR-93) and markdown/txt (KBR-95) rows get a
+ *  Preview button that opens the zoom/pan + markdown lightbox. */
 export default function AttachmentList({
   items,
   onDelete,
@@ -30,7 +30,7 @@ export default function AttachmentList({
             {a.filename}
           </AuthedDownloadLink>
           <span className="attach-size">{formatBytes(a.sizeBytes)}</span>
-          {a.kind === 'image' && (
+          {isPreviewableAttachment(a) && (
             <button
               type="button"
               className="attach-preview"
@@ -59,8 +59,8 @@ export default function AttachmentList({
       ))}
     </ul>
     {preview && (
-      <ImagePreviewModal
-        images={items.filter((a) => a.kind === 'image')}
+      <AttachmentPreviewModal
+        items={items.filter(isPreviewableAttachment)}
         startId={preview.id}
         onClose={() => setPreview(null)}
       />

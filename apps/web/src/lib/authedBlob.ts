@@ -66,3 +66,38 @@ export function useAuthedObjectUrl(url?: string): BlobUrlState {
 export function isAttachmentUrl(href?: string): boolean {
   return typeof href === 'string' && href.startsWith('/api/v1/attachments/');
 }
+
+interface TextState {
+  text?: string;
+  loading: boolean;
+  error: boolean;
+  status?: number;
+}
+
+/** Fetch `url` (authenticated) as text — for markdown/txt previews (KBR-95). */
+export function useAuthedText(url?: string): TextState {
+  const [state, setState] = useState<TextState>({ loading: Boolean(url), error: false });
+  useEffect(() => {
+    if (!url) {
+      setState({ loading: false, error: false });
+      return;
+    }
+    let alive = true;
+    setState({ loading: true, error: false });
+    const token = getToken();
+    fetch(url, { credentials: 'include', headers: token ? { authorization: `Bearer ${token}` } : {} })
+      .then(async (res) => {
+        if (!res.ok) {
+          if (alive) setState({ loading: false, error: true, status: res.status });
+          return;
+        }
+        const text = await res.text();
+        if (alive) setState({ text, loading: false, error: false });
+      })
+      .catch(() => {
+        if (alive) setState({ loading: false, error: true });
+      });
+    return () => { alive = false; };
+  }, [url]);
+  return state;
+}

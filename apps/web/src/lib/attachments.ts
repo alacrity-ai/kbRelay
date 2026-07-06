@@ -33,3 +33,21 @@ export function stripAttachmentMarkdown(text: string | null | undefined, attachm
   const re = new RegExp(`!?\\[[^\\]]*\\]\\(/api/v1/attachments/${attachmentId}/blob\\)`, 'g');
   return text.replace(re, '_🗑 attachment removed_');
 }
+
+// ── Preview support (KBR-93 images, KBR-95 markdown/txt) ──────
+
+/** Renderable as markdown in the preview modal? */
+export function isMarkdownAttachment(a: AttachmentDto): boolean {
+  const fn = a.filename.toLowerCase();
+  return fn.endsWith('.md') || fn.endsWith('.markdown') || a.contentType === 'text/markdown';
+}
+
+/** Renderable as plain text in the preview modal? */
+export function isPlainTextAttachment(a: AttachmentDto): boolean {
+  return a.filename.toLowerCase().endsWith('.txt') || a.contentType === 'text/plain';
+}
+
+/** Does this attachment get a Preview button / participate in the slideshow? */
+export function isPreviewableAttachment(a: AttachmentDto): boolean {
+  return a.kind === 'image' || isMarkdownAttachment(a) || isPlainTextAttachment(a);
+}

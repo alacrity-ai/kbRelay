@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { AttachmentDto } from '@kbrelay/shared';
 import { attachmentBlobUrl } from '../lib/api';
-import { useAuthedObjectUrl } from '../lib/authedBlob';
-import { formatBytes } from '../lib/attachments';
+import { useAuthedObjectUrl, useAuthedText } from '../lib/authedBlob';
+import { formatBytes, isMarkdownAttachment } from '../lib/attachments';
+import Markdown from './Markdown';
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 8;
@@ -11,15 +12,20 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 interface View { scale: number; tx: number; ty: number }
 const HOME: View = { scale: 1, tx: 0, ty: 0 };
 
-/** Lightbox for a card's image attachments (KBR-93): fixed-size frame, wheel /
- *  double-click / button zoom, drag pan, two-finger pinch+pan on touch, and
- *  slideshow cycling through sibling images (‹ › buttons + arrow keys).
- *  The transform model is `translate(tx,ty) scale(s)` about the viewport
- *  center; zoomAt() keeps the content point under the cursor fixed. */
-export default function ImagePreviewModal({ images, startId, onClose }: { images: AttachmentDto[]; startId: string; onClose: () => void }) {
+/** Lightbox for a card's previewable attachments (KBR-93 images, KBR-95
+ *  markdown/txt): fixed-size frame; images get wheel / double-click / button
+ *  zoom, drag pan and two-finger pinch+pan; markdown/txt render as a smooth
+ *  scrollable GFM pane. ‹ › buttons + arrow keys cycle through ALL previewable
+ *  siblings in row order, whatever their type. The image transform model is
+ *  `translate(tx,ty) scale(s)` about the viewport center; zoomAt() keeps the
+ *  content point under the cursor fixed. */
+export default function AttachmentPreviewModal({ items, startId, onClose }: { items: AttachmentDto[]; startId: string; onClose: () => void }) {
+  const images = items; // slideshow order = row order, images and text alike
   const [index, setIndex] = useState(() => Math.max(0, images.findIndex((a) => a.id === startId)));
   const attachment = images[index];
-  const { objectUrl, loading, error, status } = useAuthedObjectUrl(attachmentBlobUrl(attachment.id));
+  const isImage = attachment.kind === 'image';
+  const { objectUrl, loading, error, status } = useAuthedObjectUrl(isImage ? attachmentBlobUrl(attachment.id) : undefined);
+  const text = useAuthedText(!isImage ? attachmentBlobUrl(attachment.id) : undefined);
   const [view, setView] = useState<View>(HOME);
 
   // Cycle with wrap-around; each image starts fresh at 100% / centered.
@@ -72,7 +78,9 @@ export default function ImagePreviewModal({ images, startId, onClose }: { images
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [toCenter]);
+    // Re-attach when the slideshow lands on a different item — the image
+    // viewport unmounts entirely while a text attachment is shown.
+  }, [toCenter, index, isImage]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -141,6 +149,7 @@ export default function ImagePreviewModal({ images, startId, onClose }: { images
           {images.length > 1 && <span className="imgprev-count">{index + 1} / {images.length}</span>}
           <button type="button" className="imgprev-close" aria-label="Close preview" onClick={onClose}>✕</button>
         </div>
+        {isImage ? (
         <div
           ref={viewportRef}
           className="imgprev-viewport"
@@ -165,22 +174,41 @@ export default function ImagePreviewModal({ images, startId, onClose }: { images
               style={{ transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})` }}
             />
           )}
-          {images.length > 1 && (
-            <>
-              {/* stopPropagation: the viewport's pointerdown would otherwise capture
-                  the pointer for pan and swallow the click. */}
-              <button type="button" className="imgprev-nav prev" aria-label="Previous image" onPointerDown={(e) => e.stopPropagation()} onClick={() => step(-1)}>‹</button>
-              <button type="button" className="imgprev-nav next" aria-label="Next image" onPointerDown={(e) => e.stopPropagation()} onClick={() => step(1)}>›</button>
-            </>
+        </div>
+        ) : (
+        <div className="imgprev-viewport imgprev-viewport-text" data-testid="preview-text-viewport">
+          {text.loading && <span className="imgprev-status">Loading {attachment.filename}…</span>}
+          {text.status === 404 && <span className="imgprev-status">🗑 Attachment removed</span>}
+          {!text.loading && text.status !== 404 && (text.error || text.text === undefined) && (
+            <span className="imgprev-status">⚠ Couldn’t load {attachment.filename}</span>
+          )}
+          {text.text !== undefined && (
+            isMarkdownAttachment(attachment)
+              ? <div className="imgprev-textpane md-view"><Markdown>{text.text}</Markdown></div>
+              : <pre className="imgprev-textpane imgprev-plaintext">{text.text}</pre>
           )}
         </div>
+        )}
+        {images.length > 1 && (
+          <>
+            {/* stopPropagation: on the image viewport the pointerdown would
+                otherwise capture the pointer for pan and swallow the click. */}
+            <button type="button" className="imgprev-nav prev" aria-label="Previous preview" onPointerDown={(e) => e.stopPropagation()} onClick={() => step(-1)}>‹</button>
+            <button type="button" className="imgprev-nav next" aria-label="Next preview" onPointerDown={(e) => e.stopPropagation()} onClick={() => step(1)}>›</button>
+          </>
+        )}
         <div className="imgprev-footer">
-          <button type="button" className="ghost imgprev-zoom" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.4)}>−</button>
-          <span className="imgprev-pct">{Math.round(view.scale * 100)}%</span>
-          <button type="button" className="ghost imgprev-zoom" aria-label="Zoom in" onClick={() => zoomBy(1.4)}>+</button>
-          <button type="button" className="ghost imgprev-zoom" onClick={() => setView(HOME)}>Reset</button>
+          {isImage && (
+            <>
+              <button type="button" className="ghost imgprev-zoom" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.4)}>−</button>
+              <span className="imgprev-pct">{Math.round(view.scale * 100)}%</span>
+              <button type="button" className="ghost imgprev-zoom" aria-label="Zoom in" onClick={() => zoomBy(1.4)}>+</button>
+              <button type="button" className="ghost imgprev-zoom" onClick={() => setView(HOME)}>Reset</button>
+            </>
+          )}
           <span className="imgprev-hint">
-            Scroll or pinch to zoom · drag to pan · double-click to toggle{images.length > 1 && ' · ←/→ next image'}
+            {isImage ? 'Scroll or pinch to zoom · drag to pan · double-click to toggle' : 'Scroll to read'}
+            {images.length > 1 && ' · ←/→ next preview'}
           </span>
         </div>
       </div>
