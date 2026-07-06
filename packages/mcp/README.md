@@ -51,12 +51,12 @@ claude mcp add kbrelay --scope user \
 | `list_users` | read | Tenant users → resolve names/@handles to ids. |
 | `list_projects` | read | Projects you can access (admins: all). |
 | `get_project` | read | A project + its columns (resolve column ids by name). |
-| `create_project` | write | New project (`code` required, seeds columns). |
-| `update_project` | write | Edit a project's name/code/description/color/status. |
+| `create_project` | write | New project (`code` required, seeds columns). **Admin keys only** since KBR-94 — member keys get 403. |
+| `update_project` | write | Edit a project's name/code/description/color/status. **Admin keys only** since KBR-94. |
 | `list_cards` | read | Cards in a project (filter by column/assignee/q). |
 | `get_card` | read | One card (read the spec before working it). Returns `attachments[]` — each with `filename`, `kind`, `sizeBytes`, and a same-origin `url` to fetch the bytes (v0.16.0). |
 | `create_card` | write | New card (markdown body; `@handle` to notify). |
-| `update_card` | write | Edit and/or **move** (set `columnId` — status = column). |
+| `update_card` | write | Edit and/or **move** (set `columnId` — status = column). Restoring an archived card (`archived:false`) is admin-only (KBR-94). |
 | `delete_card` | write | Delete a card (cascades). |
 | `get_timeline` | read | A card's activity log (events + comments). |
 | `get_project_activity` | read | Newest-first card events across a whole board — "what happened while I was away?" (cursor-paginated, v0.17.0). |

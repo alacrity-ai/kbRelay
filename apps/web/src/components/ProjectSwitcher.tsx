@@ -22,7 +22,8 @@ export default function ProjectSwitcher({
   currentId: string | null;
   onSelect: (id: string) => void;
   onBrowse: () => void;
-  onNew: () => void;
+  /** Absent for non-admins — project creation is admin-only (KBR-94). */
+  onNew?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -136,7 +137,9 @@ export default function ProjectSwitcher({
                 'Browse projects…'
               )}
             </button>
-            <button className="menu-item" onClick={() => { setOpen(false); onNew(); }}>+ New project</button>
+            {onNew && (
+              <button className="menu-item" onClick={() => { setOpen(false); onNew(); }}>+ New project</button>
+            )}
           </div>
         </div>
       )}

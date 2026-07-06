@@ -10,7 +10,8 @@ import { routes } from './router';
  * The two explicit exemptions are the only project-ish routes that are *not*
  * single-project gated:
  *   - GET  /api/v1/projects  — lists, filtered to the caller's access in-handler
- *   - POST /api/v1/projects  — create; any member may, and is auto-granted access
+ *   - POST /api/v1/projects  — create; admin-only in-handler since KBR-94
+ *     (the creator is auto-granted access)
  */
 const EXEMPT = new Set(['GET /api/v1/projects', 'POST /api/v1/projects']);
 

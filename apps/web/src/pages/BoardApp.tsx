@@ -130,6 +130,9 @@ export default function BoardApp({
   onSignOut: () => void;
 }) {
   const dialog = useDialog();
+  // Board-shaping (project create/settings, archive restore) is admin-only
+  // since KBR-94 — members get a clean board with no settings affordances.
+  const isAdmin = me.user.role === 'admin';
   const [projects, setProjects] = useState<ProjectDto[]>([]);
   // `users` = all current tenant members (for the bell — mention authors can be
   // cross-project). `projectUsers` = scoped to the selected project (for the
@@ -400,11 +403,11 @@ export default function BoardApp({
             currentId={selected}
             onSelect={(id) => { selectProject(id); setView('board'); }}
             onBrowse={() => { setBrowseOpen(true); void loadProjects(); }}
-            onNew={() => setNewProjectOpen(true)}
+            onNew={isAdmin ? () => setNewProjectOpen(true) : undefined}
           />
         )}
 
-        {selected && view !== 'mywork' && (
+        {isAdmin && selected && view !== 'mywork' && (
           <button className="icon-btn subtle topbar-tool project-settings-btn" onClick={() => openSettings()} aria-label="Project settings" title="Project settings">
             <Gear />
           </button>
@@ -459,9 +462,11 @@ export default function BoardApp({
             {selected && view !== 'mywork' && (
               <>
                 <div className="menu-divider" />
-                <button className="menu-item" onClick={() => openSettings()}>
-                  <Gear /> Project settings
-                </button>
+                {isAdmin && (
+                  <button className="menu-item" onClick={() => openSettings()}>
+                    <Gear /> Project settings
+                  </button>
+                )}
                 <button className="menu-item" onClick={() => setFilterOpen(true)}>
                   <Funnel /> Filter cards{isFilterActive(filter) ? ` (${filterCount(filter)})` : ''}
                 </button>
@@ -564,15 +569,21 @@ export default function BoardApp({
           projectLabels={projectLabels}
           nav={nav && nav.cardId ? nav : null}
           onNavHandled={() => setNav(null)}
-          onViewArchive={() => openSettings('archive')}
+          onViewArchive={isAdmin ? () => openSettings('archive') : undefined}
         />
       ) : (
         <div className="center">
           <div className="gate">
             <div className="brand"><BrandMark /> kbRelay</div>
             <h1 style={{ margin: 0, fontSize: '1.2rem' }}>No projects yet</h1>
-            <p className="muted-note">Create your first board to get going.</p>
-            <button className="primary" onClick={() => setNewProjectOpen(true)}>+ New project</button>
+            {isAdmin ? (
+              <>
+                <p className="muted-note">Create your first board to get going.</p>
+                <button className="primary" onClick={() => setNewProjectOpen(true)}>+ New project</button>
+              </>
+            ) : (
+              <p className="muted-note">Ask a workspace admin to grant you access to a project.</p>
+            )}
           </div>
         </div>
       )}

@@ -36,6 +36,8 @@ export async function handleListProjects(ctx: RouteContext): Promise<Response> {
 }
 
 export async function handleCreateProject(ctx: RouteContext): Promise<Response> {
+  // Board-shaping is admin-only (KBR-94); members work boards, they don't create them.
+  requireAdmin(ctx.auth);
   const { tenantId, userId } = tenantScope(ctx.auth);
   const input = await parseJson(ctx.request, createProjectInput);
   const project = await createProject(ctx.env, tenantId, userId, input);
@@ -59,6 +61,8 @@ export async function handleGetProject(ctx: RouteContext): Promise<Response> {
 }
 
 export async function handlePatchProject(ctx: RouteContext): Promise<Response> {
+  // Project settings (name/description/color/status/…) are admin-only (KBR-94).
+  requireAdmin(ctx.auth);
   const { tenantId } = tenantScope(ctx.auth);
   const input = await parseJson(ctx.request, patchProjectInput);
   const project = await patchProject(ctx.env, tenantId, ctx.params.id!, input);

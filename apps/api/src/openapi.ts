@@ -90,7 +90,7 @@ export const OPENAPI_SPEC = {
           },
           archivedAt: {
             type: ['integer', 'null'],
-            description: 'When the card was archived (v0.17.0). Null = on the board. Archive via PATCH {archived: true|false}; timeline/attachments/mentions survive.',
+            description: 'When the card was archived (v0.17.0). Null = on the board. Archive via PATCH {archived: true|false}; timeline/attachments/mentions survive. Restoring (archived:false on an archived card) is admin-only (KBR-94).',
           },
           createdBy: { type: 'string' },
           updatedBy: { type: 'string' },
@@ -622,7 +622,7 @@ export const OPENAPI_SPEC = {
         responses: { 200: { description: 'ok' } },
       },
       post: {
-        summary: 'Create a project (seeds default columns)',
+        summary: 'Create a project (seeds default columns) — admin-only (KBR-94)',
         requestBody: {
           required: true,
           content: {
@@ -645,16 +645,16 @@ export const OPENAPI_SPEC = {
     },
     '/api/v1/projects/{id}': {
       get: { summary: 'Get a project + its columns', responses: { 200: { description: 'ok' } } },
-      patch: { summary: 'Update / archive a project', responses: { 200: { description: 'ok' } } },
+      patch: { summary: 'Update / archive a project — admin-only (KBR-94)', responses: { 200: { description: 'ok' } } },
       delete: { summary: 'Delete a project (cascades) — admin-only', responses: { 200: { description: 'ok' }, 403: { description: 'not an admin' } } },
     },
     '/api/v1/projects/{id}/columns': {
       get: { summary: 'List a project\'s columns', responses: { 200: { description: 'ok' } } },
-      post: { summary: 'Add a column', responses: { 201: { description: 'created' } } },
+      post: { summary: 'Add a column — admin-only (KBR-94)', responses: { 201: { description: 'created' } } },
     },
     '/api/v1/columns/{id}': {
-      patch: { summary: 'Rename / recolor / reorder / set the role of a column', responses: { 200: { description: 'ok' } } },
-      delete: { summary: 'Delete an empty column', responses: { 200: { description: 'ok' } } },
+      patch: { summary: 'Rename / recolor / reorder / set the role of a column — admin-only (KBR-94)', responses: { 200: { description: 'ok' } } },
+      delete: { summary: 'Delete an empty column — admin-only (KBR-94)', responses: { 200: { description: 'ok' } } },
     },
     '/api/v1/projects/{id}/cards': {
       get: {
@@ -675,30 +675,30 @@ export const OPENAPI_SPEC = {
     '/api/v1/projects/{id}/labels': {
       get: { summary: 'List a project\'s labels (max 12)', responses: { 200: { description: 'ok' } } },
       post: {
-        summary: 'Create a label (name + #rrggbb color)',
+        summary: 'Create a label (name + #rrggbb color) — admin-only (KBR-94)',
         description: 'Unique name per project (case-insensitive); capped at 12 labels per project — 409 over the cap or on a duplicate name.',
         responses: { 201: { description: 'created' }, 409: { description: 'cap reached or duplicate name' } },
       },
     },
     '/api/v1/labels/{id}': {
-      patch: { summary: 'Rename / recolor a label', responses: { 200: { description: 'ok' } } },
-      delete: { summary: 'Delete a label (unlinks it from all cards)', responses: { 200: { description: 'ok' } } },
+      patch: { summary: 'Rename / recolor a label — admin-only (KBR-94)', responses: { 200: { description: 'ok' } } },
+      delete: { summary: 'Delete a label (unlinks it from all cards) — admin-only (KBR-94)', responses: { 200: { description: 'ok' } } },
     },
     '/api/v1/project-labels': {
       get: { summary: 'List the tenant\'s project labels (KBR-84)', responses: { 200: { description: 'ok' } } },
       post: {
-        summary: 'Create a project label (name + #rrggbb color)',
+        summary: 'Create a project label (name + #rrggbb color) — admin-only (KBR-94)',
         description: 'Tenant-scoped; unique name per tenant (case-insensitive); capped per tenant — 409 over the cap or on a duplicate name.',
         responses: { 201: { description: 'created' }, 409: { description: 'cap reached or duplicate name' } },
       },
     },
     '/api/v1/project-labels/{id}': {
-      patch: { summary: 'Rename / recolor a project label', responses: { 200: { description: 'ok' } } },
-      delete: { summary: 'Delete a project label (unlinks it from all projects)', responses: { 200: { description: 'ok' } } },
+      patch: { summary: 'Rename / recolor a project label — admin-only (KBR-94)', responses: { 200: { description: 'ok' } } },
+      delete: { summary: 'Delete a project label (unlinks it from all projects) — admin-only (KBR-94)', responses: { 200: { description: 'ok' } } },
     },
     '/api/v1/projects/{id}/project-labels': {
       put: {
-        summary: 'Replace a project\'s label set (KBR-84)',
+        summary: 'Replace a project\'s label set (KBR-84) — admin-only (KBR-94)',
         description: 'Body: `{ labelIds }` (web) or `{ labelNames }` (agents, case-insensitive). `{ labelIds: [] }` clears all. Returns the project\'s resulting labels.',
         responses: { 200: { description: 'ok' }, 400: { description: 'unknown label, or both id/name lists provided' } },
       },

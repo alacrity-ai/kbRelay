@@ -3,6 +3,7 @@ import type { RouteContext } from '../router';
 import { jsonResponse, HttpError } from '../http';
 import { parseJson } from '../validate';
 import { tenantScope } from '../auth/tenant-scope';
+import { requireAdmin } from '../auth/access';
 import { getProject } from '../db/repos/projects';
 import { listCards, getCard, createCard, patchCard, deleteCard, autoArchiveDone } from '../db/repos/cards';
 import { listTimeline, addComment, redactComment } from '../db/repos/card_events';
@@ -84,6 +85,13 @@ export async function handleGetCard(ctx: RouteContext): Promise<Response> {
 export async function handlePatchCard(ctx: RouteContext): Promise<Response> {
   const { tenantId, userId } = tenantScope(ctx.auth);
   const input = await parseJson(ctx.request, patchCardInput);
+  if (input.archived === false) {
+    // Restoring from the archive is a settings-tab action → admin-only
+    // (KBR-94). Archiving stays member-allowed; a redundant archived:false on
+    // a live card is a no-op, so only a real restore is gated.
+    const existing = await getCard(ctx.env, tenantId, ctx.params.id!);
+    if (existing?.archivedAt) requireAdmin(ctx.auth);
+  }
   const triggers: WebhookTrigger[] = [];
   const card = await patchCard(ctx.env, tenantId, ctx.params.id!, userId, input, triggers);
   if (triggers.length) ctx.waitUntil(dispatchTriggers(ctx.env, tenantId, card, userId, triggers));
