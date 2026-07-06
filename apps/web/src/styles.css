@@ -1562,14 +1562,13 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 }
 .link-toolbar .link-add { font-size: 0.85rem; padding: 0.25rem 0.6rem; }
 .link-hint { color: var(--muted); font-size: 0.8rem; }
-.link-fields { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+/* Stack the two fields — at the modal's width a wrapped row read as ~3 lines. */
+.link-fields { display: flex; flex-direction: column; gap: 0.4rem; }
 .link-url-input, .link-title-input {
-  font-size: 0.85rem; padding: 0.3rem 0.5rem;
+  width: 100%; font-size: 0.85rem; padding: 0.3rem 0.5rem; line-height: 1.4;
   border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--surface); color: var(--text);
 }
-.link-url-input { flex: 2 1 14rem; }
-.link-title-input { flex: 1 1 9rem; }
 .link-actions { display: flex; gap: 0.4rem; }
 .link-error { color: var(--danger); font-size: 0.8rem; }
 
@@ -1579,12 +1578,14 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--surface);
 }
+/* Glyph tints — tokens are prefixed `lg-` so they never collide with app
+   classes (a bare `board` token inherited the full-height kanban `.board`). */
 .link-glyph { display: inline-flex; color: #a78bfa; }
-.link-glyph.git { color: #a78bfa; }
-.link-glyph.board { color: #60a5fa; }
-.link-glyph.design { color: #f472b6; }
-.link-glyph.doc { color: #34d399; }
-.link-glyph.link { color: var(--text-dim); }
+.link-glyph.lg-git { color: #a78bfa; }
+.link-glyph.lg-board { color: #60a5fa; }
+.link-glyph.lg-design { color: #f472b6; }
+.link-glyph.lg-doc { color: #34d399; }
+.link-glyph.lg-link { color: var(--text-dim); }
 .link-name { color: var(--text); text-decoration: none; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link-name:hover { text-decoration: underline; }
 .link-provider { margin-left: auto; color: var(--muted); font-size: 0.72rem; text-transform: lowercase; letter-spacing: 0.02em; }

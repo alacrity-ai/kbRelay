@@ -18,7 +18,7 @@ export default function LinkList({
         const glyph = providerGlyph(l.provider);
         return (
           <li key={l.id} className="link-item">
-            <span className={`link-glyph ${glyph}`}>
+            <span className={`link-glyph lg-${glyph}`}>
               <LinkIcon glyph={glyph} />
             </span>
             <a
