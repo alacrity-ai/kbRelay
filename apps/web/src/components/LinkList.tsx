@@ -7,9 +7,12 @@ import LinkIcon from './LinkIcon';
 export default function LinkList({
   items,
   onDelete,
+  canDelete,
 }: {
   items: CardLinkDto[];
   onDelete?: (l: CardLinkDto) => void;
+  /** Per-row gate for the ✕ (KBR-101: creator or admin only). Default: all. */
+  canDelete?: (l: CardLinkDto) => boolean;
 }) {
   if (items.length === 0) return null;
   return (
@@ -31,7 +34,7 @@ export default function LinkList({
               {linkLabel(l)}
             </a>
             <span className="link-provider">{l.provider}</span>
-            {onDelete && (
+            {onDelete && (canDelete?.(l) ?? true) && (
               <button
                 type="button"
                 className="link-del"

@@ -94,16 +94,33 @@ describe('KBR-94: member gets 403 on board-shaping routes', () => {
     expect(await status(handleSetProjectLabels(ctx(memberAuth, { id: projectId }, { labelIds: [] }, 'PUT')))).toBe(403);
   });
 
-  it('archive RESTORE is admin-only; archiving stays member-allowed', async () => {
+  it('archive AND restore are admin-only (KBR-101)', async () => {
     const card = await createCard(env, adminAuth.tenantId, projectId, adminAuth.userId, { summary: 'Archivable' });
-    // Member archives — allowed (normal workflow).
-    expect(await status(handlePatchCard(ctx(memberAuth, { id: card.id }, { archived: true }, 'PATCH')))).toBe(200);
-    // Member tries to restore — 403.
+    // Member can touch `archived` in neither direction.
+    expect(await status(handlePatchCard(ctx(memberAuth, { id: card.id }, { archived: true }, 'PATCH')))).toBe(403);
     expect(await status(handlePatchCard(ctx(memberAuth, { id: card.id }, { archived: false }, 'PATCH')))).toBe(403);
-    // Admin restores — 200.
+    // Admin round-trips fine.
+    expect(await status(handlePatchCard(ctx(adminAuth, { id: card.id }, { archived: true }, 'PATCH')))).toBe(200);
     expect(await status(handlePatchCard(ctx(adminAuth, { id: card.id }, { archived: false }, 'PATCH')))).toBe(200);
-    // archived:false on a LIVE card is a harmless no-op for a member (not a restore).
-    expect(await status(handlePatchCard(ctx(memberAuth, { id: card.id }, { archived: false }, 'PATCH')))).toBe(200);
+  });
+
+  it("card CONTENT (summary/desc/AC/labels/due) is creator-or-admin (KBR-101); workflow fields stay open", async () => {
+    const adminsCard = await createCard(env, adminAuth.tenantId, projectId, adminAuth.userId, { summary: 'Admin card' });
+    // Member touching content on someone else's card → 403, field by field.
+    expect(await status(handlePatchCard(ctx(memberAuth, { id: adminsCard.id }, { summary: 'Hijacked' }, 'PATCH')))).toBe(403);
+    expect(await status(handlePatchCard(ctx(memberAuth, { id: adminsCard.id }, { description: 'x' }, 'PATCH')))).toBe(403);
+    expect(await status(handlePatchCard(ctx(memberAuth, { id: adminsCard.id }, { acceptanceCriteria: 'x' }, 'PATCH')))).toBe(403);
+    expect(await status(handlePatchCard(ctx(memberAuth, { id: adminsCard.id }, { labelIds: [] }, 'PATCH')))).toBe(403);
+    expect(await status(handlePatchCard(ctx(memberAuth, { id: adminsCard.id }, { dueAt: 1750000000000 }, 'PATCH')))).toBe(403);
+    // Workflow on someone else's card is the whole point of a relay — allowed.
+    expect(await status(handlePatchCard(ctx(memberAuth, { id: adminsCard.id }, { assigneeUserId: memberAuth.userId }, 'PATCH')))).toBe(200);
+    expect(await status(handlePatchCard(ctx(memberAuth, { id: adminsCard.id }, { reviewerUserId: adminAuth.userId }, 'PATCH')))).toBe(200);
+    // A member's OWN card is fully theirs.
+    const res = await handleCreateCard(ctx(memberAuth, { id: projectId }, { summary: 'Members own' }));
+    const { card: own } = (await res.json()) as { card: { id: string } };
+    expect(await status(handlePatchCard(ctx(memberAuth, { id: own.id }, { summary: 'Renamed', description: 'mine', dueAt: 1750000000000 }, 'PATCH')))).toBe(200);
+    // Admin can edit anyone's content.
+    expect(await status(handlePatchCard(ctx(adminAuth, { id: own.id }, { description: 'admin touch-up' }, 'PATCH')))).toBe(200);
   });
 });
 

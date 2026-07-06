@@ -90,7 +90,7 @@ export const OPENAPI_SPEC = {
           },
           archivedAt: {
             type: ['integer', 'null'],
-            description: 'When the card was archived (v0.17.0). Null = on the board. Archive via PATCH {archived: true|false}; timeline/attachments/mentions survive. Restoring (archived:false on an archived card) is admin-only (KBR-94).',
+            description: 'When the card was archived (v0.17.0). Null = on the board. Archive via PATCH {archived: true|false}; timeline/attachments/mentions survive. Both directions are admin-only (KBR-101).',
           },
           createdBy: { type: 'string' },
           updatedBy: { type: 'string' },
@@ -762,7 +762,11 @@ export const OPENAPI_SPEC = {
       get: { summary: 'Get a card', responses: { 200: { description: 'ok' } } },
       patch: {
         summary: 'Edit and/or move a card (columnId + position)',
-        responses: { 200: { description: 'ok' } },
+        description:
+          'RBAC (KBR-101): content fields (summary, description, acceptanceCriteria, labelIds, dueAt) ' +
+          'require being the card\'s creator or a tenant admin; `archived` (either direction) is admin-only. ' +
+          'Workflow fields (columnId, position, assigneeUserId, reviewerUserId) are open to any member with access.',
+        responses: { 200: { description: 'ok' }, 403: { description: 'content edit by non-creator, or archive by non-admin' } },
       },
       delete: { summary: 'Delete a card (cascades; admin-only since KBR-94)', responses: { 200: { description: 'ok' }, 403: { description: 'members cannot delete — archive instead' } } },
     },

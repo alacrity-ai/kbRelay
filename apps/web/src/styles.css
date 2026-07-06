@@ -247,6 +247,12 @@ select {
 .workspace-current-mark { margin-left: auto; color: var(--accent); font-weight: 700; }
 /* Member view (KBR-94): the lane role is a static chip, not a picker. */
 .column-role-static { display: inline-flex; align-items: center; cursor: default; }
+/* Locked spec fields in the card editor (KBR-101): read-only rendering. */
+.spec-locked {
+  border: 1px dashed var(--border); border-radius: var(--r-sm);
+  padding: 0.5rem 0.7rem; background: var(--surface);
+  opacity: 0.85; max-height: 16rem; overflow-y: auto;
+}
 
 /* Project switcher */
 .project-trigger { max-width: min(320px, 46vw); }

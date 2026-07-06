@@ -65,3 +65,34 @@ one row per membership (current one marked), click to switch (full reload),
 
 Out of scope (unchanged from v0.10): merging accounts, per-tenant profiles,
 cross-tenant search, tenant deletion self-serve.
+
+## KBR-101 addendum — member lockdown round 2 (same release)
+
+Live member-account testing surfaced a second tier of loose powers. The final
+member permission model on a card:
+
+| On a card you **created** | On someone else's card |
+|---|---|
+| everything except archive/delete | **move** (column/position), **assign** (assignee/reviewer), comment, attach, upload |
+
+Enforced server-side in `handlePatchCard`:
+- `archived` (either direction) → **admin-only** (was restore-only in the first pass).
+- **Content** — `summary`, `description`, `acceptanceCriteria`, `labelIds`,
+  `dueAt` — → **creator or admin**. Workflow fields stay open because relaying
+  work *is* moving/assigning other people's cards.
+- Card delete was already admin-only + confirm-dialoged (earlier follow-up).
+
+Web consequences:
+- `CardModal` diffs its PATCHes — only changed fields are sent, so a member
+  saving a workflow change on another's card doesn't trip the content gate.
+- Locked content renders read-only ("· locked" labels, dashed `spec-locked`
+  panes, disabled summary/due/label controls); view-mode task checkboxes are
+  inert on cards you can't edit (a toggle IS a description/AC write).
+- Attachment/link ✕ only renders for the uploader/creator or an admin (the API
+  always enforced this; the UI used to show the button and swallow the 403).
+- Archive button + Done-lane "Archive all" are admin-only.
+- Attaching a file to someone else's card still works, but the markdown embed
+  into the description is skipped (that would be a content write).
+
+Agent caveat: member-roled agent keys can no longer set labels/due/summary on
+cards a human created — they work the card and report on the timeline instead.

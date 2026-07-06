@@ -12,9 +12,12 @@ import AttachmentPreviewModal from './AttachmentPreviewModal';
 export default function AttachmentList({
   items,
   onDelete,
+  canDelete,
 }: {
   items: AttachmentDto[];
   onDelete?: (a: AttachmentDto) => void;
+  /** Per-row gate for the ✕ (KBR-101: uploader or admin only). Default: all. */
+  canDelete?: (a: AttachmentDto) => boolean;
 }) {
   const [preview, setPreview] = useState<AttachmentDto | null>(null);
   if (items.length === 0) return null;
@@ -44,7 +47,7 @@ export default function AttachmentList({
               </svg>
             </button>
           )}
-          {onDelete && (
+          {onDelete && (canDelete?.(a) ?? true) && (
             <button
               type="button"
               className="attach-del"

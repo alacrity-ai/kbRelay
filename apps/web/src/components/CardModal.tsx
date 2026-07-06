@@ -36,6 +36,9 @@ interface Props {
   onSave: (input: CardInput) => Promise<CardDto>;
   onDelete?: () => Promise<void>;
   onClose: () => void;
+  /** False for member roles (KBR-101): hides Archive and locks the spec of
+   *  cards the viewer didn't create. */
+  isAdmin?: boolean;
 }
 
 function Chain() {
@@ -64,12 +67,16 @@ function Pencil() {
  *  - Edit: the form. Reached via the Edit button, or immediately when creating.
  * Saving an existing card returns to View; creating closes the modal.
  */
-export default function CardModal({ card, columns, users, meId, tenantSlug, projectLabels = [], createInColumnId, scrollTo, onSave, onDelete, onClose }: Props) {
+export default function CardModal({ card, columns, users, meId, tenantSlug, projectLabels = [], createInColumnId, scrollTo, onSave, onDelete, onClose, isAdmin = true }: Props) {
   const isNew = !card;
   const [editing, setEditing] = useState(isNew);
   const descRef = useRef<HTMLDivElement>(null);
   const acRef = useRef<HTMLDivElement>(null);
   const dialog = useDialog();
+  // A card's CONTENT (summary/description/AC/labels/due) belongs to its
+  // creator or an admin (KBR-101). Workflow fields (column/assignee/reviewer)
+  // stay editable for members — that's how work is relayed.
+  const canEditSpec = isAdmin || !card || card.createdBy === meId;
 
   // Deep-link from a notification: flash the mentioned field. Comment targets are
   // handled inside the Timeline (which owns the comment nodes).
@@ -165,7 +172,9 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
   // A file was uploaded: inject its markdown into the description + track it.
   function onUploaded(a: AttachmentDto) {
     refreshSeq.current++; // beat any in-flight fetch (e.g. a just-adopted new card)
-    setDescription((d) => (d ? `${d}\n` : '') + attachmentMarkdown(a));
+    // Spec locked (KBR-101): the file still attaches, but we can't embed its
+    // markdown into a description we're not allowed to change.
+    if (canEditSpec) setDescription((d) => (d ? `${d}\n` : '') + attachmentMarkdown(a));
     setAttachments((list) => (list.some((x) => x.id === a.id) ? list : [...list, a]));
   }
 
@@ -260,16 +269,22 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
     setBusy(true);
     setError(null);
     try {
-      await onSave({
-        summary: summary.trim(),
-        description: description || null,
-        acceptanceCriteria: acceptance || null,
+      const input: CardInput = {
         columnId,
         assigneeUserId: assignee || null,
         reviewerUserId: reviewer || null,
-        dueAt: dueAtFromInput(due),
-        labelIds,
-      });
+      };
+      // Send content fields only when they changed (KBR-101): the server
+      // rejects content edits from non-creators, so untouched fields must not
+      // ride along with a workflow-only save.
+      if (summary.trim() !== (card?.summary ?? '')) input.summary = summary.trim();
+      if ((description || null) !== (card?.description ?? null)) input.description = description || null;
+      if ((acceptance || null) !== (card?.acceptanceCriteria ?? null)) input.acceptanceCriteria = acceptance || null;
+      const nextDue = dueAtFromInput(due);
+      if (nextDue !== (card?.dueAt ?? null)) input.dueAt = nextDue;
+      const origLabels = (card?.labels ?? []).map((l) => l.id).sort().join(',');
+      if ([...labelIds].sort().join(',') !== origLabels) input.labelIds = labelIds;
+      await onSave(input);
       // Board adopts the saved card (new or existing) into the modal, so drop to
       // view rather than closing — you see what you just created/edited.
       setEditing(false);
@@ -417,14 +432,20 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
           {editing ? (
             <>
               <div className="field">
-                <label>Summary{!isNew && card!.key ? ` · ${card!.key}` : ''}</label>
+                <label>Summary{!isNew && card!.key ? ` · ${card!.key}` : ''}{!canEditSpec && ' · locked'}</label>
                 {/* Only auto-focus when creating — clicking Edit on an existing
                     card shouldn't pop the mobile keyboard (KBR-32). */}
-                <input className="modal-title-input" value={summary} onChange={(e) => setSummary(e.target.value)} autoFocus={isNew} />
+                <input className="modal-title-input" value={summary} onChange={(e) => setSummary(e.target.value)} autoFocus={isNew} disabled={!canEditSpec} title={canEditSpec ? undefined : "Only the card's creator or an admin can edit this"} />
               </div>
               <div className="field">
-                <label>Description</label>
-                <MentionTextArea value={description} onChange={setDescription} users={users} rows={5} />
+                <label>Description{!canEditSpec && ' · locked'}</label>
+                {canEditSpec ? (
+                  <MentionTextArea value={description} onChange={setDescription} users={users} rows={5} />
+                ) : (
+                  <div className="spec-locked" title="Only the card's creator or an admin can edit this">
+                    <Markdown users={users}>{description || '_None set._'}</Markdown>
+                  </div>
+                )}
                 {/* One toolbar, mounted across the create→adopt transition: for an
                     existing card it attaches directly; for a new card it saves first. */}
                 <AttachmentToolbar
@@ -438,7 +459,7 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
                 {attachments.length > 0 && (
                   <div className="attach-view">
                     <span className="attach-view-label">Attachments</span>
-                    <AttachmentList items={attachments} onDelete={removeAttachment} />
+                    <AttachmentList items={attachments} onDelete={removeAttachment} canDelete={(a) => isAdmin || a.createdBy === meId} />
                   </div>
                 )}
               </div>
@@ -451,13 +472,19 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
                 />
                 {links.length > 0 && (
                   <div className="attach-view">
-                    <LinkList items={links} onDelete={removeLink} />
+                    <LinkList items={links} onDelete={removeLink} canDelete={(l) => isAdmin || l.createdBy === meId} />
                   </div>
                 )}
               </div>
               <div className="field">
-                <label>Acceptance criteria</label>
-                <MentionTextArea value={acceptance} onChange={setAcceptance} users={users} rows={4} />
+                <label>Acceptance criteria{!canEditSpec && ' · locked'}</label>
+                {canEditSpec ? (
+                  <MentionTextArea value={acceptance} onChange={setAcceptance} users={users} rows={4} />
+                ) : (
+                  <div className="spec-locked" title="Only the card's creator or an admin can edit this">
+                    <Markdown users={users}>{acceptance || '_None set._'}</Markdown>
+                  </div>
+                )}
               </div>
               <div className="row">
                 <div className="field">
@@ -481,8 +508,8 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
                   </select>
                 </div>
                 <div className="field">
-                  <label>Due date</label>
-                  <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+                  <label>Due date{!canEditSpec && ' · locked'}</label>
+                  <input type="date" value={due} onChange={(e) => setDue(e.target.value)} disabled={!canEditSpec} title={canEditSpec ? undefined : "Only the card's creator or an admin can edit this"} />
                 </div>
               </div>
               {/* Label picker (KBR-62): toggleable chips from the project palette. */}
@@ -496,6 +523,8 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
                         type="button"
                         className={`label-chip selectable ${labelIds.includes(l.id) ? 'active' : ''}`}
                         style={{ background: `${l.color}2b`, color: l.color, borderColor: labelIds.includes(l.id) ? l.color : `${l.color}66` }}
+                        disabled={!canEditSpec}
+                        title={canEditSpec ? undefined : "Only the card's creator or an admin can change labels"}
                         onClick={() => setLabelIds((ids) => ids.includes(l.id) ? ids.filter((x) => x !== l.id) : [...ids, l.id])}
                       >
                         {l.name}
@@ -608,7 +637,7 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
                 <span className="view-label">Description</span>
                 <div className={`view-text ${card!.description ? '' : 'empty'}`}>
                   {card!.description ? (
-                    <Markdown users={users} onToggleTask={(line) => void toggleTask('description', line)}>
+                    <Markdown users={users} onToggleTask={canEditSpec ? (line) => void toggleTask('description', line) : undefined}>
                       {card!.description}
                     </Markdown>
                   ) : 'No description.'}
@@ -633,7 +662,7 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
                 <span className="view-label">Acceptance criteria</span>
                 <div className={`view-text ${card!.acceptanceCriteria ? '' : 'empty'}`}>
                   {card!.acceptanceCriteria ? (
-                    <Markdown users={users} onToggleTask={(line) => void toggleTask('acceptanceCriteria', line)}>
+                    <Markdown users={users} onToggleTask={canEditSpec ? (line) => void toggleTask('acceptanceCriteria', line) : undefined}>
                       {card!.acceptanceCriteria}
                     </Markdown>
                   ) : 'None set.'}
@@ -662,7 +691,7 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
           {!isNew && onDelete && (
             <button className="danger" onClick={remove} disabled={busy}>Delete</button>
           )}
-          {!isNew && !editing && !card!.archivedAt && (
+          {!isNew && !editing && !card!.archivedAt && isAdmin && (
             <button className="ghost" onClick={() => void archive()} disabled={busy}>Archive</button>
           )}
           <div className="spacer" />

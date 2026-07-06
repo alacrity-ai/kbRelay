@@ -329,7 +329,7 @@ export default function Board({ projectId, users, meId, tenantSlug, reloadNonce 
               onDelete={deleteColumn}
               onSetRole={setColumnRole}
               canShape={isAdmin}
-              onArchiveAll={col.role === 'done' ? () => void archiveAll(col) : undefined}
+              onArchiveAll={isAdmin && col.role === 'done' ? () => void archiveAll(col) : undefined}
               archivedCount={col.role === 'done' ? archivedCount : undefined}
               onViewArchive={col.role === 'done' ? onViewArchive : undefined}
             />
@@ -351,6 +351,7 @@ export default function Board({ projectId, users, meId, tenantSlug, reloadNonce 
           projectLabels={projectLabels}
           scrollTo={modal.mode === 'view' ? scrollTo : undefined}
           onSave={saveCard}
+          isAdmin={isAdmin}
           onDelete={modal.mode === 'view' && isAdmin ? deleteCard : undefined}
           onClose={() => { setModal(null); setScrollTo(undefined); }}
         />

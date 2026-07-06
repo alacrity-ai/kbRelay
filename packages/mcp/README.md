@@ -56,7 +56,7 @@ claude mcp add kbrelay --scope user \
 | `list_cards` | read | Cards in a project (filter by column/assignee/q). |
 | `get_card` | read | One card (read the spec before working it). Returns `attachments[]` — each with `filename`, `kind`, `sizeBytes`, and a same-origin `url` to fetch the bytes (v0.16.0). |
 | `create_card` | write | New card (markdown body; `@handle` to notify). |
-| `update_card` | write | Edit and/or **move** (set `columnId` — status = column). Restoring an archived card (`archived:false`) is admin-only (KBR-94). |
+| `update_card` | write | Edit and/or **move** (set `columnId` — status = column). Since KBR-101, member keys can change content (summary/description/AC/labels/due) only on cards **they created**, and `archived` (either direction) is admin-only; column/assignee/reviewer moves stay open. |
 | `delete_card` | write | Delete a card (cascades). **Admin keys only** since KBR-94 — members archive instead. |
 | `get_timeline` | read | A card's activity log (events + comments). |
 | `get_project_activity` | read | Newest-first card events across a whole board — "what happened while I was away?" (cursor-paginated, v0.17.0). |

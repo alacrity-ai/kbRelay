@@ -85,12 +85,25 @@ export async function handleGetCard(ctx: RouteContext): Promise<Response> {
 export async function handlePatchCard(ctx: RouteContext): Promise<Response> {
   const { tenantId, userId } = tenantScope(ctx.auth);
   const input = await parseJson(ctx.request, patchCardInput);
-  if (input.archived === false) {
-    // Restoring from the archive is a settings-tab action → admin-only
-    // (KBR-94). Archiving stays member-allowed; a redundant archived:false on
-    // a live card is a no-op, so only a real restore is gated.
+  // Archiving AND restoring are board hygiene → admin-only (KBR-101; KBR-94
+  // originally gated only restore, but members archiving live work is wrong too).
+  if (input.archived !== undefined) requireAdmin(ctx.auth);
+  // A card's CONTENT (summary, description, acceptance criteria, labels, due
+  // date) belongs to its creator or an admin (KBR-101). Workflow fields —
+  // column moves, assignee, reviewer — stay open to any member with access,
+  // because that's how work is relayed. The web client diffs its PATCHes so
+  // untouched content fields aren't sent.
+  const touchesContent =
+    input.summary !== undefined ||
+    input.description !== undefined ||
+    input.acceptanceCriteria !== undefined ||
+    input.labelIds !== undefined ||
+    input.dueAt !== undefined;
+  if (touchesContent && ctx.auth?.role !== 'admin') {
     const existing = await getCard(ctx.env, tenantId, ctx.params.id!);
-    if (existing?.archivedAt) requireAdmin(ctx.auth);
+    if (existing && existing.createdBy !== userId) {
+      throw new HttpError(403, "Only the card's creator or an admin can edit its summary, description, acceptance criteria, labels, or due date");
+    }
   }
   const triggers: WebhookTrigger[] = [];
   const card = await patchCard(ctx.env, tenantId, ctx.params.id!, userId, input, triggers);
