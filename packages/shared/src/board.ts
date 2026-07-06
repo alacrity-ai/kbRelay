@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AttachmentDto, AttachmentCounts } from './attachments.ts';
+import type { CardLinkDto } from './cardLinks.ts';
 import type { CardLabel } from './labels.ts';
 import type { ProjectLabelDto } from './projectLabels.ts';
 
@@ -94,6 +95,10 @@ export interface CardDto {
   attachments?: AttachmentDto[];
   /** Per-kind attachment counts (v0.16.0). Present on the board list endpoint. */
   attachmentCounts?: AttachmentCounts;
+  /** External links on the card (Jira/GitHub URLs, etc.). Present on single-card GET only. */
+  links?: CardLinkDto[];
+  /** Number of external links on the card. Present on the board list endpoint. */
+  linkCount?: number;
   /** Task-list progress across description + acceptanceCriteria (v0.17.0,
    *  KBR-59). Present on the board list endpoint when the card has any. */
   taskCounts?: { done: number; total: number };

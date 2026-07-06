@@ -6,7 +6,7 @@ const byName = (n: string) => allTools.find((t) => t.name === n)!;
 
 describe('tool registry', () => {
   it('exposes the full surface with unique names and short descriptions', () => {
-    expect(allTools.length).toBe(20);
+    expect(allTools.length).toBe(23);
     const names = allTools.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length); // no duplicates
     for (const t of allTools) {
@@ -22,6 +22,7 @@ describe('tool registry', () => {
       'list_cards', 'get_card', 'create_card', 'update_card', 'delete_card',
       'get_timeline', 'add_comment', 'redact_comment', 'get_mentions', 'mark_mentions_read',
       'list_my_queue', 'get_project_activity', 'add_attachment', 'delete_attachment',
+      'link_card', 'unlink_card', 'find_cards_by_link',
     ]) {
       expect(byName(n)).toBeDefined();
     }
@@ -142,6 +143,37 @@ describe('tool input validation (zod, before any request)', () => {
     const client = { request: vi.fn(async () => ({ ok: true })) };
     await byName('delete_attachment').run({ attachmentId: 'att_9' }, client as never);
     expect(client.request).toHaveBeenCalledWith('DELETE', '/v1/attachments/att_9');
+  });
+
+  it('link_card strips cardId into the path, posts the rest as the body', async () => {
+    const client = { request: vi.fn(async () => ({})) };
+    await byName('link_card').run(
+      { cardId: 'card_1', provider: 'jira', url: 'https://jira/OBL-1', externalKey: 'OBL-1' },
+      client as never,
+    );
+    expect(client.request).toHaveBeenCalledWith('POST', '/v1/cards/card_1/links', {
+      provider: 'jira',
+      url: 'https://jira/OBL-1',
+      externalKey: 'OBL-1',
+    });
+  });
+
+  it('unlink_card hits the card-link path', async () => {
+    const client = { request: vi.fn(async () => ({ ok: true })) };
+    await byName('unlink_card').run({ linkId: 'lnk_9' }, client as never);
+    expect(client.request).toHaveBeenCalledWith('DELETE', '/v1/card-links/lnk_9');
+  });
+
+  it('find_cards_by_link builds the project lookup query', async () => {
+    const client = { request: vi.fn(async () => ({})) };
+    await byName('find_cards_by_link').run(
+      { projectId: 'prj_1', provider: 'github', externalKey: 'org/repo#42' },
+      client as never,
+    );
+    expect(client.request).toHaveBeenCalledWith(
+      'GET',
+      '/v1/projects/prj_1/card-links?provider=github&externalKey=org%2Frepo%2342',
+    );
   });
 
   it('add_comment passes attachmentIds through', async () => {

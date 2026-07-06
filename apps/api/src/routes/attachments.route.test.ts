@@ -3,7 +3,7 @@ import { readdir, readFile, mkdtemp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MAX_ATTACHMENT_BYTES, type AuthContext } from '@kbrelay/shared';
+import { MAX_ATTACHMENT_BYTES, type AuthContext, type AttachmentDto, type AttachmentCounts } from '@kbrelay/shared';
 import { createLibsqlDb } from '../runtime/node/libsql-db';
 import { createFsBlobStore } from '../runtime/node/fs-blob';
 import type { Env } from '../env';
@@ -86,7 +86,7 @@ async function attempt(p: Promise<Response>): Promise<{ status: number }> {
   }
 }
 
-async function upload(name: string, type: string, bytes: Uint8Array): Promise<{ status: number; body: any }> {
+async function upload(name: string, type: string, bytes: Uint8Array): Promise<{ status: number; body: { attachment: AttachmentDto } }> {
   const fd = new FormData();
   fd.set('file', new File([bytes], name, { type }));
   const req = new Request(`http://x/api/v1/cards/${cardId}/attachments`, { method: 'POST', body: fd });
@@ -157,13 +157,13 @@ describe('attachment routes', () => {
     await handleUploadAttachment(ctx(req, { id: card.id }));
 
     const getRes = await handleGetCard(ctx(new Request(`http://x/api/v1/cards/${card.id}`), { id: card.id }));
-    const getBody = await getRes.json();
-    expect(getBody.card.attachments.map((a: any) => a.kind)).toEqual(['image']);
+    const getBody = (await getRes.json()) as { card: { attachments: AttachmentDto[] } };
+    expect(getBody.card.attachments.map((a) => a.kind)).toEqual(['image']);
 
     const listRes = await handleListCards(ctx(new Request(`http://x/api/v1/projects/${projectId}/cards`), { id: projectId }));
-    const listBody = await listRes.json();
-    const enriched = listBody.cards.find((c: any) => c.id === card.id);
-    expect(enriched.attachmentCounts).toEqual({ image: 1, document: 0, archive: 0, misc: 0 });
+    const listBody = (await listRes.json()) as { cards: Array<{ id: string; attachmentCounts: AttachmentCounts }> };
+    const enriched = listBody.cards.find((c) => c.id === card.id);
+    expect(enriched?.attachmentCounts).toEqual({ image: 1, document: 0, archive: 0, misc: 0 });
   });
 
   it('deletes an attachment (row + blob); then it 404s', async () => {

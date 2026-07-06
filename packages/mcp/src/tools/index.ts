@@ -268,6 +268,42 @@ export const allTools: Tool[] = [
     handler: (a, c) => c.request('DELETE', `/v1/attachments/${enc(a.attachmentId)}`),
   }),
 
+  // ── Card links (external references) ──
+  defineTool({
+    name: 'link_card',
+    description:
+      'Link a card to an external system: provider (e.g. "jira"/"github") + url required; externalKey (that system\'s id, e.g. "OBL-1234", so cards are findable by it) + title optional.',
+    inputSchema: z.object({
+      cardId: z.string(),
+      provider: z.string(),
+      url: z.string(),
+      externalKey: z.string().optional(),
+      title: z.string().optional(),
+    }),
+    handler: (a, c) => {
+      const { cardId, ...body } = a;
+      return c.request('POST', `/v1/cards/${enc(cardId)}/links`, body);
+    },
+  }),
+  defineTool({
+    name: 'unlink_card',
+    description: 'Remove an external link from a card by its id. Creator or admin only — others get 403.',
+    inputSchema: z.object({ linkId: z.string() }),
+    handler: (a, c) => c.request('DELETE', `/v1/card-links/${enc(a.linkId)}`),
+  }),
+  defineTool({
+    name: 'find_cards_by_link',
+    description:
+      'Find cards in a project by an external ref: pass provider + externalKey. Returns each matching card (id, key, summary) + the link. Answers "which card tracks JIRA-123?".',
+    inputSchema: z.object({
+      projectId: z.string(),
+      provider: z.string(),
+      externalKey: z.string(),
+    }),
+    handler: (a, c) =>
+      c.request('GET', `/v1/projects/${enc(a.projectId)}/card-links?provider=${enc(a.provider)}&externalKey=${enc(a.externalKey)}`),
+  }),
+
   defineTool({
     name: 'redact_comment',
     description: 'Redact (soft-delete) YOUR OWN comment — leaves a tombstone. For a leaked secret / PII / wrong-card post. Author-only.',

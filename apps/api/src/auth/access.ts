@@ -18,7 +18,8 @@ export type AccessScope =
   | { kind: 'card'; param: string } // params[param] is a card id → resolve project
   | { kind: 'column'; param: string } // params[param] is a column id → resolve project
   | { kind: 'label'; param: string } // params[param] is a label id → resolve project (KBR-62)
-  | { kind: 'attachment'; param: string }; // params[param] is an attachment id → card → project
+  | { kind: 'attachment'; param: string } // params[param] is an attachment id → card → project
+  | { kind: 'cardLink'; param: string }; // params[param] is a card-link id → card → project
 
 /** Resolve the owning project id for a scoped route, or null if it doesn't exist. */
 export async function resolveProjectId(
@@ -35,6 +36,16 @@ export async function resolveProjectId(
     const row = await env.db.prepare(
       `SELECT c.project_id FROM attachments a JOIN cards c ON c.id = a.card_id
         WHERE a.id = ? AND a.tenant_id = ?`,
+    )
+      .bind(id, tenantId)
+      .first<{ project_id: string }>();
+    return row?.project_id ?? null;
+  }
+  // A card link resolves to its card's project (link → card → project).
+  if (scope.kind === 'cardLink') {
+    const row = await env.db.prepare(
+      `SELECT c.project_id FROM card_links l JOIN cards c ON c.id = l.card_id
+        WHERE l.id = ? AND l.tenant_id = ?`,
     )
       .bind(id, tenantId)
       .first<{ project_id: string }>();

@@ -105,6 +105,15 @@ export const OPENAPI_SPEC = {
             $ref: '#/components/schemas/AttachmentCounts',
             description: 'Per-kind attachment counts (v0.16.0). Present on the board list endpoint.',
           },
+          links: {
+            type: 'array',
+            description: 'External links on the card (Jira/GitHub URLs, etc.). Present on single-card GET only.',
+            items: { $ref: '#/components/schemas/CardLink' },
+          },
+          linkCount: {
+            type: 'integer',
+            description: 'Number of external links on the card. Present on the board list endpoint.',
+          },
           taskCounts: {
             type: 'object',
             description:
@@ -180,6 +189,23 @@ export const OPENAPI_SPEC = {
           document: { type: 'integer' },
           archive: { type: 'integer' },
           misc: { type: 'integer' },
+        },
+      },
+      CardLink: {
+        type: 'object',
+        description:
+          'An external reference on a card (Jira/GitHub URL, etc.). `provider` ' +
+          'names the system, `externalKey` is that system\'s own id when known ' +
+          '(so cards can be found by it), `url` is the thing to open.',
+        properties: {
+          id: { type: 'string' },
+          cardId: { type: 'string' },
+          provider: { type: 'string', description: 'The external system, e.g. "jira" | "github".' },
+          externalKey: { type: ['string', 'null'], description: 'That system\'s own id, e.g. "OBL-1234". Null when unknown.' },
+          url: { type: 'string' },
+          title: { type: ['string', 'null'], description: 'Optional human label.' },
+          createdBy: { type: 'string' },
+          createdAt: { type: 'integer' },
         },
       },
       CardEvent: {
@@ -796,6 +822,53 @@ export const OPENAPI_SPEC = {
           '(cookie/bearer authorizes it); nosniff + private cache.',
         parameters: [{ name: 'download', in: 'query', schema: { type: 'string', enum: ['1'] } }],
         responses: { 200: { description: 'ok' }, 404: { description: 'not found' } },
+      },
+    },
+    '/api/v1/cards/{id}/links': {
+      post: {
+        summary: 'Add an external link to a card',
+        description:
+          'Attach an external reference (Jira/GitHub URL, etc.) to a card. `provider` ' +
+          'and `url` are required; `externalKey` (that system\'s own id, so the card ' +
+          'can be found by it) and `title` are optional.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['provider', 'url'],
+                properties: {
+                  provider: { type: 'string' },
+                  url: { type: 'string' },
+                  externalKey: { type: ['string', 'null'] },
+                  title: { type: ['string', 'null'] },
+                },
+              },
+            },
+          },
+        },
+        responses: { 201: { description: 'created' }, 400: { description: 'validation failed' } },
+      },
+    },
+    '/api/v1/card-links/{id}': {
+      delete: {
+        summary: 'Delete a card link (creator or admin)',
+        responses: { 200: { description: 'deleted' }, 403: { description: 'not creator/admin' } },
+      },
+    },
+    '/api/v1/projects/{id}/card-links': {
+      get: {
+        summary: 'Find cards in a project by an external link',
+        description:
+          'Return every card in the project carrying a link with the given ' +
+          '`provider` + `externalKey` (both query params required). Each match ' +
+          'carries the card id, key, summary, and the link.',
+        parameters: [
+          { name: 'provider', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'externalKey', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { 200: { description: 'ok' }, 400: { description: 'missing provider/externalKey' } },
       },
     },
     '/api/v1/cards/{id}/comments/{commentId}': {

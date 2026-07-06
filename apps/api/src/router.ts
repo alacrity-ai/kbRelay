@@ -80,6 +80,11 @@ import {
   handleGetAttachmentBlob,
   handleDeleteAttachment,
 } from './routes/attachments';
+import {
+  handleAddCardLink,
+  handleDeleteCardLink,
+  handleFindCardLinks,
+} from './routes/card-links';
 import type { AccessScope } from './auth/access';
 import { handleOpenApi } from './openapi';
 
@@ -222,4 +227,10 @@ export const routes: Route[] = [
   { method: 'GET', pattern: '/api/v1/attachments/:id', access: { kind: 'attachment', param: 'id' }, handler: handleGetAttachment },
   { method: 'GET', pattern: '/api/v1/attachments/:id/blob', access: { kind: 'attachment', param: 'id' }, handler: handleGetAttachmentBlob },
   { method: 'DELETE', pattern: '/api/v1/attachments/:id', access: { kind: 'attachment', param: 'id' }, handler: handleDeleteAttachment },
+
+  // ── Card links (external references) ── add is card-scoped; delete resolves
+  // link → card → project via the `cardLink` scope; the lookup is project-scoped.
+  { method: 'POST', pattern: '/api/v1/cards/:id/links', access: { kind: 'card', param: 'id' }, handler: handleAddCardLink },
+  { method: 'DELETE', pattern: '/api/v1/card-links/:id', access: { kind: 'cardLink', param: 'id' }, handler: handleDeleteCardLink },
+  { method: 'GET', pattern: '/api/v1/projects/:id/card-links', access: { kind: 'project', param: 'id' }, handler: handleFindCardLinks },
 ];

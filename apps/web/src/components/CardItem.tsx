@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { CardDto, UserDto } from '@kbrelay/shared';
 import { UNASSIGNED_COLOR } from '@kbrelay/shared';
 import AttachmentBadges from './AttachmentBadges';
+import CardLinkBadge from './CardLinkBadge';
 import { formatDue, dueClass } from '../lib/due';
 
 type CardBodyProps = {
@@ -26,6 +27,8 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
   const color = assignee?.color ?? UNASSIGNED_COLOR;
   const counts = card.attachmentCounts;
   const hasBadges = !!counts && counts.image + counts.document + counts.archive + counts.misc > 0;
+  const linkCount = card.linkCount ?? 0;
+  const hasLinks = linkCount > 0;
   const tasks = card.taskCounts;
   const showDue = card.dueAt != null && !inDoneColumn;
   // Captured once per mount — fresh enough for day-granular urgency, and the
@@ -50,7 +53,7 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
         </div>
       )}
       <div className="card-title">{card.summary}</div>
-      {(assignee || reviewer || hasBadges || showDue || (tasks && tasks.total > 0)) && (
+      {(assignee || reviewer || hasBadges || hasLinks || showDue || (tasks && tasks.total > 0)) && (
         <div className="card-meta">
           {assignee ? (
             <span className="assignee-chip">
@@ -93,6 +96,7 @@ export const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardB
             </span>
           )}
           {hasBadges && <AttachmentBadges counts={counts} />}
+          {hasLinks && <CardLinkBadge count={linkCount} />}
         </div>
       )}
     </div>
