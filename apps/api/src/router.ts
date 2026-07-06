@@ -1,6 +1,6 @@
 import type { Env } from './env';
 import type { AuthContext } from '@kbrelay/shared';
-import { handleMe, handlePatchMe, handleMyQueue } from './routes/me';
+import { handleMe, handlePatchMe, handleMyQueue, handleListMyMemberships } from './routes/me';
 import { handleListMentions, handleMarkMentionsRead } from './routes/mentions';
 import { handleListUsers } from './routes/users';
 import {
@@ -49,6 +49,8 @@ import {
   handleResetPassword,
   handleAcceptInvite,
   handleAuthMe,
+  handleSwitchTenant,
+  handleCreateTenant,
 } from './routes/auth';
 import { handleListTokens, handleCreateToken, handleDeleteToken } from './routes/tokens';
 import {
@@ -134,6 +136,10 @@ export const routes: Route[] = [
   { method: 'POST', pattern: '/api/v1/auth/forgot-password', public: true, handler: handleForgotPassword },
   { method: 'POST', pattern: '/api/v1/auth/reset-password', public: true, handler: handleResetPassword },
   { method: 'GET', pattern: '/api/v1/auth/me', handler: handleAuthMe },
+  // Multi-workspace (v0.18.0, KBR-96): switch is session-only (checked
+  // in-handler); tenant create works for any authed caller.
+  { method: 'POST', pattern: '/api/v1/auth/switch-tenant', handler: handleSwitchTenant },
+  { method: 'POST', pattern: '/api/v1/tenants', handler: handleCreateTenant },
 
   // ── Self-service API keys (v0.10.0) ──
   { method: 'GET', pattern: '/api/v1/me/tokens', handler: handleListTokens },
@@ -146,6 +152,8 @@ export const routes: Route[] = [
   // Actionable queue (v0.15.0): assigned-to-me cards in a `ready`-role column.
   // Not project-scoped in the router — it filters by RBAC internally.
   { method: 'GET', pattern: '/api/v1/me/queue', handler: handleMyQueue },
+  // Every workspace the caller belongs to (v0.18.0, KBR-96).
+  { method: 'GET', pattern: '/api/v1/me/memberships', handler: handleListMyMemberships },
   { method: 'GET', pattern: '/api/v1/users', handler: handleListUsers },
 
   // ── Mentions / notifications (v0.8.0) ──

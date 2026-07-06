@@ -5,6 +5,7 @@ import { jsonResponse, errorResponse } from '../http';
 import { parseJson } from '../validate';
 import { tenantScope } from '../auth/tenant-scope';
 import { getTenant, updateMe, getUserProfile } from '../db/repos/users';
+import { listMemberships } from '../db/repos/auth';
 import { listMyQueue } from '../db/repos/cards';
 import { labelsForCards } from '../db/repos/labels';
 
@@ -24,6 +25,15 @@ export async function handleMe(ctx: RouteContext): Promise<Response> {
     user: { id: auth.userId, name: auth.userName, kind: auth.userKind, role: auth.role, color: auth.color, profile },
   };
   return jsonResponse(200, body, cors);
+}
+
+/** GET /api/v1/me/memberships — every workspace the caller belongs to
+ *  (v0.18.0, KBR-96). Read-only introspection; works for both auth modes. */
+export async function handleListMyMemberships(ctx: RouteContext): Promise<Response> {
+  const { env, cors, auth } = ctx;
+  if (!auth) return errorResponse(401, 'Authentication required', cors);
+  const memberships = await listMemberships(env, auth.userId);
+  return jsonResponse(200, { memberships }, cors);
 }
 
 /**

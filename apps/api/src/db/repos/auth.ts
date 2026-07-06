@@ -166,25 +166,27 @@ export async function loginUser(
   password: string,
 ): Promise<{ tenantId: string; userId: string } | null> {
   const user = await env.db.prepare(
-    'SELECT id, tenant_id, password_hash FROM users WHERE email = ?',
+    'SELECT id, tenant_id, last_tenant_id, password_hash FROM users WHERE email = ?',
   )
     .bind(email)
-    .first<{ id: string; tenant_id: string | null; password_hash: string | null }>();
+    .first<{ id: string; tenant_id: string | null; last_tenant_id: string | null; password_hash: string | null }>();
   if (!user || !user.password_hash) return null;
 
   const ok = await verifyPassword(password, user.password_hash);
   if (!ok) return null;
 
-  const tenantId = await pickActiveTenant(env, user.id, user.tenant_id);
+  const tenantId = await pickActiveTenant(env, user.id, user.tenant_id, user.last_tenant_id);
   if (!tenantId) return null; // credentials valid but no membership anywhere
   return { tenantId, userId: user.id };
 }
 
-/** Prefer the user's origin tenant if they still belong to it, else any membership. */
+/** Prefer where the user last worked (KBR-96), then their origin tenant, then
+ *  the oldest membership. A stale last_tenant_id (membership revoked) is skipped. */
 async function pickActiveTenant(
   env: Env,
   userId: string,
   originTenantId: string | null,
+  lastTenantId: string | null = null,
 ): Promise<string | null> {
   const rs = await env.db.prepare(
     'SELECT tenant_id FROM memberships WHERE user_id = ? ORDER BY created_at ASC',
@@ -193,8 +195,99 @@ async function pickActiveTenant(
     .all<{ tenant_id: string }>();
   const tenantIds = (rs.results ?? []).map((r) => r.tenant_id);
   if (tenantIds.length === 0) return null;
+  if (lastTenantId && tenantIds.includes(lastTenantId)) return lastTenantId;
   if (originTenantId && tenantIds.includes(originTenantId)) return originTenantId;
   return tenantIds[0]!;
+}
+
+// ── Multi-workspace (v0.18.0, KBR-96) ─────────────────────────
+
+/** All tenants the user belongs to, oldest membership first. */
+export async function listMemberships(
+  env: Env,
+  userId: string,
+): Promise<{ tenant: { id: string; name: string; slug: string }; role: 'admin' | 'member' }[]> {
+  const rs = await env.db.prepare(
+    `SELECT t.id AS id, t.name AS name, t.slug AS slug, m.role AS role
+       FROM memberships m
+       JOIN tenants t ON t.id = m.tenant_id
+      WHERE m.user_id = ?
+      ORDER BY m.created_at ASC`,
+  )
+    .bind(userId)
+    .all<{ id: string; name: string; slug: string; role: string }>();
+  return (rs.results ?? []).map((r) => ({
+    tenant: { id: r.id, name: r.name, slug: r.slug },
+    role: r.role === 'admin' ? 'admin' : 'member',
+  }));
+}
+
+/** The user's membership role in a tenant, or null if they don't belong. */
+export async function getMembershipRole(
+  env: Env,
+  userId: string,
+  tenantId: string,
+): Promise<'admin' | 'member' | null> {
+  const row = await env.db.prepare(
+    'SELECT role FROM memberships WHERE user_id = ? AND tenant_id = ?',
+  )
+    .bind(userId, tenantId)
+    .first<{ role: string }>();
+  if (!row) return null;
+  return row.role === 'admin' ? 'admin' : 'member';
+}
+
+/** Remember where the user is working so the next login lands there. */
+export async function setLastTenant(env: Env, userId: string, tenantId: string): Promise<void> {
+  await env.db.prepare('UPDATE users SET last_tenant_id = ? WHERE id = ?')
+    .bind(tenantId, userId)
+    .run();
+}
+
+/**
+ * Create a new workspace for an EXISTING user (KBR-96): tenant + admin
+ * membership + starter agent, mirroring registerTenant's seeding. This is the
+ * sanctioned path around register's email-409 — an invited-in user can still
+ * get a workspace of their own.
+ */
+export async function createTenantForUser(
+  env: Env,
+  userId: string,
+  tenantName: string,
+): Promise<{ tenantId: string }> {
+  const user = await env.db.prepare('SELECT id, name FROM users WHERE id = ?')
+    .bind(userId)
+    .first<{ id: string; name: string }>();
+  if (!user) throw new HttpError(404, 'User not found');
+
+  const now = Date.now();
+  const tenantId = newId('t');
+  const agentId = newId('u');
+  const slug = await uniqueTenantSlug(env, tenantName);
+  const agentHandle = await uniqueHandle(env, tenantId, 'assistant');
+
+  await env.db.batch([
+    env.db.prepare('INSERT INTO tenants (id, name, slug, created_at) VALUES (?, ?, ?, ?)').bind(
+      tenantId,
+      tenantName,
+      slug,
+      now,
+    ),
+    env.db.prepare(
+      `INSERT INTO memberships (id, tenant_id, user_id, role, created_at) VALUES (?, ?, ?, 'admin', ?)`,
+    ).bind(newId('m'), tenantId, userId, now),
+    // Starter agent so the workspace is agent-ready, owned by its creator.
+    env.db.prepare(
+      `INSERT INTO users (id, tenant_id, name, kind, role, color, handle, owner_user_id, created_at)
+       VALUES (?, ?, 'Assistant', 'agent', NULL, NULL, ?, ?, ?)`,
+    ).bind(agentId, tenantId, agentHandle, userId, now),
+    env.db.prepare(
+      `INSERT INTO memberships (id, tenant_id, user_id, role, created_at) VALUES (?, ?, ?, 'member', ?)`,
+    ).bind(newId('m'), tenantId, agentId, now),
+    env.db.prepare('UPDATE users SET last_tenant_id = ? WHERE id = ?').bind(tenantId, userId),
+  ]);
+
+  return { tenantId };
 }
 
 // ── Password reset ────────────────────────────────────────────

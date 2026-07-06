@@ -363,6 +363,54 @@ export const OPENAPI_SPEC = {
         responses: { 200: { description: 'ok' } },
       },
     },
+    '/api/v1/auth/switch-tenant': {
+      post: {
+        summary: 'Switch the session to another workspace you belong to (v0.18.0, KBR-96)',
+        description:
+          'Cookie sessions only — a bearer key is single-tenant by design (mint one per workspace; ' +
+          'API keys get 400). Re-issues the session cookie with the new tenant and remembers it as ' +
+          'your last-active workspace, so the next login lands there. 404 when you have no membership.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['tenantId'],
+                properties: { tenantId: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'switched — body matches /auth/me for the new tenant' },
+          400: { description: 'caller is on an API key, not a session' },
+          404: { description: 'no membership in that workspace' },
+        },
+      },
+    },
+    '/api/v1/tenants': {
+      post: {
+        summary: 'Create a NEW workspace for the current user (v0.18.0, KBR-96)',
+        description:
+          'Tenant + admin membership + starter agent, mirroring register — the sanctioned path ' +
+          'around register\'s 409 for an email that already exists. Cookie sessions are re-issued ' +
+          'into the new workspace.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['tenantName'],
+                properties: { tenantName: { type: 'string', maxLength: 80 } },
+              },
+            },
+          },
+        },
+        responses: { 201: { description: 'created — body matches /auth/me for the new tenant' } },
+      },
+    },
     '/api/v1/auth/accept-invite': {
       post: {
         summary: 'Accept a team invite (public) — creates/attaches the user and logs in',
@@ -581,6 +629,13 @@ export const OPENAPI_SPEC = {
         parameters: [
           { name: 'projectId', in: 'query', schema: { type: 'string' }, description: 'Narrow to one project.' },
         ],
+        responses: { 200: { description: 'ok' } },
+      },
+    },
+    '/api/v1/me/memberships': {
+      get: {
+        summary: 'Every workspace you belong to (v0.18.0, KBR-96)',
+        description: 'Oldest membership first: `{ memberships: [{ tenant: {id,name,slug}, role }] }`. Works for tokens and sessions.',
         responses: { 200: { description: 'ok' } },
       },
     },

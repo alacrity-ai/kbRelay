@@ -5,13 +5,15 @@ import {
   forgotPasswordInput,
   resetPasswordInput,
   acceptInviteInput,
+  switchTenantInput,
+  createTenantInput,
 } from '@kbrelay/shared';
 import type { RouteContext } from '../router';
 import type { Env } from '../env';
 import { jsonResponse, errorResponse, HttpError } from '../http';
 import { parseJson } from '../validate';
 import { signSession } from '../lib/jwt';
-import { buildSetCookie, buildClearCookie, SESSION_TTL_SECONDS } from '../lib/cookies';
+import { buildSetCookie, buildClearCookie, readSessionCookie, SESSION_TTL_SECONDS } from '../lib/cookies';
 import { sendMailgun } from '../services/mailgun';
 import { welcomeEmail, passwordResetEmail } from '../email/templates';
 import {
@@ -21,6 +23,9 @@ import {
   issuePasswordResetToken,
   consumePasswordResetToken,
   getAuthUser,
+  getMembershipRole,
+  setLastTenant,
+  createTenantForUser,
 } from '../db/repos/auth';
 import { acceptInvite } from '../db/repos/team';
 import { getTenant } from '../db/repos/users';
@@ -84,6 +89,46 @@ export async function handleLogin(ctx: RouteContext): Promise<Response> {
   const cookie = await mintSessionCookie(env, result.userId, result.tenantId);
   const body = await authMeBody(env, result.tenantId, result.userId);
   return jsonResponse(200, body, cors, { 'Set-Cookie': cookie });
+}
+
+// ── POST /api/v1/auth/switch-tenant (v0.18.0, KBR-96) ────────
+/** Re-issue the session cookie for another tenant the caller belongs to.
+ *  Cookie sessions only — a bearer token's tenant is immutable by design
+ *  (mint a key per tenant). 404 (not 403) when there's no membership, so we
+ *  don't confirm a tenant id exists. */
+export async function handleSwitchTenant(ctx: RouteContext): Promise<Response> {
+  const { env, cors, request, auth } = ctx;
+  if (!auth) return errorResponse(401, 'Authentication required', cors);
+  if (!readSessionCookie(request)) {
+    throw new HttpError(400, 'Tenant switching is session-only; API keys are single-tenant (mint one per workspace)');
+  }
+  const input = await parseJson(request, switchTenantInput);
+  const role = await getMembershipRole(env, auth.userId, input.tenantId);
+  if (!role) throw new HttpError(404, 'Workspace not found');
+
+  await setLastTenant(env, auth.userId, input.tenantId);
+  const cookie = await mintSessionCookie(env, auth.userId, input.tenantId);
+  const body = await authMeBody(env, input.tenantId, auth.userId);
+  return jsonResponse(200, body, cors, { 'Set-Cookie': cookie });
+}
+
+// ── POST /api/v1/tenants (v0.18.0, KBR-96) ───────────────────
+/** A new workspace for the CURRENT user (tenant + admin membership + starter
+ *  agent). The sanctioned path around register's email-409 for existing
+ *  accounts. Re-issues the session cookie into the new tenant when the caller
+ *  is on a cookie session. */
+export async function handleCreateTenant(ctx: RouteContext): Promise<Response> {
+  const { env, cors, request, auth } = ctx;
+  if (!auth) return errorResponse(401, 'Authentication required', cors);
+  const input = await parseJson(request, createTenantInput);
+
+  const { tenantId } = await createTenantForUser(env, auth.userId, input.tenantName);
+  const body = await authMeBody(env, tenantId, auth.userId);
+  const headers: Record<string, string> = {};
+  if (readSessionCookie(request)) {
+    headers['Set-Cookie'] = await mintSessionCookie(env, auth.userId, tenantId);
+  }
+  return jsonResponse(201, body, cors, headers);
 }
 
 // ── POST /api/v1/auth/logout ──────────────────────────────────

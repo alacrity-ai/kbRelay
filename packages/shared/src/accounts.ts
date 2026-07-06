@@ -112,3 +112,23 @@ export interface AuthMeResponse {
   user: AuthUser;
   tenant: { id: string; name: string; slug: string };
 }
+
+// ── Multi-workspace (v0.18.0, KBR-96) ─────────────────────────
+
+/** One tenant the user belongs to, as returned by GET /me/memberships. */
+export interface MembershipDto {
+  tenant: { id: string; name: string; slug: string };
+  role: MembershipRole;
+}
+
+/** Input of POST /auth/switch-tenant (cookie sessions only). */
+export const switchTenantInput = z.object({
+  tenantId: z.string().min(1, 'tenantId is required'),
+});
+export type SwitchTenantInput = z.infer<typeof switchTenantInput>;
+
+/** Input of POST /tenants — a new workspace for the CURRENT user. */
+export const createTenantInput = z.object({
+  tenantName: z.string().trim().min(1, 'workspace name is required').max(80),
+});
+export type CreateTenantInput = z.infer<typeof createTenantInput>;

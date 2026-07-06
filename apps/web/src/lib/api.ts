@@ -14,6 +14,7 @@ import type {
   SearchResponse,
   MyQueueResponse,
   AuthMeResponse,
+  MembershipDto,
   RegisterInput,
   LoginInput,
   TokenSummary,
@@ -74,6 +75,14 @@ export const register = (body: RegisterInput) =>
 export const login = (body: LoginInput) => request<AuthMeResponse>('POST', '/v1/auth/login', body);
 export const logout = () => request<{ ok: true }>('POST', '/v1/auth/logout');
 export const getAuthMe = () => request<AuthMeResponse>('GET', '/v1/auth/me');
+
+// ── Multi-workspace (v0.18.0, KBR-96) ──
+export const listMyMemberships = () =>
+  request<{ memberships: MembershipDto[] }>('GET', '/v1/me/memberships');
+export const switchTenant = (tenantId: string) =>
+  request<AuthMeResponse>('POST', '/v1/auth/switch-tenant', { tenantId });
+export const createTenant = (tenantName: string) =>
+  request<AuthMeResponse>('POST', '/v1/tenants', { tenantName });
 export const forgotPassword = (email: string) =>
   request<{ ok: true }>('POST', '/v1/auth/forgot-password', { email });
 export const resetPassword = (token: string, password: string) =>

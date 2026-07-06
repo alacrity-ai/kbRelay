@@ -242,6 +242,9 @@ select {
   font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--muted); font-weight: 700; padding: 0.1rem 0.6rem 0.15rem;
 }
+/* Multi-workspace switcher rows (KBR-96) */
+.workspace-item.current { color: var(--text); font-weight: 600; cursor: default; }
+.workspace-current-mark { margin-left: auto; color: var(--accent); font-weight: 700; }
 
 /* Project switcher */
 .project-trigger { max-width: min(320px, 46vw); }

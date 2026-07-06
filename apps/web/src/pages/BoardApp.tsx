@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { MeResponse, ProjectDto, UserDto, MentionDto, LabelDto } from '@kbrelay/shared';
+import type { MeResponse, ProjectDto, UserDto, MentionDto, LabelDto, MembershipDto } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { clearToken } from '../lib/auth';
 import { CardLinksContext, parseCardDeepLink, type CardLinks } from '../lib/cardLinks';
@@ -107,6 +107,7 @@ const GLYPH_PATHS: Record<string, string> = {
   key: 'M7.5 20a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9 M10.6 12.4 21 2 M16 7l3 3',
   guide: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',
   signout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9',
+  workspace: 'M3 21h18 M5 21V7l7-4 7 4v14 M9 9h1 M9 13h1 M14 9h1 M14 13h1',
 };
 
 function Glyph({ name, color }: { name: keyof typeof GLYPH_PATHS | string; color: string }) {
@@ -134,6 +135,8 @@ export default function BoardApp({
   // since KBR-94 — members get a clean board with no settings affordances.
   const isAdmin = me.user.role === 'admin';
   const [projects, setProjects] = useState<ProjectDto[]>([]);
+  // Multi-workspace (KBR-96): every tenant this account belongs to.
+  const [memberships, setMemberships] = useState<MembershipDto[]>([]);
   // `users` = all current tenant members (for the bell — mention authors can be
   // cross-project). `projectUsers` = scoped to the selected project (for the
   // assignee picker + @-autocomplete, so we only offer people who actually have
@@ -183,6 +186,39 @@ export default function BoardApp({
 
   const applyFilter = useCallback((f: BoardFilter) => { setFilter(f); setFilterOpen(false); }, []);
   const clearFilter = useCallback(() => { setFilter(EMPTY_FILTER); setFilterOpen(false); }, []);
+
+  useEffect(() => {
+    void api.listMyMemberships().then((r) => setMemberships(r.memberships)).catch(() => {});
+  }, []);
+
+  // Switch the session into another workspace, or create a fresh one, then do
+  // a full reload — every piece of state (projects, users, board) is per-tenant.
+  const switchWorkspace = useCallback(async (tenantId: string) => {
+    if (tenantId === me.tenant.id) return;
+    try {
+      await api.switchTenant(tenantId);
+      window.location.reload();
+    } catch (e) {
+      void dialog.alert({ title: 'Could not switch workspace', message: (e as Error).message });
+    }
+  }, [me.tenant.id, dialog]);
+
+  const newWorkspace = useCallback(async () => {
+    const name = await dialog.prompt({
+      title: 'New workspace',
+      message: 'A separate tenant with its own projects, members, and agents. You become its admin.',
+      label: 'Workspace name',
+      placeholder: 'e.g. My Consultancy',
+      confirmLabel: 'Create',
+    });
+    if (!name) return;
+    try {
+      await api.createTenant(name);
+      window.location.reload();
+    } catch (e) {
+      void dialog.alert({ title: 'Could not create workspace', message: (e as Error).message });
+    }
+  }, [dialog]);
 
   // Poll unread-mention count (bell badge) + queue/review counts (My Work
   // badge) on the same 20s cadence as the board, plus on mount and focus.
@@ -516,6 +552,24 @@ export default function BoardApp({
             <button className="menu-item" onClick={() => setProfileOpen(true)}>
               <Glyph name="profile" color="#7c3aed" /> Profile
             </button>
+
+            <div className="menu-divider" />
+            <span className="menu-section-label">Workspaces</span>
+            {(memberships.length ? memberships : [{ tenant: me.tenant, role: me.user.role } as MembershipDto]).map((m) => (
+              <button
+                key={m.tenant.id}
+                className={`menu-item workspace-item ${m.tenant.id === me.tenant.id ? 'current' : ''}`}
+                onClick={() => void switchWorkspace(m.tenant.id)}
+              >
+                <Glyph name="workspace" color="#0ea5e9" /> {m.tenant.name}
+                {m.tenant.id === me.tenant.id && <span className="workspace-current-mark">✓</span>}
+              </button>
+            ))}
+            {me.user.kind === 'human' && (
+              <button className="menu-item" onClick={() => void newWorkspace()}>
+                <Glyph name="workspace" color="#64748b" /> + New workspace
+              </button>
+            )}
 
             <div className="menu-divider" />
             <span className="menu-section-label">Configuration</span>
