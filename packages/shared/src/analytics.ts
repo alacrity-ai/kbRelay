@@ -10,6 +10,11 @@
  *     count the card once (latest entry wins for timing/attribution). Events
  *     survive archiving, so archived-after-done cards still count; deleted
  *     cards do not (their events are purged).
+ *   attribution — completion credit goes to whoever was the card's ASSIGNEE at
+ *     the moment it entered Done (not whoever dragged it), and review credit to
+ *     whoever was the REVIEWER at that moment — both reconstructed point-in-time
+ *     from the assign/reviewer event log. A card with no assignee/reviewer at
+ *     that moment is uncredited (it still counts in `totals.completed`).
  *   cycle time — first entry into the `in_progress`-role column (falling back
  *     to card creation when a card skips straight ahead) → the completing
  *     done-entry.
@@ -59,7 +64,7 @@ export interface LeaderboardEntry {
   name: string;
   kind: 'human' | 'agent';
   color: string | null;
-  /** Cards this user moved into done (completions they performed). */
+  /** Cards completed (moved to Done) in the window while assigned to this user. */
   completed: number;
   /** Cards this user created. */
   created: number;
@@ -72,7 +77,7 @@ export interface ReviewerEntry {
   name: string;
   kind: 'human' | 'agent';
   color: string | null;
-  /** Cards completed in the window that carry this user as reviewer. */
+  /** Cards completed in the window with this user as reviewer at the time of completion. */
   reviewed: number;
 }
 
@@ -82,6 +87,12 @@ export interface AnalyticsCore {
   /** Window bounds, epoch ms: [since, until). */
   since: number;
   until: number;
+  /**
+   * Earliest created/completed activity within the window, epoch ms, or null
+   * when the window is empty. Denominator for rate stats (e.g. completions/day)
+   * so a young project isn't averaged over dead time before it existed.
+   */
+  firstActivityAt: number | null;
   bucket: 'day' | 'week';
   totals: AnalyticsTotals;
   throughput: ThroughputPoint[];

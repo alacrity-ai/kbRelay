@@ -12,7 +12,7 @@ import { listColumns } from '../db/repos/columns';
 import { createCard, patchCard } from '../db/repos/cards';
 import { addComment } from '../db/repos/card_events';
 import { createAgent } from '../db/repos/agents';
-import { projectAnalytics, tenantAnalytics } from '../db/repos/analytics';
+import { projectAnalytics, tenantAnalytics, valueAsOf } from '../db/repos/analytics';
 import { handleProjectAnalytics, handleTenantAnalytics } from './analytics';
 
 /**
@@ -52,22 +52,24 @@ beforeAll(async () => {
   const agent = await createAgent(env, tenantId, ownerId, 'Worker', [p1]);
   memberId = agent.id;
 
-  // A: owner's card, worked properly (ready → in_progress → done), member reviews.
-  const a = await createCard(env, tenantId, p1, ownerId, { summary: 'A', columnId: cols.ready });
+  // A: owner's card, assigned to owner, worked properly (ready → in_progress →
+  // done), member reviews. Completion credit → owner (assignee), review → member.
+  const a = await createCard(env, tenantId, p1, ownerId, { summary: 'A', columnId: cols.ready, assigneeUserId: ownerId });
   await patchCard(env, tenantId, a.id, ownerId, { reviewerUserId: memberId });
   await patchCard(env, tenantId, a.id, ownerId, { columnId: cols.in_progress });
   await patchCard(env, tenantId, a.id, ownerId, { columnId: cols.done });
 
-  // B: member's card, jumps straight to done (cycle falls back to creation).
-  const b = await createCard(env, tenantId, p1, memberId, { summary: 'B', columnId: cols.ready });
+  // B: member's card, assigned to member, jumps straight to done (cycle falls
+  // back to creation). Completion credit → member.
+  const b = await createCard(env, tenantId, p1, memberId, { summary: 'B', columnId: cols.ready, assigneeUserId: memberId });
   await patchCard(env, tenantId, b.id, memberId, { columnId: cols.done });
 
   // C: still open, and overdue.
   const c = await createCard(env, tenantId, p1, ownerId, { summary: 'C', columnId: cols.ready });
   await patchCard(env, tenantId, c.id, ownerId, { dueAt: Date.now() - 60_000 });
 
-  // D: completed, reopened, completed again — must count ONCE.
-  const d = await createCard(env, tenantId, p1, ownerId, { summary: 'D', columnId: cols.ready });
+  // D: assigned to owner, completed, reopened, completed again — must count ONCE.
+  const d = await createCard(env, tenantId, p1, ownerId, { summary: 'D', columnId: cols.ready, assigneeUserId: ownerId });
   await patchCard(env, tenantId, d.id, ownerId, { columnId: cols.done });
   await patchCard(env, tenantId, d.id, ownerId, { columnId: cols.in_progress });
   await patchCard(env, tenantId, d.id, ownerId, { columnId: cols.done });
@@ -88,6 +90,11 @@ describe('projectAnalytics', () => {
     const dto = await projectAnalytics(env, tenantId, p1, 30, Date.now());
     expect(dto.projectId).toBe(p1);
     expect(dto.totals).toEqual({ created: 4, completed: 3, activeCards: 1, overdue: 1, comments: 1 });
+
+    // First activity is stamped (denominator for rate stats, KBR-105).
+    expect(dto.firstActivityAt).not.toBeNull();
+    expect(dto.firstActivityAt!).toBeLessThanOrEqual(Date.now());
+    expect(dto.firstActivityAt!).toBeGreaterThanOrEqual(dto.since);
 
     // Throughput buckets zero-fill the window and sum to the totals.
     expect(dto.bucket).toBe('day');
@@ -179,6 +186,64 @@ describe('route handlers', () => {
   });
 });
 
+describe('valueAsOf (point-in-time role reconstruction)', () => {
+  const ch = (createdAt: number, from: string | null, to: string | null) =>
+    ({ card_id: 'x', event_type: 'assigned' as const, created_at: createdAt, from_id: from, to_id: to });
+
+  it('returns the current value when the field never changed', () => {
+    expect(valueAsOf([], 100, 'u_current')).toBe('u_current');
+    expect(valueAsOf([], 100, null)).toBeNull();
+  });
+
+  it('uses the latest change at or before t', () => {
+    const changes = [ch(10, null, 'u_a'), ch(20, 'u_a', 'u_b')];
+    expect(valueAsOf(changes, 25, 'u_b')).toBe('u_b'); // after both
+    expect(valueAsOf(changes, 15, 'u_b')).toBe('u_a'); // between the two
+  });
+
+  it('rolls back to the first change’s `from` when every change is after t', () => {
+    // Card was assigned to u_a at done, then reassigned to u_b/u_c afterwards.
+    const changes = [ch(30, 'u_a', 'u_b'), ch(40, 'u_b', 'u_c')];
+    expect(valueAsOf(changes, 20, 'u_c')).toBe('u_a'); // ignores the later current value
+  });
+});
+
+describe('attribution credits the role-holder, not the mover (KBR-105)', () => {
+  it('completion → assignee@done, review → reviewer@done', async () => {
+    const proj = await createProject(env, tenantId, ownerId, { name: 'Attrib', code: 'ATR' });
+    const worker = await createAgent(env, tenantId, ownerId, 'Attr Worker', [proj.id]);
+    const acols: Record<string, string> = {};
+    for (const ac of await listColumns(env, tenantId, proj.id)) if (ac.role) acols[ac.role] = ac.id;
+
+    // Assigned to the worker, reviewed by the owner; the OWNER drags it to Done.
+    const card = await createCard(env, tenantId, proj.id, ownerId, {
+      summary: 'X', columnId: acols.ready!, assigneeUserId: worker.id, reviewerUserId: ownerId,
+    });
+    await patchCard(env, tenantId, card.id, ownerId, { columnId: acols.done! });
+
+    const dto = await projectAnalytics(env, tenantId, proj.id, 30, Date.now());
+    expect(dto.totals.completed).toBe(1);
+    // Credit the assignee (worker), NOT the mover (owner).
+    expect(dto.leaderboard.find((e) => e.userId === worker.id)?.completed).toBe(1);
+    expect(dto.leaderboard.find((e) => e.userId === ownerId)?.completed ?? 0).toBe(0);
+    // Review credit to the reviewer at completion.
+    expect(dto.reviewers).toEqual([expect.objectContaining({ userId: ownerId, reviewed: 1 })]);
+  });
+
+  it('unassigned/unreviewed completions still count in totals but credit nobody', async () => {
+    const proj = await createProject(env, tenantId, ownerId, { name: 'NoAssign', code: 'NAS' });
+    const ncols: Record<string, string> = {};
+    for (const nc of await listColumns(env, tenantId, proj.id)) if (nc.role) ncols[nc.role] = nc.id;
+    const card = await createCard(env, tenantId, proj.id, ownerId, { summary: 'Y', columnId: ncols.ready! });
+    await patchCard(env, tenantId, card.id, ownerId, { columnId: ncols.done! });
+
+    const dto = await projectAnalytics(env, tenantId, proj.id, 30, Date.now());
+    expect(dto.totals.completed).toBe(1);
+    expect(dto.leaderboard.every((e) => e.completed === 0)).toBe(true);
+    expect(dto.reviewers).toEqual([]);
+  });
+});
+
 // KEEP LAST: mutates the fixture tenant at volume. D1 caps bound parameters
 // at 100/statement (libsql doesn't), so the completed-card IN(...) lookups
 // must chunk — this crosses the 80-id chunk boundary and would have caught
@@ -189,7 +254,7 @@ describe('bind-limit chunking', () => {
     const bulkCols: Record<string, string> = {};
     for (const bc of await listColumns(env, tenantId, bulk.id)) if (bc.role) bulkCols[bc.role] = bc.id;
     for (let i = 0; i < 85; i++) {
-      const card = await createCard(env, tenantId, bulk.id, ownerId, { summary: `bulk-${i}`, columnId: bulkCols.ready! });
+      const card = await createCard(env, tenantId, bulk.id, ownerId, { summary: `bulk-${i}`, columnId: bulkCols.ready!, assigneeUserId: ownerId });
       await patchCard(env, tenantId, card.id, ownerId, { columnId: bulkCols.done! });
     }
     const dto = await projectAnalytics(env, tenantId, bulk.id, 30, Date.now());

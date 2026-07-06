@@ -20,6 +20,18 @@ import * as api from '../lib/api';
 
 const CREATED_COLOR = '#64748b';
 const COMPLETED_COLOR = '#10b981';
+const DAY_MS = 86_400_000;
+
+/**
+ * Completions/day over the window's ACTIVE span, not its full length — a board
+ * that only existed for 6 days of a 30-day window is rated over those 6 days
+ * (KBR-105). Denominator = days since first activity, clamped to [1, days].
+ */
+export function completionsPerDay(completed: number, firstActivityAt: number | null, until: number, days: number): string {
+  const span = firstActivityAt == null ? days : Math.min(days, Math.max(1, (until - firstActivityAt) / DAY_MS));
+  const rate = completed / span;
+  return rate >= 10 ? rate.toFixed(0) : rate.toFixed(1);
+}
 
 /** "3d 4h", "5h 12m", "18m" — coarse on purpose; analytics, not stopwatches. */
 export function fmtDuration(ms: number): string {
@@ -223,7 +235,7 @@ export default function Analytics({ projectId, projectName }: { projectId: strin
 
   const totals = data?.totals;
   const quiet = totals && totals.created === 0 && totals.completed === 0 && totals.comments === 0;
-  const completedPerDay = totals ? (totals.completed / days).toFixed(totals.completed >= days ? 0 : 1) : '—';
+  const completedPerDay = data ? completionsPerDay(data.totals.completed, data.firstActivityAt, data.until, days) : '—';
 
   return (
     <div className="anx-wrap">
@@ -270,7 +282,7 @@ export default function Analytics({ projectId, projectName }: { projectId: strin
             <StatCard label="Active" value={data.totals.activeCards} hint="On the board now, not Done" />
             <StatCard label="Overdue" value={data.totals.overdue} hint="Past their due date, not Done" />
             <StatCard label="Avg cycle" value={fmtCycle(data.cycleTime.avgMs)} hint={`Start → Done, median ${fmtCycle(data.cycleTime.medianMs)} over ${data.cycleTime.samples} cards`} />
-            <StatCard label="Done / day" value={completedPerDay} hint="Average completions per day in the window" />
+            <StatCard label="Done / day" value={completedPerDay} hint="Average completions per active day since work began in this window" />
           </div>
 
           <div className="anx-panel anx-throughput">
@@ -281,9 +293,11 @@ export default function Analytics({ projectId, projectName }: { projectId: strin
           </div>
 
           <div className="anx-grid">
-            {'columns' in data ? <ColumnDist columns={data.columns} /> : <ProjectTable dto={data} />}
             <Leaderboard entries={data.leaderboard} />
             <Reviewers entries={data.reviewers} />
+          </div>
+          <div className="anx-full">
+            {'columns' in data ? <ColumnDist columns={data.columns} /> : <ProjectTable dto={data} />}
           </div>
         </>
       )}

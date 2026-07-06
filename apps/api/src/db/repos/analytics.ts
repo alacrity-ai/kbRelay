@@ -23,6 +23,12 @@ import type {
  * (roles are mutable and un-historied; this mirrors auto-archive's join). One
  * card counts once per window — its latest done-entry wins for timing and
  * leaderboard attribution.
+ *
+ * Attribution is by ROLE, not by who dragged the card (KBR-105): completion
+ * credit goes to the card's assignee, and review credit to its reviewer, as
+ * those stood at the moment of the winning done-entry — reconstructed
+ * point-in-time from the assign/reviewer event log (`valueAsOf`), so a later
+ * reassignment can't retro-steal the credit.
  */
 
 const DAY_MS = 86_400_000;
@@ -45,7 +51,6 @@ interface CreatedRow {
 
 interface DoneMoveRow {
   card_id: string;
-  author_user_id: string | null;
   created_at: number;
   project_id: string;
 }
@@ -55,6 +60,35 @@ interface UserRow {
   name: string;
   kind: 'human' | 'agent';
   color: string | null;
+}
+
+/** One `assigned`/`reviewer` change event: meta `{from,to}` are user ids. */
+export interface FieldChangeRow {
+  card_id: string;
+  event_type: 'assigned' | 'reviewer';
+  created_at: number;
+  from_id: string | null;
+  to_id: string | null;
+}
+
+/**
+ * The value of a `{from,to}`-logged field as of time `t`, from its change log.
+ * Card creation logs no assign/reviewer event, so the card's CURRENT value is
+ * the baseline whenever no change predates `t`:
+ *   - latest change with created_at <= t  → its `to`
+ *   - else, changes exist but all after t → the earliest change's `from`
+ *     (roll the field back to before its first change)
+ *   - else, no changes ever               → `current`
+ * `changes` must be ascending by created_at.
+ */
+export function valueAsOf(changes: FieldChangeRow[], t: number, current: string | null): string | null {
+  if (changes.length === 0) return current;
+  let value = changes[0]!.from_id; // state before the first logged change
+  for (const c of changes) {
+    if (c.created_at <= t) value = c.to_id;
+    else break;
+  }
+  return value;
 }
 
 /** UTC bucket key: the day, or the Monday of the week, as YYYY-MM-DD. */
@@ -105,6 +139,7 @@ function emptyCore(windowDays: AnalyticsWindow, since: number, until: number, bu
     windowDays,
     since,
     until,
+    firstActivityAt: null,
     bucket,
     totals: { created: 0, completed: 0, activeCards: 0, overdue: 0, comments: 0 },
     throughput: bucketKeys(since, until, bucket).map((date) => ({ date, created: 0, completed: 0 })),
@@ -160,7 +195,7 @@ async function computeCore(
     (
       await env.db
         .prepare(
-          `SELECT e.card_id, e.author_user_id, e.created_at, c.project_id
+          `SELECT e.card_id, e.created_at, c.project_id
              FROM card_events e
              JOIN cards c ON c.id = e.card_id AND c.tenant_id = e.tenant_id
              JOIN columns col ON col.id = json_extract(e.meta_json, '$.to.id') AND col.tenant_id = e.tenant_id
@@ -180,8 +215,14 @@ async function computeCore(
   const completedIds = [...completions.keys()];
 
   // ── Cycle time: first in_progress-entry (fallback: card creation) → done ──
+  // plus the inputs for point-in-time assignee/reviewer attribution: each
+  // completed card's CURRENT assignee/reviewer (the baseline) and its full
+  // assign/reviewer change log (to roll back to the done moment).
   const cycleStart = new Map<string, number>();
-  const reviewerOf = new Map<string, string | null>();
+  const assigneeNow = new Map<string, string | null>();
+  const reviewerNow = new Map<string, string | null>();
+  const assignChanges = new Map<string, FieldChangeRow[]>();
+  const reviewerChanges = new Map<string, FieldChangeRow[]>();
   if (completedIds.length > 0) {
     const starts = await chunkedIn(completedIds, async (chunk) =>
       (
@@ -203,14 +244,44 @@ async function computeCore(
     const meta = await chunkedIn(completedIds, async (chunk) =>
       (
         await env.db
-          .prepare(`SELECT id, created_at, reviewer_user_id FROM cards WHERE tenant_id = ? AND id IN (${placeholders(chunk.length)})`)
+          .prepare(
+            `SELECT id, created_at, assignee_user_id, reviewer_user_id FROM cards WHERE tenant_id = ? AND id IN (${placeholders(chunk.length)})`,
+          )
           .bind(tenantId, ...chunk)
-          .all<{ id: string; created_at: number; reviewer_user_id: string | null }>()
+          .all<{ id: string; created_at: number; assignee_user_id: string | null; reviewer_user_id: string | null }>()
       ).results ?? [],
     );
     for (const m of meta) {
       if (!cycleStart.has(m.id)) cycleStart.set(m.id, m.created_at);
-      reviewerOf.set(m.id, m.reviewer_user_id);
+      assigneeNow.set(m.id, m.assignee_user_id);
+      reviewerNow.set(m.id, m.reviewer_user_id);
+    }
+
+    // Assign/reviewer change log for the completed cards. Each card's rows come
+    // from a single chunk query and are ORDER BY created_at ASC, so per-card
+    // order is preserved through the concat — as valueAsOf requires.
+    const changes = await chunkedIn(completedIds, async (chunk) =>
+      (
+        await env.db
+          .prepare(
+            `SELECT e.card_id, e.event_type, e.created_at,
+                    json_extract(e.meta_json, '$.from') AS from_id,
+                    json_extract(e.meta_json, '$.to') AS to_id
+               FROM card_events e
+              WHERE e.tenant_id = ? AND e.kind = 'system'
+                AND e.event_type IN ('assigned', 'reviewer')
+                AND e.card_id IN (${placeholders(chunk.length)})
+              ORDER BY e.created_at ASC`,
+          )
+          .bind(tenantId, ...chunk)
+          .all<FieldChangeRow>()
+      ).results ?? [],
+    );
+    for (const ch of changes) {
+      const map = ch.event_type === 'assigned' ? assignChanges : reviewerChanges;
+      const list = map.get(ch.card_id);
+      if (list) list.push(ch);
+      else map.set(ch.card_id, [ch]);
     }
   }
 
@@ -262,13 +333,19 @@ async function computeCore(
     createdBy.set(row.created_by, (createdBy.get(row.created_by) ?? 0) + 1);
   }
 
+  // Attribution is by ROLE at the done moment, not by who moved the card:
+  // completion → assignee@done, review → reviewer@done (KBR-105).
   const completedBy = new Map<string, number>();
+  const reviewedBy = new Map<string, number>();
   const cycleSamples: number[] = [];
   for (const done of completions.values()) {
     bump(done.created_at, 'completed');
     const p = proj(done.project_id);
     p.completed += 1;
-    if (done.author_user_id) completedBy.set(done.author_user_id, (completedBy.get(done.author_user_id) ?? 0) + 1);
+    const assignee = valueAsOf(assignChanges.get(done.card_id) ?? [], done.created_at, assigneeNow.get(done.card_id) ?? null);
+    if (assignee) completedBy.set(assignee, (completedBy.get(assignee) ?? 0) + 1);
+    const reviewer = valueAsOf(reviewerChanges.get(done.card_id) ?? [], done.created_at, reviewerNow.get(done.card_id) ?? null);
+    if (reviewer) reviewedBy.set(reviewer, (reviewedBy.get(reviewer) ?? 0) + 1);
     const start = cycleStart.get(done.card_id);
     if (start !== undefined && done.created_at >= start) {
       const sample = done.created_at - start;
@@ -290,12 +367,6 @@ async function computeCore(
   for (const row of commentRows) {
     comments += row.n;
     if (row.author_user_id) commentsBy.set(row.author_user_id, (commentsBy.get(row.author_user_id) ?? 0) + row.n);
-  }
-
-  const reviewedBy = new Map<string, number>();
-  for (const id of completedIds) {
-    const reviewer = reviewerOf.get(id);
-    if (reviewer) reviewedBy.set(reviewer, (reviewedBy.get(reviewer) ?? 0) + 1);
   }
 
   // ── Resolve users once for both boards ──
@@ -342,6 +413,15 @@ async function computeCore(
     .sort((a, b) => b.reviewed - a.reviewed || a.name.localeCompare(b.name))
     .slice(0, REVIEWERS_CAP);
 
+  // Earliest activity in the window — the honest denominator for rate stats so
+  // a 6-day-old board isn't averaged over the empty tail of a 30-day window.
+  let firstActivityAt: number | null = null;
+  const noteFirst = (ms: number) => {
+    if (firstActivityAt === null || ms < firstActivityAt) firstActivityAt = ms;
+  };
+  for (const row of createdRows) noteFirst(row.created_at);
+  for (const done of completions.values()) noteFirst(done.created_at);
+
   cycleSamples.sort((a, b) => a - b);
   const cycleTime: CycleTimeStats = {
     avgMs:
@@ -355,6 +435,7 @@ async function computeCore(
       windowDays,
       since,
       until,
+      firstActivityAt,
       bucket,
       totals: { created: createdRows.length, completed: completions.size, activeCards, overdue, comments },
       throughput: [...throughputMap.values()],

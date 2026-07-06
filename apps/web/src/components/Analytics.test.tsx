@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import type { ProjectAnalyticsDto, TenantAnalyticsDto } from '@kbrelay/shared';
-import Analytics, { fmtDuration } from './Analytics';
+import Analytics, { fmtDuration, completionsPerDay } from './Analytics';
 
 vi.mock('../lib/api', () => ({
   getProjectAnalytics: vi.fn(),
@@ -13,6 +13,7 @@ const core = {
   windowDays: 30 as const,
   since: 0,
   until: 1,
+  firstActivityAt: 0,
   bucket: 'day' as const,
   totals: { created: 4, completed: 3, activeCards: 1, overdue: 1, comments: 5 },
   throughput: [
@@ -97,6 +98,26 @@ describe('Analytics', () => {
     vi.mocked(api.getProjectAnalytics).mockRejectedValue(new Error('nope'));
     render(<Analytics projectId="p1" />);
     expect(await screen.findByText('nope')).toBeTruthy();
+  });
+});
+
+describe('completionsPerDay', () => {
+  const DAY = 86_400_000;
+  it('divides by the active span, not the whole window (KBR-105)', () => {
+    // 225 completed on a board first active 6 days into a 30-day window → ~38/day, not 8.
+    const until = 30 * DAY;
+    expect(completionsPerDay(225, until - 6 * DAY, until, 30)).toBe('38');
+  });
+  it('falls back to the full window when there is no activity', () => {
+    expect(completionsPerDay(0, null, 30 * DAY, 30)).toBe('0.0');
+  });
+  it('clamps the span to [1 day, window]', () => {
+    expect(completionsPerDay(5, 100, 100, 30)).toBe('5.0'); // <1 day of span → 1 day
+    expect(completionsPerDay(300, 0, 100 * DAY, 30)).toBe('10'); // 100 days of data, capped at 30
+  });
+  it('shows one decimal below 10/day, integer at/above', () => {
+    expect(completionsPerDay(15, 0, 3 * DAY, 30)).toBe('5.0');
+    expect(completionsPerDay(300, 0, 10 * DAY, 30)).toBe('30');
   });
 });
 

@@ -795,7 +795,8 @@ export const OPENAPI_SPEC = {
           'throughput series (daily; weekly at 90d), cycle-time stats, contributor ' +
           'and reviewer leaderboards, and a per-project breakdown. ' +
           '`?days=` one of 7|30|90 (default 30; 400 otherwise). "Completed" = a card ' +
-          'moved into the done-role column.',
+          'moved into the done-role column; completion credit goes to the card\'s ' +
+          'assignee and review credit to its reviewer as they stood at that moment.',
         parameters: [{ name: 'days', in: 'query', schema: { type: 'integer', enum: [7, 30, 90], default: 30 } }],
         responses: { 200: { description: 'ok' }, 400: { description: 'invalid days' } },
       },

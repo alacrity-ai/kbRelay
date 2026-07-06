@@ -1819,10 +1819,15 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 
 .anx-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  /* Leaderboard | Top reviewers, side by side. minmax(0,1fr) lets a track
+     shrink below its content so nothing overflows into its neighbour. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.8rem;
   align-items: start;
 }
+/* Full-width row under the people grid (By project / Cards by column). */
+.anx-full { margin-top: 0.8rem; }
+.anx-full > .anx-panel { margin-bottom: 0; }
 
 .anx-dot {
   display: inline-block;
@@ -1863,6 +1868,7 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 .anx-lb-sub { display: block; padding-left: calc(38% * 0); margin-left: 1.1rem; font-size: 0.72rem; color: var(--muted, #94a3b8); }
 .anx-legend-note { margin: 0.5rem 0 0; font-size: 0.72rem; color: var(--muted, #94a3b8); }
 
+.anx-projects { overflow-x: auto; }
 .anx-projects table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .anx-projects th {
   text-align: left;
