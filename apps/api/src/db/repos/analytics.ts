@@ -86,6 +86,20 @@ function median(sorted: number[]): number | null {
 
 const placeholders = (n: number) => Array.from({ length: n }, () => '?').join(', ');
 
+/**
+ * D1 caps bound parameters at 100 per statement (libsql allows ~32k, so tests
+ * won't catch an overrun — prod did, on the first tenant-wide call). Any
+ * IN (...) over an unbounded id list must go through here.
+ */
+const BIND_CHUNK = 80;
+async function chunkedIn<T>(ids: string[], run: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += BIND_CHUNK) {
+    out.push(...(await run(ids.slice(i, i + BIND_CHUNK))));
+  }
+  return out;
+}
+
 function emptyCore(windowDays: AnalyticsWindow, since: number, until: number, bucket: 'day' | 'week'): AnalyticsCore {
   return {
     windowDays,
@@ -169,8 +183,7 @@ async function computeCore(
   const cycleStart = new Map<string, number>();
   const reviewerOf = new Map<string, string | null>();
   if (completedIds.length > 0) {
-    const idIn = `(${placeholders(completedIds.length)})`;
-    const starts =
+    const starts = await chunkedIn(completedIds, async (chunk) =>
       (
         await env.db
           .prepare(
@@ -178,21 +191,23 @@ async function computeCore(
                FROM card_events e
                JOIN columns col ON col.id = json_extract(e.meta_json, '$.to.id') AND col.tenant_id = e.tenant_id
               WHERE e.tenant_id = ? AND e.kind = 'system' AND e.event_type = 'moved'
-                AND col.role = 'in_progress' AND e.card_id IN ${idIn}
+                AND col.role = 'in_progress' AND e.card_id IN (${placeholders(chunk.length)})
               GROUP BY e.card_id`,
           )
-          .bind(tenantId, ...completedIds)
+          .bind(tenantId, ...chunk)
           .all<{ card_id: string; start_at: number }>()
-      ).results ?? [];
+      ).results ?? [],
+    );
     for (const s of starts) cycleStart.set(s.card_id, s.start_at);
 
-    const meta =
+    const meta = await chunkedIn(completedIds, async (chunk) =>
       (
         await env.db
-          .prepare(`SELECT id, created_at, reviewer_user_id FROM cards WHERE tenant_id = ? AND id IN ${idIn}`)
-          .bind(tenantId, ...completedIds)
+          .prepare(`SELECT id, created_at, reviewer_user_id FROM cards WHERE tenant_id = ? AND id IN (${placeholders(chunk.length)})`)
+          .bind(tenantId, ...chunk)
           .all<{ id: string; created_at: number; reviewer_user_id: string | null }>()
-      ).results ?? [];
+      ).results ?? [],
+    );
     for (const m of meta) {
       if (!cycleStart.has(m.id)) cycleStart.set(m.id, m.created_at);
       reviewerOf.set(m.id, m.reviewer_user_id);
@@ -287,13 +302,14 @@ async function computeCore(
   const userIds = [...new Set([...createdBy.keys(), ...completedBy.keys(), ...commentsBy.keys(), ...reviewedBy.keys()])];
   const users = new Map<string, UserRow>();
   if (userIds.length > 0) {
-    const rows =
+    const rows = await chunkedIn(userIds, async (chunk) =>
       (
         await env.db
-          .prepare(`SELECT id, name, kind, color FROM users WHERE id IN (${placeholders(userIds.length)})`)
-          .bind(...userIds)
+          .prepare(`SELECT id, name, kind, color FROM users WHERE id IN (${placeholders(chunk.length)})`)
+          .bind(...chunk)
           .all<UserRow>()
-      ).results ?? [];
+      ).results ?? [],
+    );
     for (const u of rows) users.set(u.id, u);
   }
   const userOf = (id: string): UserRow => users.get(id) ?? { id, name: 'Unknown', kind: 'human', color: null };

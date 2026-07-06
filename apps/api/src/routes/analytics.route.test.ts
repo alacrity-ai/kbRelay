@@ -178,3 +178,23 @@ describe('route handlers', () => {
     }
   });
 });
+
+// KEEP LAST: mutates the fixture tenant at volume. D1 caps bound parameters
+// at 100/statement (libsql doesn't), so the completed-card IN(...) lookups
+// must chunk — this crosses the 80-id chunk boundary and would have caught
+// the prod 500 on the first tenant-wide call.
+describe('bind-limit chunking', () => {
+  it('handles >80 completions in one window', async () => {
+    const bulk = await createProject(env, tenantId, ownerId, { name: 'Bulk', code: 'BLK' });
+    const bulkCols: Record<string, string> = {};
+    for (const bc of await listColumns(env, tenantId, bulk.id)) if (bc.role) bulkCols[bc.role] = bc.id;
+    for (let i = 0; i < 85; i++) {
+      const card = await createCard(env, tenantId, bulk.id, ownerId, { summary: `bulk-${i}`, columnId: bulkCols.ready! });
+      await patchCard(env, tenantId, card.id, ownerId, { columnId: bulkCols.done! });
+    }
+    const dto = await projectAnalytics(env, tenantId, bulk.id, 30, Date.now());
+    expect(dto.totals.completed).toBe(85);
+    expect(dto.cycleTime.samples).toBe(85);
+    expect(dto.leaderboard[0]).toMatchObject({ userId: ownerId, completed: 85 });
+  });
+});
