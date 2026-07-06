@@ -54,7 +54,7 @@ export async function dispatch(
     return errorResponse(404, 'Not found', cors);
   } catch (err) {
     if (err instanceof HttpError) {
-      return errorResponse(err.status, err.message, cors, err.details);
+      return errorResponse(err.status, err.message, cors, err.details, err.headers);
     }
     console.error('Unhandled error:', err instanceof Error ? (err.stack ?? err.message) : err);
     return errorResponse(500, 'Internal error', cors);

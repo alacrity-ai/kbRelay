@@ -39,8 +39,14 @@ export function errorResponse(
   error: string,
   corsHeaders: Record<string, string>,
   details?: Record<string, string>,
+  extraHeaders?: Record<string, string>,
 ): Response {
-  return jsonResponse(status, { error, ...(details ? { details } : {}) }, corsHeaders);
+  return jsonResponse(
+    status,
+    { error, ...(details ? { details } : {}) },
+    corsHeaders,
+    extraHeaders ?? {},
+  );
 }
 
 /**
@@ -52,9 +58,17 @@ export function errorResponse(
 export class HttpError extends Error {
   status: number;
   details?: Record<string, string>;
-  constructor(status: number, message: string, details?: Record<string, string>) {
+  /** Extra response headers (e.g. `Retry-After` on a 503). */
+  headers?: Record<string, string>;
+  constructor(
+    status: number,
+    message: string,
+    details?: Record<string, string>,
+    headers?: Record<string, string>,
+  ) {
     super(message);
     this.status = status;
     this.details = details;
+    this.headers = headers;
   }
 }

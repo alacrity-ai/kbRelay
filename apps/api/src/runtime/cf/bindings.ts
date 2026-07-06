@@ -1,6 +1,7 @@
 import type { Env } from '../../env';
 import type { Db } from '../shared/db';
 import type { BlobStore } from '../shared/blob';
+import { resilientDb } from './resilient-db';
 
 /**
  * Raw Cloudflare Worker bindings (from `wrangler.toml` vars/secrets + the D1
@@ -41,7 +42,9 @@ function r2BlobStore(bucket: R2Bucket): BlobStore {
 
 export function buildCfBindings(cf: CfBindings): Env {
   return {
-    db: cf.DB as unknown as Db,
+    // Wrap the raw D1 binding with the resilient port (KBR-108): per-query
+    // timeout, transient-read retry, and a clean 503 instead of a 45s hang.
+    db: resilientDb(cf.DB as unknown as Db),
     blob: cf.BLOB ? r2BlobStore(cf.BLOB) : undefined,
     ALLOWED_ORIGINS: cf.ALLOWED_ORIGINS,
     PUBLIC_BASE_URL: cf.PUBLIC_BASE_URL,
