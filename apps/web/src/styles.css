@@ -312,7 +312,12 @@ select {
   opacity: 0.78;
   transition: opacity 0.15s ease;
   backdrop-filter: blur(4px);
+  /* Never let a scrub turn into a text-selection / native element drag — that
+     hijacks the pointer and flashes the no-drop cursor (KBR-106). */
+  user-select: none;
+  -webkit-user-select: none;
 }
+.bmini, .bmini * { -webkit-user-drag: none; }
 .bmini:hover { opacity: 1; }
 .bmini-idle { opacity: 0.3 !important; pointer-events: none; }
 

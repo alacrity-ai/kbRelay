@@ -107,6 +107,10 @@ export default function BoardMinimap({
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (dragging) return;
+    // Stop the browser from starting a native drag/selection on mousedown —
+    // otherwise grabbing the scrubber sometimes drags a text selection instead,
+    // hijacking the pointer and flashing the no-drop cursor (KBR-106).
+    e.preventDefault();
     scrubbing.current = true;
     e.currentTarget.setPointerCapture?.(e.pointerId);
     scrubTo(e.clientX);
@@ -139,6 +143,8 @@ export default function BoardMinimap({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(viewLeft)}
+        draggable={false}
+        onDragStart={(e) => e.preventDefault()}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endScrub}
