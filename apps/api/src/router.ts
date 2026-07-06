@@ -12,6 +12,7 @@ import {
   handleListProjectEvents,
 } from './routes/projects';
 import { handleSearch } from './routes/search';
+import { handleProjectAnalytics, handleTenantAnalytics } from './routes/analytics';
 import {
   handleListLabels,
   handleCreateLabel,
@@ -186,6 +187,11 @@ export const routes: Route[] = [
 
   // ── Global quick-find (v0.17.0) ── RBAC is applied inside the query.
   { method: 'GET', pattern: '/api/v1/search', handler: handleSearch },
+
+  // ── Analytics (v0.19.0, KBR-102/103) ── read-only aggregates. The
+  // workspace route scopes members to granted projects inside the query.
+  { method: 'GET', pattern: '/api/v1/analytics', handler: handleTenantAnalytics },
+  { method: 'GET', pattern: '/api/v1/projects/:id/analytics', access: { kind: 'project', param: 'id' }, handler: handleProjectAnalytics },
 
   // ── Projects ── (list filters in-handler; create auto-grants the creator)
   { method: 'GET', pattern: '/api/v1/projects', handler: handleListProjects },

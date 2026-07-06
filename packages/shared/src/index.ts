@@ -1,5 +1,6 @@
 export * from './accounts.ts';
 export * from './agents.ts';
+export * from './analytics.ts';
 export * from './attachments.ts';
 export * from './cardLinks.ts';
 export * from './auth.ts';

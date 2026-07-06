@@ -785,6 +785,32 @@ export const OPENAPI_SPEC = {
         responses: { 200: { description: 'ok' }, 400: { description: 'q too short' } },
       },
     },
+    '/api/v1/analytics': {
+      get: {
+        summary: 'Workspace analytics — totals, throughput, cycle time, leaderboards',
+        description:
+          'Read-only aggregates over the caller\'s accessible projects (members see ' +
+          'granted projects only; admins the whole workspace). Returns window totals ' +
+          '(created/completed/active/overdue/comments), a created-vs-completed ' +
+          'throughput series (daily; weekly at 90d), cycle-time stats, contributor ' +
+          'and reviewer leaderboards, and a per-project breakdown. ' +
+          '`?days=` one of 7|30|90 (default 30; 400 otherwise). "Completed" = a card ' +
+          'moved into the done-role column.',
+        parameters: [{ name: 'days', in: 'query', schema: { type: 'integer', enum: [7, 30, 90], default: 30 } }],
+        responses: { 200: { description: 'ok' }, 400: { description: 'invalid days' } },
+      },
+    },
+    '/api/v1/projects/{id}/analytics': {
+      get: {
+        summary: 'Project analytics — same aggregates scoped to one board',
+        description:
+          'The workspace payload minus the per-project breakdown, plus the live ' +
+          'column distribution of non-archived cards. `?days=` one of 7|30|90 ' +
+          '(default 30).',
+        parameters: [{ name: 'days', in: 'query', schema: { type: 'integer', enum: [7, 30, 90], default: 30 } }],
+        responses: { 200: { description: 'ok' }, 400: { description: 'invalid days' } },
+      },
+    },
     '/api/v1/projects/{id}/events': {
       get: {
         summary: 'Project activity feed — newest-first card events across the board',
