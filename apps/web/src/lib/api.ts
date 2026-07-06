@@ -28,6 +28,8 @@ import type {
   CreateWebhookInput,
   PatchWebhookInput,
   AttachmentDto,
+  CardLinkDto,
+  CreateCardLinkInput,
 } from '@kbrelay/shared';
 import { getToken } from './auth';
 
@@ -275,6 +277,15 @@ export async function uploadAttachment(cardId: string, file: File): Promise<Atta
 
 export const deleteAttachment = (id: string) =>
   request<{ ok: true }>('DELETE', `/v1/attachments/${id}`);
+
+// ── Card links (external references, KBR-88/91) ──
+/** Add an external link to a card. Returns the created link. */
+export const addCardLink = (cardId: string, input: CreateCardLinkInput) =>
+  request<{ link: CardLinkDto }>('POST', `/v1/cards/${cardId}/links`, input).then((r) => r.link);
+
+/** Remove a card link (creator or admin, enforced server-side). */
+export const deleteCardLink = (id: string) =>
+  request<{ ok: true }>('DELETE', `/v1/card-links/${id}`);
 
 // ── Mentions / notifications (v0.8.0) ──
 export const getMentions = (status: MentionsStatus = 'unread') =>

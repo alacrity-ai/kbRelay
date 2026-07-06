@@ -1551,6 +1551,57 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 .attach-badge.archive { color: #fbbf24; }
 .attach-badge.misc { color: var(--muted); }
 
+/* External card links (KBR-91) — same visual system as attachments, violet tint. */
+.link-toolbar {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+.link-toolbar.open {
+  padding: 0.5rem 0.55rem; border: 1px dashed var(--border); border-radius: var(--r-sm);
+  align-items: stretch; flex-direction: column;
+}
+.link-toolbar .link-add { font-size: 0.85rem; padding: 0.25rem 0.6rem; }
+.link-hint { color: var(--muted); font-size: 0.8rem; }
+.link-fields { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.link-url-input, .link-title-input {
+  font-size: 0.85rem; padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text);
+}
+.link-url-input { flex: 2 1 14rem; }
+.link-title-input { flex: 1 1 9rem; }
+.link-actions { display: flex; gap: 0.4rem; }
+.link-error { color: var(--danger); font-size: 0.8rem; }
+
+.link-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.link-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface);
+}
+.link-glyph { display: inline-flex; color: #a78bfa; }
+.link-glyph.git { color: #a78bfa; }
+.link-glyph.board { color: #60a5fa; }
+.link-glyph.design { color: #f472b6; }
+.link-glyph.doc { color: #34d399; }
+.link-glyph.link { color: var(--text-dim); }
+.link-name { color: var(--text); text-decoration: none; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-name:hover { text-decoration: underline; }
+.link-provider { margin-left: auto; color: var(--muted); font-size: 0.72rem; text-transform: lowercase; letter-spacing: 0.02em; }
+.link-del {
+  background: transparent; border: none; color: var(--muted); cursor: pointer;
+  font-size: 0.85rem; line-height: 1; padding: 0.15rem 0.3rem; border-radius: var(--r-sm);
+}
+.link-del:hover { color: var(--danger); background: var(--surface-hover); }
+
+/* Board card link badge — matches .attach-badge sizing/weight. margin-left:auto
+   right-aligns a links-only card; harmless when attach-badges already took the
+   slack (they then sit adjacent, gap apart). */
+.link-badge {
+  display: inline-flex; align-items: center; gap: 0.15rem; margin-left: auto;
+  color: var(--text-dim); font-size: 0.72rem; line-height: 1;
+}
+
 /* Auth'd inline-image placeholder / error (bearer-only auth → fetch to object URL). */
 .md-img-status {
   display: inline-block; margin: 0.4rem 0; padding: 0.4rem 0.7rem;

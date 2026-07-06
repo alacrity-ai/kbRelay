@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CardDto, ColumnDto, LabelDto, UserDto, MentionSourceKind, AttachmentDto } from '@kbrelay/shared';
+import type { CardDto, ColumnDto, LabelDto, UserDto, MentionSourceKind, AttachmentDto, CardLinkDto } from '@kbrelay/shared';
 import { UNASSIGNED_COLOR, toggleTaskAtLine } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
@@ -11,6 +11,8 @@ import Markdown from './Markdown';
 import MentionTextArea from './MentionTextArea';
 import AttachmentToolbar from './AttachmentToolbar';
 import AttachmentList from './AttachmentList';
+import LinkComposer from './LinkComposer';
+import LinkList from './LinkList';
 import { useDialog } from './Dialog';
 
 export interface CardScrollTarget {
@@ -100,6 +102,9 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
   // Attachments (v0.16.0). Seeded from the card if present; (re)fetched on open,
   // since the board's card list carries only counts.
   const [attachments, setAttachments] = useState<AttachmentDto[]>(card?.attachments ?? []);
+  // External links (KBR-88/91) — same lifecycle as attachments: seeded from the
+  // card, refetched on open (the board list carries only `linkCount`).
+  const [links, setLinks] = useState<CardLinkDto[]>(card?.links ?? []);
   // A monotonically-increasing token guards against a stale server read
   // clobbering a fresher local mutation. When a brand-new card is adopted
   // (undefined → saved) this effect fires a fetch, but the file the user is
@@ -112,7 +117,10 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
     const seq = ++refreshSeq.current;
     try {
       const { card: full } = await api.getCard(card.id);
-      if (seq === refreshSeq.current) setAttachments(full.attachments ?? []);
+      if (seq === refreshSeq.current) {
+        setAttachments(full.attachments ?? []);
+        setLinks(full.links ?? []);
+      }
     } catch {
       /* leave the last-known list on a transient error */
     }
@@ -161,17 +169,43 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
     setAttachments((list) => (list.some((x) => x.id === a.id) ? list : [...list, a]));
   }
 
-  // Attaching on an unsaved new card: confirm, then save it first (Board adopts
-  // the new card into this modal), and return its id so the upload can proceed.
-  async function saveNewCardForAttach(): Promise<string | null> {
+  // A link was added via the composer: track it (unlike attachments, links don't
+  // ride in the description — they're a first-class list).
+  function onLinkAdded(l: CardLinkDto) {
+    refreshSeq.current++; // beat any in-flight fetch (e.g. a just-adopted new card)
+    setLinks((list) => (list.some((x) => x.id === l.id) ? list : [...list, l]));
+  }
+
+  async function removeLink(l: CardLinkDto) {
+    const ok = await dialog.confirm({
+      title: 'Remove this link?',
+      message: `“${l.title ?? l.url}” will be removed from the card.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.deleteCardLink(l.id);
+      refreshSeq.current++; // a local mutation wins over any in-flight fetch
+      setLinks((list) => list.filter((x) => x.id !== l.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove link');
+    }
+  }
+
+  // Attaching/linking on an unsaved new card: confirm, then save it first (Board
+  // adopts the new card into this modal), and return its id so the follow-up
+  // (upload or link) can proceed. `noun` tailors the copy per action.
+  async function saveNewCardFor(noun: 'file' | 'link'): Promise<string | null> {
+    const verb = noun === 'file' ? 'attach' : 'link';
     if (!summary.trim()) {
-      setError('Add a summary before attaching a file.');
+      setError(`Add a summary before ${noun === 'file' ? 'attaching a file' : 'adding a link'}.`);
       return null;
     }
     const ok = await dialog.confirm({
-      title: 'Save this card to attach?',
-      message: 'Attaching a file will save this card first, then add the file.',
-      confirmLabel: 'Save & attach',
+      title: `Save this card to ${verb}?`,
+      message: `Adding a ${noun} will save this card first, then add the ${noun}.`,
+      confirmLabel: `Save & ${verb}`,
     });
     if (!ok) return null;
     try {
@@ -388,7 +422,7 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
                     existing card it attaches directly; for a new card it saves first. */}
                 <AttachmentToolbar
                   cardId={card ? card.id : undefined}
-                  resolveCardId={card ? undefined : saveNewCardForAttach}
+                  resolveCardId={card ? undefined : () => saveNewCardFor('file')}
                   onUploaded={onUploaded}
                   hint={card ? undefined : 'attaching will save the card first'}
                 />
@@ -398,6 +432,19 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
                   <div className="attach-view">
                     <span className="attach-view-label">Attachments</span>
                     <AttachmentList items={attachments} onDelete={removeAttachment} />
+                  </div>
+                )}
+              </div>
+              <div className="field">
+                <label>Links</label>
+                <LinkComposer
+                  cardId={card ? card.id : undefined}
+                  resolveCardId={card ? undefined : () => saveNewCardFor('link')}
+                  onAdded={onLinkAdded}
+                />
+                {links.length > 0 && (
+                  <div className="attach-view">
+                    <LinkList items={links} onDelete={removeLink} />
                   </div>
                 )}
               </div>
@@ -565,6 +612,12 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
                   <div className="attach-view">
                     <span className="attach-view-label">Attachments</span>
                     <AttachmentList items={attachments} />
+                  </div>
+                )}
+                {links.length > 0 && (
+                  <div className="attach-view">
+                    <span className="attach-view-label">Links</span>
+                    <LinkList items={links} />
                   </div>
                 )}
               </div>
