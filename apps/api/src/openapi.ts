@@ -764,7 +764,7 @@ export const OPENAPI_SPEC = {
         summary: 'Edit and/or move a card (columnId + position)',
         responses: { 200: { description: 'ok' } },
       },
-      delete: { summary: 'Delete a card', responses: { 200: { description: 'ok' } } },
+      delete: { summary: 'Delete a card (cascades; admin-only since KBR-94)', responses: { 200: { description: 'ok' }, 403: { description: 'members cannot delete — archive instead' } } },
     },
     '/api/v1/search': {
       get: {

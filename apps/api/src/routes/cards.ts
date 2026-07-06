@@ -99,6 +99,9 @@ export async function handlePatchCard(ctx: RouteContext): Promise<Response> {
 }
 
 export async function handleDeleteCard(ctx: RouteContext): Promise<Response> {
+  // Destructive and irreversible (card + timeline + attachments) → admin-only
+  // (KBR-94 follow-up: a member deleted a live ticket). Members archive instead.
+  requireAdmin(ctx.auth);
   const { tenantId } = tenantScope(ctx.auth);
   const blobKeys = await deleteCard(ctx.env, tenantId, ctx.params.id!);
   // Purge the bytes after responding — rows are already gone (KBR-41).

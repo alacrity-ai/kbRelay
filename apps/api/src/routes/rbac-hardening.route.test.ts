@@ -14,7 +14,7 @@ import { handleCreateProject, handlePatchProject } from './projects';
 import { handleCreateColumn, handlePatchColumn, handleDeleteColumn } from './columns';
 import { handleCreateLabel, handlePatchLabel, handleDeleteLabel } from './labels';
 import { handleCreateProjectLabel, handlePatchProjectLabel, handleDeleteProjectLabel, handleSetProjectLabels } from './projectLabels';
-import { handleCreateCard, handlePatchCard } from './cards';
+import { handleCreateCard, handlePatchCard, handleDeleteCard } from './cards';
 
 /**
  * KBR-94: board-shaping surfaces are admin-only. Members (human or agent) keep
@@ -104,6 +104,14 @@ describe('KBR-94: member gets 403 on board-shaping routes', () => {
     expect(await status(handlePatchCard(ctx(adminAuth, { id: card.id }, { archived: false }, 'PATCH')))).toBe(200);
     // archived:false on a LIVE card is a harmless no-op for a member (not a restore).
     expect(await status(handlePatchCard(ctx(memberAuth, { id: card.id }, { archived: false }, 'PATCH')))).toBe(200);
+  });
+});
+
+describe('KBR-94 follow-up: card DELETE is admin-only', () => {
+  it('member gets 403; admin can delete', async () => {
+    const card = await createCard(env, adminAuth.tenantId, projectId, adminAuth.userId, { summary: 'Deletable' });
+    expect(await status(handleDeleteCard(ctx(memberAuth, { id: card.id }, undefined, 'DELETE')))).toBe(403);
+    expect(await status(handleDeleteCard(ctx(adminAuth, { id: card.id }, undefined, 'DELETE')))).toBe(200);
   });
 });
 

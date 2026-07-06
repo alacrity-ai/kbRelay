@@ -341,6 +341,13 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
 
   async function remove() {
     if (!onDelete) return;
+    const sure = await dialog.confirm({
+      title: `Delete ${card?.key ?? 'this card'}?`,
+      message: 'This permanently deletes the card, its timeline, and its attachments. It cannot be undone — archive it instead if you might need it later.',
+      confirmLabel: 'Delete card',
+      danger: true,
+    });
+    if (!sure) return;
     setBusy(true);
     try {
       await onDelete();

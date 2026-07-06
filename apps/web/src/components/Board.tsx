@@ -351,7 +351,7 @@ export default function Board({ projectId, users, meId, tenantSlug, reloadNonce 
           projectLabels={projectLabels}
           scrollTo={modal.mode === 'view' ? scrollTo : undefined}
           onSave={saveCard}
-          onDelete={modal.mode === 'view' ? deleteCard : undefined}
+          onDelete={modal.mode === 'view' && isAdmin ? deleteCard : undefined}
           onClose={() => { setModal(null); setScrollTo(undefined); }}
         />
       )}
