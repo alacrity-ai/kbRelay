@@ -295,6 +295,64 @@ select {
   align-items: flex-start;
   height: calc(100dvh - var(--topbar-h));
 }
+
+/* ── Board minimap scrubber (KBR-106) ──────────────────────
+   Fixed-size, bottom-right overview + horizontal-scroll control. Desktop only;
+   the component hides itself when the board doesn't overflow. */
+.bmini {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 30;
+  padding: 6px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 8px);
+  box-shadow: var(--shadow-2, 0 6px 20px rgba(0, 0, 0, 0.35));
+  opacity: 0.78;
+  transition: opacity 0.15s ease;
+  backdrop-filter: blur(4px);
+}
+.bmini:hover { opacity: 1; }
+.bmini-idle { opacity: 0.3 !important; pointer-events: none; }
+
+.bmini-track {
+  position: relative;
+  display: flex;
+  gap: 3px;
+  width: 200px;
+  height: 58px;
+  align-items: flex-start;
+  cursor: pointer;
+  touch-action: none; /* let pointer-drag scrub without the page panning */
+}
+.bmini-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: stretch;
+}
+/* Header rectangle — full-strength color, reads brighter than the cards. */
+.bmini-head { height: 8px; border-radius: 2px; filter: brightness(1.15) saturate(1.1); }
+/* Card rectangles — same hue, dimmer so the header pops. */
+.bmini-card { height: 5px; border-radius: 1px; opacity: 0.5; }
+/* Viewport indicator — the slice currently on screen. */
+.bmini-view {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  min-width: 6px;
+  border: 1px solid var(--accent, #6366f1);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent, #6366f1) 22%, transparent);
+  pointer-events: none;
+  transition: left 0.02s linear;
+}
+@media (max-width: 768px) {
+  .bmini { display: none; }
+}
 .column {
   background: linear-gradient(180deg, var(--surface) 0%, var(--bg-2) 100%);
   border: 1px solid var(--border);
@@ -567,6 +625,17 @@ select {
 .col-row-name { flex: 1; font-weight: 500; word-break: break-word; }
 .col-row-actions { display: flex; gap: 0.25rem; flex: none; }
 .add-col-btn { align-self: flex-start; }
+
+/* Per-column color picker (KBR-107). */
+.col-color { position: relative; flex: none; display: inline-flex; }
+.col-dot-btn { width: 16px; height: 16px; padding: 0; border: 1px solid var(--border); cursor: pointer; }
+.col-dot-btn:disabled { cursor: default; opacity: 0.6; }
+.col-color-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+  padding: 0.5rem; width: 178px; /* fixed so the swatches wrap into a grid */
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-2);
+}
 
 .project-settings-btn { flex: none; }
 

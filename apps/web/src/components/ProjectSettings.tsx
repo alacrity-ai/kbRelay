@@ -49,6 +49,8 @@ export default function ProjectSettings({
   const [cols, setCols] = useState<ColumnDto[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Which column's color palette is open (KBR-107).
+  const [colorEditId, setColorEditId] = useState<string | null>(null);
 
   // General-tab local edit state.
   const [name, setName] = useState('');
@@ -83,6 +85,16 @@ export default function ProjectSettings({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // Dismiss the open column-color palette on an outside click (KBR-107).
+  useEffect(() => {
+    if (!colorEditId) return;
+    const close = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('.col-color')) setColorEditId(null);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [colorEditId]);
 
   const autoArchiveDays = /^\d+$/.test(autoArchive.trim()) ? Number(autoArchive.trim()) : null;
 
@@ -161,6 +173,25 @@ export default function ProjectSettings({
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not set role');
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Recolor a column (KBR-107). `null` clears back to the neutral default. */
+  async function setColumnColor(column: ColumnDto, newColor: string | null) {
+    setColorEditId(null);
+    if (busy || (column.color ?? null) === newColor) return;
+    setBusy(true);
+    setError(null);
+    // Optimistic — the dot (and board, once onChanged fires) recolor at once.
+    setCols((prev) => prev.map((c) => (c.id === column.id ? { ...c, color: newColor } : c)));
+    try {
+      await api.patchColumn(column.id, { color: newColor });
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not set color');
       await load();
     } finally {
       setBusy(false);
@@ -321,7 +352,40 @@ export default function ProjectSettings({
                 {cols.map((c, i) => (
                   <div className="col-row" key={c.id}>
                     <span className="col-index">{i + 1}</span>
-                    <span className="column-dot" style={{ background: c.color ?? '#64748b' }} />
+                    <div className="col-color">
+                      <button
+                        type="button"
+                        className="column-dot col-dot-btn"
+                        style={{ background: c.color ?? '#64748b' }}
+                        disabled={busy}
+                        aria-label={`Change color for ${c.name}`}
+                        aria-haspopup="menu"
+                        aria-expanded={colorEditId === c.id}
+                        title="Column color"
+                        onClick={() => setColorEditId(colorEditId === c.id ? null : c.id)}
+                      />
+                      {colorEditId === c.id && (
+                        <div className="col-color-pop color-swatches" role="menu">
+                          <button
+                            type="button"
+                            className={`color-swatch default-swatch ${c.color == null ? 'active' : ''}`}
+                            aria-label="Default color"
+                            title="Default"
+                            onClick={() => void setColumnColor(c, null)}
+                          />
+                          {USER_PALETTE.map((sw) => (
+                            <button
+                              type="button"
+                              key={sw}
+                              className={`color-swatch ${c.color?.toLowerCase() === sw.toLowerCase() ? 'active' : ''}`}
+                              style={{ background: sw }}
+                              aria-label={`set color ${sw}`}
+                              onClick={() => void setColumnColor(c, sw)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <span className="col-row-name">{c.name}</span>
                     <select
                       className="col-row-role"

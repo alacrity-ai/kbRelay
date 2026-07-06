@@ -17,6 +17,7 @@ import type { CardDto, ColumnDto, ColumnRole, LabelDto, UserDto } from '@kbrelay
 import * as api from '../lib/api';
 import type { CardInput } from '../lib/api';
 import Column from './Column';
+import BoardMinimap from './BoardMinimap';
 import { CardBody } from './CardItem';
 import CardModal, { type CardScrollTarget } from './CardModal';
 import { useDialog } from './Dialog';
@@ -55,6 +56,8 @@ export default function Board({ projectId, users, meId, tenantSlug, reloadNonce 
   // Refs read by the background poller (avoid stale closures / overlapping loads).
   const draggingRef = useRef(false);
   const loadingRef = useRef(false);
+  // The horizontal scroll container, driven by the minimap scrubber (KBR-106).
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
     // Mouse only (NOT PointerSensor — pointer events also fire for touch and would
@@ -300,6 +303,8 @@ export default function Board({ projectId, users, meId, tenantSlug, reloadNonce 
   if (loading) return <div className="loading-wrap"><div className="spinner" /></div>;
 
   const activeCard = activeId ? cardsById[activeId] : null;
+  const cardCounts: Record<string, number> = {};
+  for (const col of columns) cardCounts[col.id] = (items[col.id] ?? []).length;
 
   return (
     <>
@@ -316,7 +321,7 @@ export default function Board({ projectId, users, meId, tenantSlug, reloadNonce 
         onDragEnd={onDragEnd}
         onDragCancel={onDragCancel}
       >
-        <div className={`board ${activeId ? 'dragging' : ''}`}>
+        <div id="board-scroll" ref={boardRef} className={`board ${activeId ? 'dragging' : ''}`}>
           {columns.map((col) => (
             <Column
               key={col.id}
@@ -339,6 +344,8 @@ export default function Board({ projectId, users, meId, tenantSlug, reloadNonce 
           {activeCard ? <CardBody card={activeCard} users={users} className="overlay" /> : null}
         </DragOverlay>
       </DndContext>
+
+      <BoardMinimap scrollRef={boardRef} columns={columns} counts={cardCounts} dragging={!!activeId} />
 
       {modal && (
         <CardModal
