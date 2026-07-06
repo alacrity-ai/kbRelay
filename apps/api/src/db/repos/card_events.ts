@@ -157,7 +157,11 @@ export async function listTimeline(
   cardId: string,
 ): Promise<CardEventDto[]> {
   const rs = await env.db.prepare(
-    'SELECT * FROM card_events WHERE card_id = ? AND tenant_id = ? ORDER BY created_at ASC, id ASC',
+    // Tiebreak on rowid (insertion order), not id: ids are random UUIDs, so
+    // two events in the same created_at millisecond would otherwise order
+    // non-deterministically (KBR-98 flaky due.test.ts, and wrong timeline order
+    // for same-ms events in the real UI). rowid is monotonic on both D1 + libsql.
+    'SELECT * FROM card_events WHERE card_id = ? AND tenant_id = ? ORDER BY created_at ASC, rowid ASC',
   )
     .bind(cardId, tenantId)
     .all<CardEventRow>();
