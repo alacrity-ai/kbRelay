@@ -1539,6 +1539,86 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   font-size: 0.85rem; line-height: 1; padding: 0.15rem 0.3rem; border-radius: var(--r-sm);
 }
 .attach-del:hover { color: var(--danger); background: var(--surface-hover); }
+.attach-preview {
+  display: inline-flex; align-items: center;
+  background: transparent; border: none; color: var(--muted); cursor: pointer;
+  line-height: 1; padding: 0.15rem 0.3rem; border-radius: var(--r-sm);
+}
+.attach-preview:hover { color: var(--accent); background: var(--surface-hover); }
+
+/* Image preview lightbox (KBR-93) */
+.imgprev-backdrop {
+  position: fixed; inset: 0; background: rgba(3, 7, 15, 0.78);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--space-4); z-index: 70;
+  animation: fade-in var(--dur) var(--ease);
+}
+.imgprev-frame {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xl);
+  width: min(1000px, 94vw);
+  height: min(760px, 88dvh);
+  display: flex; flex-direction: column;
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+  animation: pop-in var(--dur) var(--ease);
+}
+.imgprev-header {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+.imgprev-name {
+  color: var(--text); font-size: 0.9rem; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.imgprev-size { color: var(--muted); font-size: 0.75rem; flex-shrink: 0; }
+.imgprev-count { color: var(--text-dim); font-size: 0.78rem; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.imgprev-close {
+  margin-left: auto; background: transparent; border: none; color: var(--muted);
+  cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 0.25rem 0.4rem;
+  border-radius: var(--r-sm);
+}
+.imgprev-close:hover { color: var(--text); background: var(--surface-hover); }
+.imgprev-viewport {
+  flex: 1; position: relative; overflow: hidden;
+  background: var(--surface-2);
+  display: flex; align-items: center; justify-content: center;
+  touch-action: none; /* we own pinch + pan (pointer events) */
+  user-select: none;
+}
+.imgprev-img {
+  max-width: 100%; max-height: 100%;
+  transform-origin: center center;
+  will-change: transform;
+  pointer-events: none; /* gestures land on the viewport, not the img */
+}
+.imgprev-status { color: var(--muted); font-size: 0.9rem; }
+.imgprev-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 2.4rem; height: 3.2rem;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(3, 7, 15, 0.45); border: 1px solid var(--border);
+  color: var(--text); font-size: 1.6rem; line-height: 1;
+  cursor: pointer; border-radius: var(--r-md);
+  touch-action: auto; /* a tap here navigates; it is not a pan gesture */
+}
+.imgprev-nav:hover { background: rgba(3, 7, 15, 0.7); border-color: var(--border-strong); }
+.imgprev-nav.prev { left: 0.6rem; }
+.imgprev-nav.next { right: 0.6rem; }
+.imgprev-footer {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  border-top: 1px solid var(--border);
+}
+.imgprev-zoom { padding: 0.15rem 0.6rem; font-size: 0.9rem; }
+.imgprev-pct { color: var(--text-dim); font-size: 0.8rem; min-width: 3.2em; text-align: center; }
+.imgprev-hint { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
+@media (max-width: 640px) {
+  .imgprev-hint { display: none; }
+}
 
 /* Board card attachment badges (KBR-28) */
 .attach-badges { display: inline-flex; align-items: center; gap: 0.4rem; margin-left: auto; }
