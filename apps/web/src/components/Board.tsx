@@ -41,7 +41,7 @@ type ModalState =
   | { mode: 'view'; card: CardDto } // open an existing card (modal toggles view/edit itself)
   | null;
 
-export default function Board({ projectId, users, meId, tenantSlug, reloadNonce = 0, filter = EMPTY_FILTER, projectLabels = [], nav = null, onNavHandled, onViewArchive }: { projectId: string; users: UserDto[]; meId: string; tenantSlug?: string; reloadNonce?: number; filter?: BoardFilter; projectLabels?: LabelDto[]; nav?: BoardNav | null; onNavHandled?: () => void; onViewArchive?: () => void }) {
+export default function Board({ projectId, users, meId, tenantSlug, reloadNonce = 0, filter = EMPTY_FILTER, projectLabels = [], nav = null, onNavHandled, onViewArchive, isAdmin = true }: { projectId: string; users: UserDto[]; meId: string; tenantSlug?: string; reloadNonce?: number; filter?: BoardFilter; projectLabels?: LabelDto[]; nav?: BoardNav | null; onNavHandled?: () => void; onViewArchive?: () => void; isAdmin?: boolean }) {
   const [columns, setColumns] = useState<ColumnDto[]>([]);
   const [archivedCount, setArchivedCount] = useState(0);
   const [items, setItems] = useState<Record<string, string[]>>({});
@@ -328,6 +328,7 @@ export default function Board({ projectId, users, meId, tenantSlug, reloadNonce 
               onRename={renameColumn}
               onDelete={deleteColumn}
               onSetRole={setColumnRole}
+              canShape={isAdmin}
               onArchiveAll={col.role === 'done' ? () => void archiveAll(col) : undefined}
               archivedCount={col.role === 'done' ? archivedCount : undefined}
               onViewArchive={col.role === 'done' ? onViewArchive : undefined}

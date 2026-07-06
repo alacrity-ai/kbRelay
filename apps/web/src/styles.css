@@ -245,6 +245,8 @@ select {
 /* Multi-workspace switcher rows (KBR-96) */
 .workspace-item.current { color: var(--text); font-weight: 600; cursor: default; }
 .workspace-current-mark { margin-left: auto; color: var(--accent); font-weight: 700; }
+/* Member view (KBR-94): the lane role is a static chip, not a picker. */
+.column-role-static { display: inline-flex; align-items: center; cursor: default; }
 
 /* Project switcher */
 .project-trigger { max-width: min(320px, 46vw); }

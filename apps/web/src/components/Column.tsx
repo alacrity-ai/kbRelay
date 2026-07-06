@@ -18,6 +18,7 @@ export default function Column({
   onArchiveAll,
   archivedCount,
   onViewArchive,
+  canShape = true,
 }: {
   column: ColumnDto;
   cards: CardDto[];
@@ -33,6 +34,8 @@ export default function Column({
   archivedCount?: number;
   /** Open Project Settings → Archive from the done-lane badge (KBR-75). */
   onViewArchive?: () => void;
+  /** False for non-admins (KBR-94): hides rename/delete/role controls. */
+  canShape?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const role = column.role ? ROLE_META[column.role] : null;
@@ -66,26 +69,39 @@ export default function Column({
                 </svg>
               </button>
             )}
-            <button className="icon-btn ghost" title="Rename column" onClick={() => onRename(column)} aria-label="Rename column">✎</button>
-            <button className="icon-btn ghost" title="Delete column" onClick={() => onDelete(column)} aria-label="Delete column">✕</button>
+            {canShape && (
+              <>
+                <button className="icon-btn ghost" title="Rename column" onClick={() => onRename(column)} aria-label="Rename column">✎</button>
+                <button className="icon-btn ghost" title="Delete column" onClick={() => onDelete(column)} aria-label="Delete column">✕</button>
+              </>
+            )}
           </div>
         </div>
         {/* Row 2: role picker + a (?) popover explaining the role. Fixed second
             row keeps every header the same height so lanes line up. */}
         <div className="column-header-bottom">
-          <select
-            className="column-role-select"
-            value={column.role ?? ''}
-            title="Set this lane's role — one lane per role (reassigning moves it)"
-            aria-label={`Role for ${column.name}`}
-            style={role ? { color: role.color, borderColor: role.color } : undefined}
-            onChange={(e) => onSetRole(column, (e.target.value || null) as ColumnRole | null)}
-          >
-            <option value="">No role</option>
-            {ROLE_ORDER.map((r) => (
-              <option key={r} value={r}>{ROLE_META[r].label}</option>
-            ))}
-          </select>
+          {canShape ? (
+            <select
+              className="column-role-select"
+              value={column.role ?? ''}
+              title="Set this lane's role — one lane per role (reassigning moves it)"
+              aria-label={`Role for ${column.name}`}
+              style={role ? { color: role.color, borderColor: role.color } : undefined}
+              onChange={(e) => onSetRole(column, (e.target.value || null) as ColumnRole | null)}
+            >
+              <option value="">No role</option>
+              {ROLE_ORDER.map((r) => (
+                <option key={r} value={r}>{ROLE_META[r].label}</option>
+              ))}
+            </select>
+          ) : (
+            <span
+              className="column-role-select column-role-static"
+              style={role ? { color: role.color, borderColor: role.color } : undefined}
+            >
+              {role ? role.label : 'No role'}
+            </span>
+          )}
           <RoleHelp role={role} roleHelp={roleHelp} />
           {/* Archived count on the done lane (KBR-75): right-justified, deep-links
               to Project Settings → Archive. */}

@@ -624,6 +624,7 @@ export default function BoardApp({
           nav={nav && nav.cardId ? nav : null}
           onNavHandled={() => setNav(null)}
           onViewArchive={isAdmin ? () => openSettings('archive') : undefined}
+          isAdmin={isAdmin}
         />
       ) : (
         <div className="center">
