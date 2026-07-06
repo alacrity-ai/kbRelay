@@ -7,6 +7,7 @@ import { useDialog } from '../components/Dialog';
 import { recordProjectView, orderByRecency } from '../lib/recentProjects';
 import Board, { type BoardNav } from '../components/Board';
 import ActivityFeed from '../components/ActivityFeed';
+import Analytics from '../components/Analytics';
 import QuickFind from '../components/QuickFind';
 import MyWork from '../components/MyWork';
 import Dropdown from '../components/Dropdown';
@@ -84,6 +85,19 @@ function Magnifier() {
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <circle cx="11" cy="11" r="7" />
       <path d="m21 21-4.35-4.35" />
+    </svg>
+  );
+}
+
+/** Bar-chart glyph for the Analytics view (KBR-102). */
+function ChartBars() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 20v-6" />
+      <path d="M10 20V4" />
+      <path d="M16 20v-9" />
+      <path d="M2 20h20" />
     </svg>
   );
 }
@@ -167,9 +181,9 @@ export default function BoardApp({
   // Mentions are added at render time so a mark-read updates the badge instantly.
   const [queueCount, setQueueCount] = useState(0);
   const [nav, setNav] = useState<BoardNav | null>(null);
-  // My Work (default landing, KBR-64) vs board vs Activity feed (KBR-67).
-  // A card jump always returns to the board.
-  const [view, setView] = useState<'mywork' | 'board' | 'activity'>('mywork');
+  // My Work (default landing, KBR-64) vs board vs Activity feed (KBR-67) vs
+  // Analytics (KBR-102). A card jump always returns to the board.
+  const [view, setView] = useState<'mywork' | 'board' | 'activity' | 'analytics'>('mywork');
   // Global quick-find palette (v0.17.0, KBR-68) — Cmd/Ctrl+K or the topbar button.
   const [findOpen, setFindOpen] = useState(false);
 
@@ -472,6 +486,17 @@ export default function BoardApp({
           </button>
         )}
 
+        {selected && view !== 'mywork' && (
+          <button
+            className={`icon-btn subtle topbar-tool analytics-btn ${view === 'analytics' ? 'active' : ''}`}
+            onClick={() => setView((v) => (v === 'analytics' ? 'board' : 'analytics'))}
+            aria-label={view === 'analytics' ? 'Show board' : 'Analytics'}
+            title={view === 'analytics' ? 'Show board' : 'Analytics'}
+          >
+            <ChartBars />
+          </button>
+        )}
+
         <button
           className="icon-btn subtle topbar-tool quickfind-btn"
           onClick={() => setFindOpen(true)}
@@ -508,6 +533,9 @@ export default function BoardApp({
                 </button>
                 <button className="menu-item" onClick={() => setView((v) => (v === 'activity' ? 'board' : 'activity'))}>
                   <Pulse /> {view === 'activity' ? 'Show board' : 'Project activity'}
+                </button>
+                <button className="menu-item" onClick={() => setView((v) => (v === 'analytics' ? 'board' : 'analytics'))}>
+                  <ChartBars /> {view === 'analytics' ? 'Show board' : 'Analytics'}
                 </button>
               </>
             )}
@@ -611,6 +639,12 @@ export default function BoardApp({
         />
       ) : selected && view === 'activity' ? (
         <ActivityFeed key={selected} projectId={selected} users={projectUsers} />
+      ) : selected && view === 'analytics' ? (
+        <Analytics
+          key={selected}
+          projectId={selected}
+          projectName={projects.find((p) => p.id === selected)?.name}
+        />
       ) : selected ? (
         <Board
           key={selected}

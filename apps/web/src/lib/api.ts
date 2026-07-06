@@ -31,6 +31,8 @@ import type {
   AttachmentDto,
   CardLinkDto,
   CreateCardLinkInput,
+  ProjectAnalyticsResponse,
+  TenantAnalyticsResponse,
 } from '@kbrelay/shared';
 import { getToken } from './auth';
 
@@ -243,6 +245,15 @@ export const listProjectEvents = (
   const qs = q.toString();
   return request<ProjectEventsResponse>('GET', `/v1/projects/${projectId}/events${qs ? `?${qs}` : ''}`);
 };
+
+// ── Analytics (v0.19.0) ──
+export const getProjectAnalytics = (projectId: string, days?: number) =>
+  request<ProjectAnalyticsResponse>(
+    'GET',
+    `/v1/projects/${projectId}/analytics${days != null ? `?days=${days}` : ''}`,
+  );
+export const getTenantAnalytics = (days?: number) =>
+  request<TenantAnalyticsResponse>('GET', `/v1/analytics${days != null ? `?days=${days}` : ''}`);
 
 // ── Card timeline (v0.3.0) ──
 export const getTimeline = (cardId: string) =>
