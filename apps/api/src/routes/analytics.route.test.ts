@@ -49,7 +49,7 @@ beforeAll(async () => {
   for (const c of await listColumns(env, tenantId, p1)) if (c.role) cols[c.role] = c.id;
 
   // Member-roled agent with access to p1 ONLY.
-  const agent = await createAgent(env, tenantId, ownerId, 'Worker', [p1]);
+  const agent = await createAgent(env, tenantId, { userId: ownerId, isAdmin: true, isOwner: true }, 'Worker', [p1]);
   memberId = agent.id;
 
   // A: owner's card, assigned to owner, worked properly (ready → in_progress →
@@ -147,7 +147,7 @@ describe('tenantAnalytics', () => {
   });
 
   it('a member with no grants gets an empty (not erroring) payload', async () => {
-    const lurker = await createAgent(env, tenantId, ownerId, 'Lurker', []);
+    const lurker = await createAgent(env, tenantId, { userId: ownerId, isAdmin: true, isOwner: true }, 'Lurker', []);
     const dto = await tenantAnalytics(env, tenantId, { userId: lurker.id, isAdmin: false }, 30, Date.now());
     expect(dto.totals).toEqual({ created: 0, completed: 0, activeCards: 0, overdue: 0, comments: 0 });
     expect(dto.projects).toEqual([]);
@@ -211,7 +211,7 @@ describe('valueAsOf (point-in-time role reconstruction)', () => {
 describe('attribution credits the role-holder, not the mover (KBR-105)', () => {
   it('completion → assignee@done, review → reviewer@done', async () => {
     const proj = await createProject(env, tenantId, ownerId, { name: 'Attrib', code: 'ATR' });
-    const worker = await createAgent(env, tenantId, ownerId, 'Attr Worker', [proj.id]);
+    const worker = await createAgent(env, tenantId, { userId: ownerId, isAdmin: true, isOwner: true }, 'Attr Worker', [proj.id]);
     const acols: Record<string, string> = {};
     for (const ac of await listColumns(env, tenantId, proj.id)) if (ac.role) acols[ac.role] = ac.id;
 

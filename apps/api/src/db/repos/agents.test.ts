@@ -24,6 +24,11 @@ let tenantId: string;
 let ownerId: string;
 let projectId: string;
 
+// The registrant is the tenant owner (KBR-114); all ops here act as them.
+// Scope-matrix coverage (member/admin/owner visibility) lives in
+// agent-ownership.test.ts.
+const owner = () => ({ userId: ownerId, isAdmin: true, isOwner: true });
+
 beforeAll(async () => {
   const { db, client } = createLibsqlDb(':memory:');
   const files = (await readdir(migrationsDir)).filter((f) => f.endsWith('.sql')).sort();
@@ -51,7 +56,7 @@ beforeAll(async () => {
 
 describe('agent users', () => {
   it('the starter Assistant agent is owned by the tenant owner', async () => {
-    const agents = await listAgents(env, tenantId);
+    const agents = await listAgents(env, tenantId, owner());
     expect(agents.length).toBe(1);
     expect(agents[0]!.name).toBe('Assistant');
     expect(agents[0]!.ownerUserId).toBe(ownerId);
@@ -62,11 +67,11 @@ describe('agent users', () => {
   // KBR-113 — agents carry their workspace role and are promoted/demoted
   // through the same membership path as humans.
   it('agents surface their membership role and can be promoted to admin', async () => {
-    const created = await createAgent(env, tenantId, ownerId, 'Roley');
+    const created = await createAgent(env, tenantId, owner(), 'Roley');
     expect(created.role).toBe('member'); // create seeds member; admin is an explicit promotion
 
     await setMemberRole(env, tenantId, created.id, 'admin');
-    let agents = await listAgents(env, tenantId);
+    let agents = await listAgents(env, tenantId, owner());
     expect(agents.find((a) => a.id === created.id)!.role).toBe('admin');
 
     // Since KBR-114 the tenant owner is un-demotable, so an admin human always
@@ -75,17 +80,17 @@ describe('agent users', () => {
     await expect(setMemberRole(env, tenantId, ownerId, 'member')).rejects.toMatchObject({ status: 409 });
 
     await setMemberRole(env, tenantId, created.id, 'member');
-    agents = await listAgents(env, tenantId);
+    agents = await listAgents(env, tenantId, owner());
     expect(agents.find((a) => a.id === created.id)!.role).toBe('member');
-    await removeAgent(env, tenantId, created.id);
+    await removeAgent(env, tenantId, owner(), created.id);
   });
 
   it('create grants a handle, membership, and the requested project access', async () => {
-    const created = await createAgent(env, tenantId, ownerId, 'Claude', [projectId]);
+    const created = await createAgent(env, tenantId, owner(), 'Claude', [projectId]);
     expect(created.handle).toBe('claude');
     expect(created.projectIds).toEqual([projectId]);
 
-    const agents = await listAgents(env, tenantId);
+    const agents = await listAgents(env, tenantId, owner());
     const claude = agents.find((a) => a.id === created.id)!;
     expect(claude.ownerUserId).toBe(ownerId);
     expect(claude.projectIds).toEqual([projectId]);
@@ -93,7 +98,7 @@ describe('agent users', () => {
   });
 
   it('minting a key for an agent shows up in its token list + count', async () => {
-    const claude = (await listAgents(env, tenantId)).find((a) => a.name === 'Claude')!;
+    const claude = (await listAgents(env, tenantId, owner())).find((a) => a.name === 'Claude')!;
     const created = await createToken(env, tenantId, claude.id, 'claude-laptop');
     expect(created.secret).toMatch(/^[a-f0-9]{64}$/);
 
@@ -101,12 +106,12 @@ describe('agent users', () => {
     expect(tokens.length).toBe(1);
     expect(tokens[0]!.label).toBe('claude-laptop');
 
-    const refreshed = (await listAgents(env, tenantId)).find((a) => a.id === claude.id)!;
+    const refreshed = (await listAgents(env, tenantId, owner())).find((a) => a.id === claude.id)!;
     expect(refreshed.tokenCount).toBe(1);
   });
 
   it('an agent key resolves to the agent identity (provenance crux)', async () => {
-    const agent = await createAgent(env, tenantId, ownerId, 'Provenance Bot', [projectId]);
+    const agent = await createAgent(env, tenantId, owner(), 'Provenance Bot', [projectId]);
     const { secret } = await createToken(env, tenantId, agent.id, 'prov-key');
     const req = new Request('http://x/api/v1/me', {
       headers: { authorization: `Bearer ${secret}` },
@@ -116,7 +121,7 @@ describe('agent users', () => {
     expect(ctx!.userId).toBe(agent.id); // work done with this key is attributed to the agent
     expect(ctx!.userKind).toBe('agent');
     expect(ctx!.role).toBe('member');
-    await removeAgent(env, tenantId, agent.id); // clean up so later counts are stable
+    await removeAgent(env, tenantId, owner(), agent.id); // clean up so later counts are stable
   });
 
   it('assertAgentInTenant rejects a human and an unknown id', async () => {
@@ -125,38 +130,38 @@ describe('agent users', () => {
   });
 
   it('patch renames and reassigns owner (owner must be a member)', async () => {
-    const claude = (await listAgents(env, tenantId)).find((a) => a.name === 'Claude')!;
-    await patchAgent(env, tenantId, claude.id, { name: 'Claude Opus' });
-    let refreshed = (await listAgents(env, tenantId)).find((a) => a.id === claude.id)!;
+    const claude = (await listAgents(env, tenantId, owner())).find((a) => a.name === 'Claude')!;
+    await patchAgent(env, tenantId, owner(), claude.id, { name: 'Claude Opus' });
+    let refreshed = (await listAgents(env, tenantId, owner())).find((a) => a.id === claude.id)!;
     expect(refreshed.name).toBe('Claude Opus');
 
     // Reassigning to a non-member is rejected.
     await expect(
-      patchAgent(env, tenantId, claude.id, { ownerUserId: 'u_stranger' }),
+      patchAgent(env, tenantId, owner(), claude.id, { ownerUserId: 'u_stranger' }),
     ).rejects.toThrow();
 
     // The starter agent is a member, so it's a valid (if unusual) owner target.
-    const assistant = (await listAgents(env, tenantId)).find((a) => a.name === 'Assistant')!;
-    await patchAgent(env, tenantId, claude.id, { ownerUserId: assistant.id });
-    refreshed = (await listAgents(env, tenantId)).find((a) => a.id === claude.id)!;
+    const assistant = (await listAgents(env, tenantId, owner())).find((a) => a.name === 'Assistant')!;
+    await patchAgent(env, tenantId, owner(), claude.id, { ownerUserId: assistant.id });
+    refreshed = (await listAgents(env, tenantId, owner())).find((a) => a.id === claude.id)!;
     expect(refreshed.ownerUserId).toBe(assistant.id);
   });
 
   it('patch recolors an agent; null color means the palette fallback (KBR-74)', async () => {
-    const claude = (await listAgents(env, tenantId)).find((a) => a.name === 'Claude Opus')!;
+    const claude = (await listAgents(env, tenantId, owner())).find((a) => a.name === 'Claude Opus')!;
     expect(claude.color).toBeNull(); // never explicitly colored
 
-    await patchAgent(env, tenantId, claude.id, { color: '#DB2777' });
-    const refreshed = (await listAgents(env, tenantId)).find((a) => a.id === claude.id)!;
+    await patchAgent(env, tenantId, owner(), claude.id, { color: '#DB2777' });
+    const refreshed = (await listAgents(env, tenantId, owner())).find((a) => a.id === claude.id)!;
     expect(refreshed.color).toBe('#DB2777');
   });
 
   it('deactivate drops membership/access/tokens but keeps the user row', async () => {
-    const claude = (await listAgents(env, tenantId)).find((a) => a.name === 'Claude Opus')!;
-    await removeAgent(env, tenantId, claude.id);
+    const claude = (await listAgents(env, tenantId, owner())).find((a) => a.name === 'Claude Opus')!;
+    await removeAgent(env, tenantId, owner(), claude.id);
 
     // No longer listed (membership gone).
-    expect((await listAgents(env, tenantId)).some((a) => a.id === claude.id)).toBe(false);
+    expect((await listAgents(env, tenantId, owner())).some((a) => a.id === claude.id)).toBe(false);
     // Tokens revoked.
     expect((await listTokens(env, tenantId, claude.id)).length).toBe(0);
     // project_access gone.

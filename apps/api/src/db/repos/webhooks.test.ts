@@ -41,7 +41,7 @@ beforeAll(async () => {
   ownerId = reg.userId;
   const project = await createProject(env, tenantId, ownerId, { name: 'B', code: 'WHR' });
   projectId = project.id;
-  agentId = (await createAgent(env, tenantId, ownerId, 'Claude', [projectId])).id;
+  agentId = (await createAgent(env, tenantId, { userId: ownerId, isAdmin: true, isOwner: true }, 'Claude', [projectId])).id;
   readyCol = (await listColumns(env, tenantId, projectId)).find((c) => c.role === 'ready')!.id;
 });
 

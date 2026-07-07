@@ -15,6 +15,8 @@ import { handleCreateColumn, handlePatchColumn, handleDeleteColumn } from './col
 import { handleCreateLabel, handlePatchLabel, handleDeleteLabel } from './labels';
 import { handleCreateProjectLabel, handlePatchProjectLabel, handleDeleteProjectLabel, handleSetProjectLabels } from './projectLabels';
 import { handleCreateCard, handlePatchCard, handleDeleteCard } from './cards';
+import { handleListAgents } from './agents';
+import { handleSetMemberRole, handleSetMemberProjects, handleRemoveMember } from './team';
 
 /**
  * KBR-94: board-shaping surfaces are admin-only. Members (human or agent) keep
@@ -45,7 +47,7 @@ beforeAll(async () => {
   const project = await createProject(env, reg.tenantId, reg.userId, { name: 'Board', code: 'RBC' });
   projectId = project.id;
   // A member-roled agent user with access to the project — the "worker" persona.
-  const agent = await createAgent(env, reg.tenantId, reg.userId, 'Worker', [projectId]);
+  const agent = await createAgent(env, reg.tenantId, { userId: reg.userId, isAdmin: true, isOwner: true }, 'Worker', [projectId]);
   memberAuth = {
     tenantId: reg.tenantId, userId: agent.id, userName: 'Worker',
     userKind: 'agent', role: 'member', color: '#111111', tokenId: null,
@@ -151,3 +153,19 @@ describe('KBR-94: admin is unaffected', () => {
   });
 });
 
+
+describe('KBR-115: agents surface is ownership-scoped, not admin-gated', () => {
+  it('a member can list agents (scoped, possibly empty) instead of 403', async () => {
+    const res = await handleListAgents(ctx(memberAuth, {}, undefined, 'GET'));
+    expect(res.status).toBe(200);
+    const { agents } = (await res.json()) as { agents: { id: string }[] };
+    expect(agents).toEqual([]); // Worker owns no agents
+  });
+
+  it('team role/project/remove routes reject agent targets with 400', async () => {
+    const agentId = memberAuth.userId; // Worker is an agent user
+    expect(await status(handleSetMemberRole(ctx(adminAuth, { userId: agentId }, { role: 'admin' }, 'PATCH')))).toBe(400);
+    expect(await status(handleSetMemberProjects(ctx(adminAuth, { userId: agentId }, { projectIds: [] }, 'PUT')))).toBe(400);
+    expect(await status(handleRemoveMember(ctx(adminAuth, { userId: agentId }, undefined, 'DELETE')))).toBe(400);
+  });
+});

@@ -67,6 +67,7 @@ import {
   handleListAgents,
   handleCreateAgent,
   handlePatchAgent,
+  handleSetAgentProjects,
   handleRemoveAgent,
   handleListAgentTokens,
   handleCreateAgentToken,
@@ -175,10 +176,11 @@ export const routes: Route[] = [
   { method: 'DELETE', pattern: '/api/v1/team/members/:userId', handler: handleRemoveMember },
   { method: 'PUT', pattern: '/api/v1/team/members/:userId/projects', handler: handleSetMemberProjects },
 
-  // ── Agent users (v0.14.0) — admin-gated in-handler; not project-scoped ──
+  // ── Agent users (v0.14.0; ownership-scoped in-repo since KBR-115) ──
   { method: 'GET', pattern: '/api/v1/agents', handler: handleListAgents },
   { method: 'POST', pattern: '/api/v1/agents', handler: handleCreateAgent },
   { method: 'PATCH', pattern: '/api/v1/agents/:userId', handler: handlePatchAgent },
+  { method: 'PUT', pattern: '/api/v1/agents/:userId/projects', handler: handleSetAgentProjects },
   { method: 'DELETE', pattern: '/api/v1/agents/:userId', handler: handleRemoveAgent },
   { method: 'GET', pattern: '/api/v1/agents/:userId/tokens', handler: handleListAgentTokens },
   { method: 'POST', pattern: '/api/v1/agents/:userId/tokens', handler: handleCreateAgentToken },

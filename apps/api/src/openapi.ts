@@ -489,13 +489,22 @@ export const OPENAPI_SPEC = {
       },
     },
     '/api/v1/agents': {
-      get: { summary: 'List agent users — with owner, project access, key count (admin)', responses: { 200: { description: 'ok' } } },
-      post: {
-        summary: 'Create an agent user (admin) — kind=agent, owned by the caller',
+      get: {
+        summary: 'List the agents you can manage — with owner, role/cap, project access, key count',
         description:
-          'Creates an agent user with a membership (role member) and optional ' +
-          'project access. Mint keys for it via /agents/{userId}/tokens; its work ' +
-          'is then attributed to the agent, not to you.',
+          'Ownership-scoped (KBR-115): members see only their own agents; admins ' +
+          'also see member-owned and ownerless agents (never another admin\'s); ' +
+          'the workspace owner sees every agent. Each entry carries `roleCap` — ' +
+          'the highest role the agent may hold (its owner\'s role).',
+        responses: { 200: { description: 'ok' } },
+      },
+      post: {
+        summary: 'Create an agent user — kind=agent, owned by the caller',
+        description:
+          'Open to every workspace user. Creates an agent user with a membership ' +
+          '(role member) and optional project access, intersected with the ' +
+          'projects YOU can see. Mint keys for it via /agents/{userId}/tokens; ' +
+          'its work is then attributed to the agent, not to you.',
         requestBody: {
           required: true,
           content: {
@@ -505,7 +514,7 @@ export const OPENAPI_SPEC = {
                 required: ['name'],
                 properties: {
                   name: { type: 'string' },
-                  projectIds: { type: 'array', items: { type: 'string' }, description: 'Projects to grant up front.' },
+                  projectIds: { type: 'array', items: { type: 'string' }, description: 'Projects to grant up front (silently limited to projects the caller can see).' },
                 },
               },
             },
@@ -516,34 +525,59 @@ export const OPENAPI_SPEC = {
     },
     '/api/v1/agents/{userId}': {
       patch: {
-        summary: 'Rename an agent and/or reassign its owner (admin)',
+        summary: "Rename/recolor an agent, set its role, and/or reassign its owner",
+        description:
+          'Scoped to agents you manage (404 otherwise). `role` is capped at the ' +
+          'owner\'s role — an agent never outranks its owning human (403). ' +
+          '`ownerUserId` reassignment is admin-only and may not leave an admin ' +
+          'agent owned by a member.',
         requestBody: {
           required: true,
           content: {
             'application/json': {
               schema: {
                 type: 'object',
-                description: 'Provide name and/or ownerUserId.',
+                description: 'Provide name, ownerUserId, color, and/or role.',
                 properties: {
                   name: { type: 'string' },
-                  ownerUserId: { type: 'string', description: 'Must be a member of the workspace.' },
+                  ownerUserId: { type: 'string', description: 'Must be a member of the workspace (admin-only).' },
+                  color: { type: 'string', description: '#rrggbb hex' },
+                  role: { type: 'string', enum: ['admin', 'member'], description: "Capped at the owner's role." },
                 },
               },
             },
           },
         },
-        responses: { 200: { description: 'ok' }, 400: { description: 'invalid owner' }, 404: { description: 'not an agent' } },
+        responses: { 200: { description: 'ok' }, 400: { description: 'invalid owner' }, 403: { description: 'role exceeds the owner cap' }, 404: { description: 'not an agent you manage' } },
       },
       delete: {
-        summary: 'Deactivate an agent (admin) — revoke keys, drop access; keep the user row',
+        summary: 'Deactivate an agent you manage — revoke keys, drop access; keep the user row',
         description: 'Revokes all the agent\'s tokens and removes its membership + project access. The users row is kept so cards it created keep its name.',
-        responses: { 200: { description: 'ok' }, 404: { description: 'not an agent' } },
+        responses: { 200: { description: 'ok' }, 404: { description: 'not an agent you manage' } },
+      },
+    },
+    '/api/v1/agents/{userId}/projects': {
+      put: {
+        summary: "Replace an agent's project access — within the projects YOU can see",
+        description:
+          'Scoped replace (KBR-115): grants and revokes apply only to projects ' +
+          'the caller can see, so a member\'s save never disturbs an ' +
+          'admin-granted project outside their view. Admins replace the full set.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { type: 'object', required: ['projectIds'], properties: { projectIds: { type: 'array', items: { type: 'string' } } } },
+            },
+          },
+        },
+        responses: { 200: { description: 'ok' }, 404: { description: 'not an agent you manage' } },
       },
     },
     '/api/v1/agents/{userId}/tokens': {
-      get: { summary: 'List an agent\'s API keys (admin)', responses: { 200: { description: 'ok' } } },
+      get: { summary: "List an agent's API keys (agents you manage)", responses: { 200: { description: 'ok' } } },
       post: {
-        summary: 'Mint an API key for an agent (admin) — returns the plaintext secret ONCE',
+        summary: 'Mint an API key for an agent you manage — returns the plaintext secret ONCE',
         requestBody: {
           required: true,
           content: {
@@ -556,7 +590,7 @@ export const OPENAPI_SPEC = {
       },
     },
     '/api/v1/agents/{userId}/tokens/{tokenId}': {
-      delete: { summary: 'Revoke an agent\'s API key (admin)', responses: { 200: { description: 'ok' }, 404: { description: 'not found' } } },
+      delete: { summary: "Revoke an agent's API key (agents you manage)", responses: { 200: { description: 'ok' }, 404: { description: 'not found' } } },
     },
     '/api/v1/me/tokens': {
       get: { summary: 'List your API tokens (never the secret)', responses: { 200: { description: 'ok' } } },

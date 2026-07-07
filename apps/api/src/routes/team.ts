@@ -14,12 +14,27 @@ import {
   replaceMemberProjectAccess,
 } from '../db/repos/team';
 import { getTenant } from '../db/repos/users';
+import { HttpError } from '../http';
 
 /**
  * Team management + project RBAC admin surface (v0.11.0). Every handler here is
  * admin-gated via requireAdmin (403 otherwise). accept-invite is public and
  * lives in routes/auth.ts. Project access is binary — grant or revoke.
+ *
+ * Role/project mutations are HUMANS-ONLY since KBR-115: agents go through the
+ * /agents API, where ownership scope and the role cap are enforced — reaching
+ * an agent through here would bypass both.
  */
+
+/** 400 if the target user is an agent — the /agents API owns agent mutations. */
+async function rejectAgentTarget(ctx: RouteContext, userId: string): Promise<void> {
+  const row = await ctx.env.db.prepare('SELECT kind FROM users WHERE id = ?')
+    .bind(userId)
+    .first<{ kind: string }>();
+  if (row?.kind === 'agent') {
+    throw new HttpError(400, 'Agents are managed via the /agents API');
+  }
+}
 
 // ── GET /api/v1/team ──────────────────────────────────────────
 export async function handleGetTeam(ctx: RouteContext): Promise<Response> {
@@ -66,6 +81,7 @@ export async function handleRevokeInvite(ctx: RouteContext): Promise<Response> {
 export async function handleSetMemberRole(ctx: RouteContext): Promise<Response> {
   const { env, cors, auth, params, request } = ctx;
   requireAdmin(auth);
+  await rejectAgentTarget(ctx, params.userId!);
   const input = await parseJson(request, setMemberRoleInput);
   await setMemberRole(env, auth!.tenantId, params.userId!, input.role);
   return jsonResponse(200, { ok: true }, cors);
@@ -75,6 +91,7 @@ export async function handleSetMemberRole(ctx: RouteContext): Promise<Response> 
 export async function handleRemoveMember(ctx: RouteContext): Promise<Response> {
   const { env, cors, auth, params } = ctx;
   requireAdmin(auth);
+  await rejectAgentTarget(ctx, params.userId!);
   await removeMember(env, auth!.tenantId, params.userId!);
   return jsonResponse(200, { ok: true }, cors);
 }
@@ -83,6 +100,7 @@ export async function handleRemoveMember(ctx: RouteContext): Promise<Response> {
 export async function handleSetMemberProjects(ctx: RouteContext): Promise<Response> {
   const { env, cors, auth, params, request } = ctx;
   requireAdmin(auth);
+  await rejectAgentTarget(ctx, params.userId!);
   const input = await parseJson(request, setProjectAccessInput);
   await replaceMemberProjectAccess(env, auth!.tenantId, params.userId!, input.projectIds);
   return jsonResponse(200, { ok: true }, cors);
