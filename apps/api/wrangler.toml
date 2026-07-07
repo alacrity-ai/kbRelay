@@ -34,10 +34,13 @@ PUBLIC_BASE_URL = "https://kbrelay.lalalimited.com"
 pattern = "kbrelay.lalalimited.com/api/*"
 zone_name = "lalalimited.com"
 
-# Scalar docs (KBR-109). The Worker owns exactly `/docs`; everything else on the
-# host (the SPA) stays with Pages. Worker routes take precedence over Pages.
+# Scalar docs (KBR-109). Wildcard (not exact `/docs`) is deliberate: a Pages
+# custom domain shadows a *non-wildcard* Worker route, so an exact `/docs` route
+# lost to the SPA in prod. The `/api/*` route wins precisely because it's a
+# wildcard — mirror that. The router only handles exact `/docs`; `/docs/<x>`
+# 404s from the Worker, which is fine (no such page exists).
 [[env.prod.routes]]
-pattern = "kbrelay.lalalimited.com/docs"
+pattern = "kbrelay.lalalimited.com/docs*"
 zone_name = "lalalimited.com"
 
 [[env.prod.d1_databases]]
@@ -68,9 +71,9 @@ PUBLIC_BASE_URL = "https://dev.kbrelay.lalalimited.com"
 pattern = "dev.kbrelay.lalalimited.com/api/*"
 zone_name = "lalalimited.com"
 
-# Scalar docs (KBR-109) — mirror of the prod `/docs` route.
+# Scalar docs (KBR-109) — mirror of the prod `/docs*` route (see prod note).
 [[env.dev.routes]]
-pattern = "dev.kbrelay.lalalimited.com/docs"
+pattern = "dev.kbrelay.lalalimited.com/docs*"
 zone_name = "lalalimited.com"
 
 [[env.dev.d1_databases]]

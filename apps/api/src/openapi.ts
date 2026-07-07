@@ -1,5 +1,6 @@
 import type { RouteContext } from './router';
 import { API_DESCRIPTION } from './openapi-description';
+import { buildEnrichedSpec } from './openapi-tags';
 
 /**
  * Canonical OpenAPI 3.1 description of the kbRelay API. This object is
@@ -970,9 +971,17 @@ export const OPENAPI_SPEC = {
   },
 } as const;
 
+/**
+ * The served spec: the canonical contract above, enriched with sidebar `tags` +
+ * `x-tagGroups` (KBR-109). Computed once — the tags are derived from paths, so
+ * this never drifts from the route table. OPENAPI_SPEC stays the raw source of
+ * truth the parity test reads.
+ */
+const ENRICHED_SPEC = buildEnrichedSpec(OPENAPI_SPEC);
+
 /** GET /api/openapi.json — public. */
 export function handleOpenApi(ctx: RouteContext): Response {
-  return new Response(JSON.stringify(OPENAPI_SPEC, null, 2), {
+  return new Response(JSON.stringify(ENRICHED_SPEC, null, 2), {
     status: 200,
     headers: { ...ctx.cors, 'content-type': 'application/json; charset=utf-8' },
   });
