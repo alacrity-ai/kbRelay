@@ -296,11 +296,18 @@ export async function patchAgent(
     newOwnerRole = owner.role as MembershipRole;
   }
 
-  // The role the agent will end up with, checked against the cap of the owner
-  // it will end up with — so a combined {role, ownerUserId} patch is coherent.
+  // The cap gates PROMOTIONS and TRANSFERS, not pre-existing state: an agent
+  // that is already admin above its cap (owner removed/reassigned, or promoted
+  // pre-KBR-115) stays patchable — it just can't be promoted again, and a
+  // transfer can't newly place an admin agent under a member owner. The role
+  // the agent will end up with is checked against the owner it will end up
+  // with, so a combined {role, ownerUserId} patch is coherent.
   const effectiveRole = input.role ?? agent.role;
-  const effectiveCap = capFor(newOwnerRole ?? agent.ownerRole);
-  if (effectiveRole === 'admin' && effectiveCap !== 'admin') {
+  const isPromotion = input.role === 'admin' && agent.role !== 'admin';
+  if (isPromotion && capFor(newOwnerRole ?? agent.ownerRole) !== 'admin') {
+    throw new HttpError(403, "An agent can't outrank its owner");
+  }
+  if (input.ownerUserId !== undefined && effectiveRole === 'admin' && capFor(newOwnerRole) !== 'admin') {
     throw new HttpError(403, "An agent can't outrank its owner");
   }
 

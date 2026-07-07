@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type {
   TeamMember,
   PendingInvite,
@@ -6,25 +6,23 @@ import type {
   ProjectLabelDto,
   MembershipRole,
   AgentSummary,
-  TokenSummary,
   WebhookSubscriptionDto,
 } from '@kbrelay/shared';
-import { USER_PALETTE, colorForUser, MAX_PROJECT_LABELS_PER_TENANT } from '@kbrelay/shared';
+import { USER_PALETTE, MAX_PROJECT_LABELS_PER_TENANT } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { useDialog } from './Dialog';
-import { McpGuideButton } from './McpGuide';
+import ProjectAccessEditor, { initials } from './ProjectAccessEditor';
 
-type Tab = 'people' | 'agents' | 'webhooks' | 'labels';
+type Tab = 'people' | 'webhooks' | 'labels';
 
 /**
  * Tenant Settings — admin-only. Three tabs:
  *  - People: invite / remove / re-role human members + per-member project access.
- *  - Agents: create/manage agent users (kind='agent', owned by a human), their
- *    project access, and their API keys — the keys you hand to an agent runtime
- *    so its work is attributed to the agent, not to you.
  *  - Channel events: outbound webhook subscriptions (KBR-16) that push agent
  *    callbacks to a Claude Code channel / routine.
- * Reached from the account menu (hidden for non-admins).
+ *  - Project labels: tenant-wide board buckets (KBR-85).
+ * Agent management moved to its own modal, open to every role (KBR-116) —
+ * see AgentsModal. Reached from the account menu (hidden for non-admins).
  */
 export default function TenantSettings({
   meId,
@@ -46,7 +44,6 @@ export default function TenantSettings({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<MembershipRole>('member');
-  const [newAgentName, setNewAgentName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -55,6 +52,8 @@ export default function TenantSettings({
     setMembers(t.members);
     setInvites(t.invites);
   }
+  // Agents are managed in their own modal (KBR-116); the list here only feeds
+  // the Channel-events target picker, scoped to agents this admin can manage.
   async function loadAgents() {
     const { agents: a } = await api.listAgents();
     setAgents(a);
@@ -113,15 +112,6 @@ export default function TenantSettings({
     if (yes) void guarded(() => api.removeMember(m.id));
   };
 
-  const createAgent = () => {
-    const name = newAgentName.trim();
-    if (!name) return;
-    void guarded(async () => {
-      await api.createAgent(name);
-      setNewAgentName('');
-    });
-  };
-
   return (
     <div className="dialog-backdrop" onClick={() => { if (!busy) onClose(); }}>
       <div className="dialog-card wide" role="dialog" aria-modal="true" aria-labelledby="ts-title" onClick={(e) => e.stopPropagation()}>
@@ -135,7 +125,6 @@ export default function TenantSettings({
 
         <div className="settings-tabs">
           <button className={`tab ${tab === 'people' ? 'active' : ''}`} onClick={() => { setTab('people'); setExpanded(null); }}>People</button>
-          <button className={`tab ${tab === 'agents' ? 'active' : ''}`} onClick={() => { setTab('agents'); setExpanded(null); }}>Agents</button>
           <button className={`tab ${tab === 'webhooks' ? 'active' : ''}`} onClick={() => { setTab('webhooks'); setExpanded(null); }}>Channel events</button>
           <button className={`tab ${tab === 'labels' ? 'active' : ''}`} onClick={() => { setTab('labels'); setExpanded(null); }}>Project labels</button>
         </div>
@@ -238,49 +227,6 @@ export default function TenantSettings({
                       </div>
                     );
                   })
-                )}
-              </div>
-            </>
-          )}
-
-          {tab === 'agents' && (
-            <>
-              <p className="muted-note">
-                Agent users act with their own API keys, so their work is attributed to <em>them</em>, not to you. <McpGuideButton />
-                <br />
-                Create one per agent (Claude, ChatGPT, …), grant it projects, and mint a key to hand to its runtime or the kbRelay MCP.
-              </p>
-              <div className="field">
-                <label>New agent</label>
-                <div className="invite-row">
-                  <input
-                    value={newAgentName}
-                    placeholder="e.g. Claude"
-                    maxLength={80}
-                    onChange={(e) => setNewAgentName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') createAgent(); }}
-                  />
-                  <button className="primary" onClick={createAgent} disabled={!newAgentName.trim() || busy}>Create</button>
-                </div>
-              </div>
-
-              <div className="member-list">
-                <span className="view-label">Agents</span>
-                {agents === null ? (
-                  <div className="muted-note">Loading…</div>
-                ) : agents.length === 0 ? (
-                  <div className="muted-note">No agents yet.</div>
-                ) : (
-                  agents.map((a) => (
-                    <AgentCard
-                      key={a.id}
-                      agent={a}
-                      projects={projects}
-                      busy={busy}
-                      guarded={guarded}
-                      dialog={dialog}
-                    />
-                  ))
                 )}
               </div>
             </>
@@ -413,299 +359,6 @@ function ProjectLabelsPanel({ onChanged }: { onChanged: () => void }) {
       )}
     </>
   );
-}
-
-/** One agent row: identity + owner, with Projects + Keys expanders and Remove. */
-function AgentCard({
-  agent,
-  projects,
-  busy,
-  guarded,
-  dialog,
-}: {
-  agent: AgentSummary;
-  projects: ProjectDto[];
-  busy: boolean;
-  guarded: (fn: () => Promise<unknown>) => Promise<void>;
-  dialog: ReturnType<typeof useDialog>;
-}) {
-  const [panel, setPanel] = useState<'projects' | 'keys' | 'color' | null>(null);
-  const open = panel !== null;
-
-  const toggle = (p: 'projects' | 'keys' | 'color') => setPanel((cur) => (cur === p ? null : p));
-
-  // Effective color mirrors the board: explicit, else the deterministic fallback.
-  const agentColor = agent.color ?? colorForUser(agent.id);
-
-  const rename = async () => {
-    const name = await dialog.prompt({
-      title: 'Rename agent', label: 'Agent name', defaultValue: agent.name, confirmLabel: 'Save',
-    });
-    if (name && name.trim() && name.trim() !== agent.name) {
-      void guarded(() => api.patchAgent(agent.id, { name: name.trim() }));
-    }
-  };
-
-  const remove = async () => {
-    const yes = await dialog.confirm({
-      title: `Remove ${agent.name}?`,
-      message: 'Its API keys are revoked and it loses all access. Cards it created keep its name.',
-      confirmLabel: 'Remove',
-      danger: true,
-    });
-    if (yes) void guarded(() => api.removeAgent(agent.id));
-  };
-
-  return (
-    <div className="member-card">
-      <div className="member-row">
-        <div className="member-main">
-          <span className="avatar sm" style={{ background: agentColor }} aria-hidden>{initials(agent.name)}</span>
-          <div className="member-ident">
-            <div className="member-name">
-              {agent.name}
-              {agent.handle && <span className="handle-tag">@{agent.handle}</span>}
-              <span className="kind-badge agent">agent</span>
-            </div>
-            <div className="member-email">
-              {agent.ownerName ? `owned by ${agent.ownerName}` : 'unowned'} · {agent.tokenCount} key{agent.tokenCount === 1 ? '' : 's'}
-            </div>
-          </div>
-        </div>
-        <div className="member-actions">
-          {/* Workspace role (KBR-113) — same control as People, same endpoint;
-              the server's last-admin 409 surfaces via the tab's error strip. */}
-          <select
-            className="role-select"
-            value={agent.role}
-            disabled={busy}
-            onChange={(e) => void guarded(() => api.setMemberRole(agent.id, e.target.value as MembershipRole))}
-            aria-label={`Workspace role for ${agent.name}`}
-            data-testid={`agent-role-${agent.id}`}
-          >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-          </select>
-          <button className={`ghost sm ${open && panel === 'projects' ? 'active' : ''}`} onClick={() => toggle('projects')}>Projects</button>
-          <button className={`ghost sm ${open && panel === 'keys' ? 'active' : ''}`} onClick={() => toggle('keys')}>Keys</button>
-          <button className={`ghost sm ${open && panel === 'color' ? 'active' : ''}`} onClick={() => toggle('color')}>Color</button>
-          <button className="ghost sm" onClick={rename} disabled={busy}>Rename</button>
-          <button className="ghost sm danger-text" onClick={() => void remove()} disabled={busy}>Remove</button>
-        </div>
-      </div>
-
-      {open && panel === 'projects' && (
-        <ProjectAccessEditor
-          initialIds={agent.projectIds}
-          projects={projects}
-          busy={busy}
-          onSave={(ids) => guarded(() => api.setMemberProjects(agent.id, ids))}
-        />
-      )}
-      {open && panel === 'keys' && <AgentKeys agentId={agent.id} />}
-      {/* Recolor (KBR-74): same palette as your own profile; a click saves. The
-          agent's cards + avatar pick it up everywhere its color is shown. */}
-      {open && panel === 'color' && (
-        <div className="field agent-color-panel">
-          <div className="color-swatches">
-            {USER_PALETTE.map((c) => (
-              <button
-                type="button"
-                key={c}
-                className={`color-swatch ${agentColor.toLowerCase() === c.toLowerCase() ? 'active' : ''}`}
-                style={{ background: c }}
-                aria-label={`set ${agent.name}'s color to ${c}`}
-                disabled={busy}
-                onClick={() => void guarded(() => api.patchAgent(agent.id, { color: c }))}
-              />
-            ))}
-          </div>
-          <p className="muted-note">Cards assigned to {agent.name} show in this color.</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** API-key management for a single agent (list / create / revoke, one-time reveal). */
-function AgentKeys({ agentId }: { agentId: string }) {
-  const dialog = useDialog();
-  const [tokens, setTokens] = useState<TokenSummary[] | null>(null);
-  const [label, setLabel] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [freshSecret, setFreshSecret] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  async function load() {
-    try {
-      const { tokens: t } = await api.listAgentTokens(agentId);
-      setTokens(t);
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }
-  useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentId]);
-
-  async function create() {
-    const name = label.trim();
-    if (!name || busy) return;
-    setBusy(true); setError(null);
-    try {
-      const created = await api.createAgentToken(agentId, name);
-      setFreshSecret(created.secret);
-      setCopied(false);
-      setLabel('');
-      await load();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function revoke(t: TokenSummary) {
-    const yes = await dialog.confirm({
-      title: 'Revoke this key?',
-      message: `"${t.label}" stops working immediately. The agent using it loses access.`,
-      confirmLabel: 'Revoke', danger: true,
-    });
-    if (!yes) return;
-    try { await api.revokeAgentToken(agentId, t.id); await load(); }
-    catch (err) { setError((err as Error).message); }
-  }
-
-  async function copySecret() {
-    if (!freshSecret) return;
-    try { await navigator.clipboard.writeText(freshSecret); setCopied(true); } catch { /* manual copy */ }
-  }
-
-  const fmt = (ms: number | null) => (ms ? new Date(ms).toLocaleDateString() : '—');
-
-  return (
-    <div className="member-projects agent-keys">
-      {freshSecret && (
-        <div className="secret-reveal">
-          <div className="secret-reveal-head">New key — copy it now, it won't be shown again</div>
-          <div className="secret-reveal-row">
-            <code className="secret-value">{freshSecret}</code>
-            <button className="ghost sm" onClick={copySecret}>{copied ? 'Copied' : 'Copy'}</button>
-          </div>
-        </div>
-      )}
-      <div className="key-create-row">
-        <input
-          value={label}
-          placeholder="key label, e.g. claude-mcp"
-          maxLength={80}
-          onChange={(e) => setLabel(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') void create(); }}
-        />
-        <button className="primary" onClick={create} disabled={!label.trim() || busy}>
-          {busy ? 'Creating…' : 'Create key'}
-        </button>
-      </div>
-      {error && <div className="error-text">{error}</div>}
-      <div className="key-list">
-        {tokens === null ? (
-          <div className="muted-note">Loading…</div>
-        ) : tokens.length === 0 ? (
-          <div className="muted-note">No keys yet.</div>
-        ) : (
-          tokens.map((t) => (
-            <div className="key-row" key={t.id}>
-              <div className="key-row-main">
-                <span className="key-label">{t.label}</span>
-                <span className="key-meta">created {fmt(t.createdAt)} · last used {fmt(t.lastUsedAt)}</span>
-              </div>
-              <button className="ghost sm danger-text" onClick={() => void revoke(t)}>Revoke</button>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** The per-member/agent project checklist. Local edit state; "Save" replaces the set. */
-function ProjectAccessEditor({
-  initialIds,
-  projects,
-  busy,
-  onSave,
-}: {
-  initialIds: string[];
-  projects: ProjectDto[];
-  busy: boolean;
-  onSave: (ids: string[]) => Promise<void>;
-}) {
-  const [selected, setSelected] = useState<Set<string>>(new Set(initialIds));
-  const [q, setQ] = useState('');
-  const dirty =
-    selected.size !== initialIds.length || initialIds.some((id) => !selected.has(id));
-
-  const toggle = (id: string) => {
-    const next = new Set(selected);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setSelected(next);
-  };
-
-  // Filtering is display-only: `selected` holds the full set independent of what's
-  // shown, and Save sends [...selected], so hidden-but-checked projects are kept.
-  const filtered = useMemo(() => {
-    const n = q.trim().toLowerCase();
-    return n
-      ? projects.filter((p) => p.name.toLowerCase().includes(n) || (p.code ?? '').toLowerCase().includes(n))
-      : projects;
-  }, [projects, q]);
-
-  return (
-    <div className="member-projects">
-      {projects.length === 0 ? (
-        <span className="muted-note">No projects yet.</span>
-      ) : (
-        <>
-          {projects.length > 8 && (
-            <input
-              className="project-checks-filter"
-              value={q}
-              placeholder="Filter by name or code…"
-              onChange={(e) => setQ(e.target.value)}
-              disabled={busy}
-            />
-          )}
-          <div className="project-checks">
-            {filtered.length === 0 ? (
-              <span className="muted-note">No matches.</span>
-            ) : (
-              filtered.map((p) => (
-                <label key={p.id} className="project-check">
-                  <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} disabled={busy} />
-                  <span className="project-dot" style={{ background: p.color ?? 'var(--accent)' }} />
-                  {p.code && <span className="project-code">{p.code}</span>}
-                  {p.name}
-                </label>
-              ))
-            )}
-          </div>
-        </>
-      )}
-      <div className="member-projects-actions">
-        <button className="primary sm" disabled={!dirty || busy} onClick={() => void onSave([...selected])}>
-          Save access
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  const chars = parts.length > 1 ? parts[0]![0]! + parts[parts.length - 1]![0]! : name.slice(0, 2);
-  return chars.toUpperCase();
 }
 
 /**

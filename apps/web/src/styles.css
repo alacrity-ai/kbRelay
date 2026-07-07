@@ -940,6 +940,12 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 .handle-tag { color: var(--muted); font-weight: 400; font-size: 0.82rem; }
 .member-actions { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
 .role-select { flex: 0 0 auto; }
+/* Pinned role for capped agents (KBR-115): an agent never outranks its owner. */
+.role-pill {
+  flex: 0 0 auto; font-size: 0.78rem; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 6px; padding: 0.25rem 0.55rem;
+  cursor: default;
+}
 .ghost.sm.active { color: var(--text); border-color: var(--accent); }
 .member-projects { padding: 0.2rem 0.7rem 0.7rem; border-top: 1px solid var(--border); }
 .agent-keys { padding-top: 0.6rem; }

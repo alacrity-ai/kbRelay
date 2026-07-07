@@ -106,12 +106,17 @@ export const removeMember = (userId: string) =>
 export const setMemberProjects = (userId: string, projectIds: string[]) =>
   request<{ ok: true }>('PUT', `/v1/team/members/${userId}/projects`, { projectIds });
 
-// ── Agent users (v0.14.0) ── admin-only
+// ── Agent users (v0.14.0) ── ownership-scoped since KBR-115: every role may
+// call these; the server limits results/targets to agents the caller manages.
 export const listAgents = () => request<{ agents: AgentSummary[] }>('GET', '/v1/agents');
 export const createAgent = (name: string, projectIds?: string[]) =>
   request<{ agent: AgentSummary }>('POST', '/v1/agents', { name, projectIds });
-export const patchAgent = (userId: string, body: { name?: string; ownerUserId?: string; color?: string }) =>
-  request<{ ok: true }>('PATCH', `/v1/agents/${userId}`, body);
+export const patchAgent = (
+  userId: string,
+  body: { name?: string; ownerUserId?: string; color?: string; role?: MembershipRole },
+) => request<{ ok: true }>('PATCH', `/v1/agents/${userId}`, body);
+export const setAgentProjects = (userId: string, projectIds: string[]) =>
+  request<{ ok: true }>('PUT', `/v1/agents/${userId}/projects`, { projectIds });
 export const removeAgent = (userId: string) =>
   request<{ ok: true }>('DELETE', `/v1/agents/${userId}`);
 export const listAgentTokens = (userId: string) =>

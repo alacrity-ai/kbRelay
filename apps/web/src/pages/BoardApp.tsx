@@ -21,6 +21,7 @@ import ApiKeysModal from '../components/ApiKeysModal';
 import ClaudeCodeGuide from '../components/ClaudeCodeGuide';
 import ProfileSettings from '../components/ProfileSettings';
 import TenantSettings from '../components/TenantSettings';
+import AgentsModal from '../components/AgentsModal';
 import BrandMark from '../components/BrandMark';
 
 const PROJECT_KEY = 'kbrelay.selectedProject';
@@ -123,6 +124,7 @@ const GLYPH_PATHS: Record<string, string> = {
   docs: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6',
   signout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9',
   workspace: 'M3 21h18 M5 21V7l7-4 7 4v14 M9 9h1 M9 13h1 M14 9h1 M14 13h1',
+  bot: 'M12 2v4 M8 6h8a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M9 12h.01 M15 12h.01 M9.5 15.5h5',
 };
 
 function Glyph({ name, color }: { name: keyof typeof GLYPH_PATHS | string; color: string }) {
@@ -177,6 +179,7 @@ export default function BoardApp({
   const [guideOpen, setGuideOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
+  const [agentsOpen, setAgentsOpen] = useState(false);
   const [mentionCount, setMentionCount] = useState(0);
   // "Needs me" total for the My Work badge (KBR-70 follow-up): queue + reviews.
   // Mentions are added at render time so a mark-read updates the badge instantly.
@@ -607,6 +610,11 @@ export default function BoardApp({
                 <Glyph name="team" color="#0891b2" /> Team &amp; access
               </button>
             )}
+            {/* Open to every role (KBR-116): the server scopes the list to
+                agents the caller manages, so members run their own workforce. */}
+            <button className="menu-item" onClick={() => setAgentsOpen(true)} data-testid="menu-agents">
+              <Glyph name="bot" color="#7c3aed" /> Agents
+            </button>
             <button className="menu-item" onClick={() => setApiKeysOpen(true)}>
               <Glyph name="key" color="#d97706" /> API keys
             </button>
@@ -740,6 +748,7 @@ export default function BoardApp({
       {teamOpen && (
         <TenantSettings meId={me.user.id} projects={projects} onClose={() => setTeamOpen(false)} onChanged={() => void loadProjects(selected ?? undefined)} />
       )}
+      {agentsOpen && <AgentsModal me={me} projects={projects} onClose={() => setAgentsOpen(false)} />}
     </CardLinksContext.Provider>
   );
 }

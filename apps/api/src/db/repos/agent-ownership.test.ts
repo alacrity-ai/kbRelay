@@ -205,4 +205,19 @@ describe('role cap — an agent never outranks its owner', () => {
     expect(adopted.role).toBe('admin');
     await removeAgent(env, tenantId, adam(), stray);
   });
+
+  it('a grandfathered above-cap admin agent stays patchable; only promotion is blocked', async () => {
+    // e.g. the seeded u_claude: promoted pre-KBR-115, then ownerless.
+    const legacy = (await createAgent(env, tenantId, adam(), 'Legacy Bot')).id;
+    await patchAgent(env, tenantId, adam(), legacy, { role: 'admin' });
+    await env.db.prepare('UPDATE users SET owner_user_id = NULL WHERE id = ?').bind(legacy).run();
+
+    // Recolor/rename must not trip the cap…
+    await patchAgent(env, tenantId, adam(), legacy, { color: '#DB2777' });
+    // …demotion is always allowed…
+    await patchAgent(env, tenantId, adam(), legacy, { role: 'member' });
+    // …but re-promotion now needs an admin owner again.
+    await expect(patchAgent(env, tenantId, adam(), legacy, { role: 'admin' })).rejects.toMatchObject({ status: 403 });
+    await removeAgent(env, tenantId, adam(), legacy);
+  });
 });
