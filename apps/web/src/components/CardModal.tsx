@@ -740,11 +740,11 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
           ) : (
             <>
               {/* When review verdicts are present the footer overflows small
-                  screens, so Close/Approve/Reject condense into one "Action"
+                  screens, so Approve/Reject/Edit condense into one "Action"
                   popover on mobile (KBR-117) — the inline trio hides via the
-                  review-inline media rule. */}
-              <button className={`ghost${canReview ? ' review-inline' : ''}`} onClick={onClose} disabled={busy}>Close</button>
-              <button className="primary" onClick={startEdit}><Pencil /> Edit</button>
+                  review-inline media rule while Close stays put. */}
+              <button className="ghost" onClick={onClose} disabled={busy}>Close</button>
+              <button className={`primary${canReview ? ' review-inline' : ''}`} onClick={startEdit}><Pencil /> Edit</button>
               {canReview && (
                 <>
                   <button
@@ -770,7 +770,6 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
                     trigger={<>Action <span className="chevron">▴</span></>}
                   >
                     <div className="menu-list">
-                      <button className="menu-item" onClick={onClose} data-testid="action-close">Close</button>
                       <button
                         className="menu-item action-approve"
                         onClick={() => { setReviewComment(''); setReviewing('approve'); }}
@@ -785,6 +784,7 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
                       >
                         Reject
                       </button>
+                      <button className="menu-item" onClick={startEdit} data-testid="action-edit"><Pencil /> Edit</button>
                     </div>
                   </Dropdown>
                 </>
