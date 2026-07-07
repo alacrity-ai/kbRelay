@@ -233,6 +233,7 @@ select {
   width: 100%; text-align: left; justify-content: flex-start;
   background: transparent; border: none; border-radius: var(--r-sm);
   padding: 0.55rem 0.6rem; color: var(--text);
+  text-decoration: none; /* menu items are also rendered as <a> (Documentation, KBR-109) */
 }
 .menu-item:hover { background: var(--surface-2); }
 .menu-item.active { background: var(--accent-soft); color: #fff; font-weight: 600; }

@@ -34,6 +34,12 @@ PUBLIC_BASE_URL = "https://kbrelay.lalalimited.com"
 pattern = "kbrelay.lalalimited.com/api/*"
 zone_name = "lalalimited.com"
 
+# Scalar docs (KBR-109). The Worker owns exactly `/docs`; everything else on the
+# host (the SPA) stays with Pages. Worker routes take precedence over Pages.
+[[env.prod.routes]]
+pattern = "kbrelay.lalalimited.com/docs"
+zone_name = "lalalimited.com"
+
 [[env.prod.d1_databases]]
 binding = "DB"
 database_name = "kbrelay"
@@ -60,6 +66,11 @@ PUBLIC_BASE_URL = "https://dev.kbrelay.lalalimited.com"
 
 [[env.dev.routes]]
 pattern = "dev.kbrelay.lalalimited.com/api/*"
+zone_name = "lalalimited.com"
+
+# Scalar docs (KBR-109) — mirror of the prod `/docs` route.
+[[env.dev.routes]]
+pattern = "dev.kbrelay.lalalimited.com/docs"
 zone_name = "lalalimited.com"
 
 [[env.dev.d1_databases]]

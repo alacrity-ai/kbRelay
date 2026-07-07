@@ -13,6 +13,13 @@ export default defineConfig({
         target: 'http://localhost:8787',
         changeOrigin: true,
       },
+      // The Scalar docs page (KBR-109) is served by the Worker, mirroring the
+      // production `kbrelay.lalalimited.com/docs` route. Prefix match is fine —
+      // the app has no client-side `/docs*` routes.
+      '/docs': {
+        target: 'http://localhost:8787',
+        changeOrigin: true,
+      },
     },
   },
   test: {

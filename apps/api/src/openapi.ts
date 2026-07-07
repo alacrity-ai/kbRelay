@@ -1,4 +1,5 @@
 import type { RouteContext } from './router';
+import { API_DESCRIPTION } from './openapi-description';
 
 /**
  * Canonical OpenAPI 3.1 description of the kbRelay API. This object is
@@ -11,10 +12,9 @@ export const OPENAPI_SPEC = {
   info: {
     title: 'kbRelay API',
     version: '0.0.0',
-    description:
-      'Multi-tenant kanban board API. All /api/v1 routes require a bearer token ' +
-      '(Authorization: Bearer <token>) that resolves to a user within a tenant. ' +
-      'Every response is scoped to that tenant.',
+    // Rich Markdown landing page (KBR-109) — rendered by Scalar at the top of
+    // /docs and carried in the public spec. See openapi-description.ts.
+    description: API_DESCRIPTION,
   },
   servers: [{ url: 'https://kbrelay.lalalimited.com' }],
   security: [{ bearerAuth: [] }],

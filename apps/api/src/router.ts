@@ -90,6 +90,7 @@ import {
 } from './routes/card-links';
 import type { AccessScope } from './auth/access';
 import { handleOpenApi } from './openapi';
+import { handleDocs } from './docs';
 
 /** Everything a route handler needs. `auth` is non-null for protected routes. */
 export interface RouteContext {
@@ -129,6 +130,9 @@ export interface Route {
 export const routes: Route[] = [
   // ── Public ──
   { method: 'GET', pattern: '/api/openapi.json', public: true, handler: handleOpenApi },
+  // Scalar-rendered API/MCP/product docs (KBR-109). Served off `/docs` via a
+  // dedicated Worker route (wrangler.toml); the rest of the host is the Pages SPA.
+  { method: 'GET', pattern: '/docs', public: true, handler: handleDocs },
 
   // ── Human auth (v0.10.0) — public entrypoints ──
   { method: 'POST', pattern: '/api/v1/auth/register', public: true, handler: handleRegister },

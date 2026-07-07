@@ -120,6 +120,7 @@ const GLYPH_PATHS: Record<string, string> = {
   team: 'M17 21v-2a4 4 0 0 0-3-3.87 M7 21v-2a4 4 0 0 1 3-3.87 M9 3.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7 M16 3.6a3.5 3.5 0 0 1 0 6.8',
   key: 'M7.5 20a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9 M10.6 12.4 21 2 M16 7l3 3',
   guide: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',
+  docs: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6',
   signout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9',
   workspace: 'M3 21h18 M5 21V7l7-4 7 4v14 M9 9h1 M9 13h1 M14 9h1 M14 13h1',
 };
@@ -612,6 +613,16 @@ export default function BoardApp({
 
             <div className="menu-divider" />
             <span className="menu-section-label">Guides</span>
+            {/* Full API/MCP/product reference (KBR-109). Opens the Scalar docs in
+                a new tab so the board stays put. */}
+            <a
+              className="menu-item"
+              href="/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Glyph name="docs" color="#db2777" /> Documentation
+            </a>
             <button className="menu-item" onClick={() => setGuideOpen(true)}>
               <Glyph name="guide" color="#16a34a" /> Claude Code setup
             </button>
