@@ -6,7 +6,7 @@ const byName = (n: string) => allTools.find((t) => t.name === n)!;
 
 describe('tool registry', () => {
   it('exposes the full surface with unique names and short descriptions', () => {
-    expect(allTools.length).toBe(23);
+    expect(allTools.length).toBe(24);
     const names = allTools.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length); // no duplicates
     for (const t of allTools) {
@@ -20,7 +20,7 @@ describe('tool registry', () => {
     for (const n of [
       'whoami', 'list_users', 'list_projects', 'get_project', 'create_project', 'update_project',
       'list_cards', 'get_card', 'create_card', 'update_card', 'delete_card',
-      'get_timeline', 'add_comment', 'redact_comment', 'get_mentions', 'mark_mentions_read',
+      'get_timeline', 'add_comment', 'review_card', 'redact_comment', 'get_mentions', 'mark_mentions_read',
       'list_my_queue', 'get_project_activity', 'add_attachment', 'delete_attachment',
       'link_card', 'unlink_card', 'find_cards_by_link',
     ]) {
@@ -77,6 +77,25 @@ describe('tool input validation (zod, before any request)', () => {
       'GET',
       '/v1/projects/prj_3/events?since=1700000000000&limit=20&cursor=169_evt_9',
     );
+  });
+
+  it('review_card requires a valid decision and posts to the review path', async () => {
+    const client = { request: vi.fn(async () => ({})) };
+    // decision is required + enum-checked before any request.
+    await expect(byName('review_card').run({ cardId: 'card_1' }, client as never)).rejects.toThrow();
+    await expect(byName('review_card').run({ cardId: 'card_1', decision: 'ship-it' }, client as never)).rejects.toThrow();
+    expect(client.request).not.toHaveBeenCalled();
+
+    await byName('review_card').run({ cardId: 'card_1', decision: 'approve', body: 'LGTM' }, client as never);
+    expect(client.request).toHaveBeenCalledWith('POST', '/v1/cards/card_1/review', {
+      decision: 'approve',
+      body: 'LGTM',
+    });
+    // body is optional — a bare reject still calls through.
+    await byName('review_card').run({ cardId: 'card_1', decision: 'reject' }, client as never);
+    expect(client.request).toHaveBeenLastCalledWith('POST', '/v1/cards/card_1/review', {
+      decision: 'reject',
+    });
   });
 
   it('create_card strips projectId into the path, not the body', async () => {

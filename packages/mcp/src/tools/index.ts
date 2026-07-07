@@ -213,6 +213,20 @@ export const allTools: Tool[] = [
       return c.request('POST', `/v1/cards/${enc(cardId)}/comments`, body);
     },
   }),
+  defineTool({
+    name: 'review_card',
+    description:
+      "Assigned-reviewer verdict on an in-review card (403 otherwise). approve: review note + AC checkboxes completed + card → done column. reject: review note + card → in_progress. body = review comment.",
+    inputSchema: z.object({
+      cardId: z.string(),
+      decision: z.enum(['approve', 'reject']),
+      body: z.string().optional(),
+    }),
+    handler: (a, c) => {
+      const { cardId, ...body } = a;
+      return c.request('POST', `/v1/cards/${enc(cardId)}/review`, body);
+    },
+  }),
   // ── Attachments (v0.17.0, KBR-66) ──
   defineTool({
     name: 'add_attachment',
