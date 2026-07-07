@@ -230,11 +230,14 @@ function AgentCard({
               <option value="admin">Admin</option>
             </select>
           )}
-          <button className={`ghost sm ${open && panel === 'projects' ? 'active' : ''}`} onClick={() => toggle('projects')}>Projects</button>
-          <button className={`ghost sm ${open && panel === 'keys' ? 'active' : ''}`} onClick={() => toggle('keys')}>Keys</button>
-          <button className={`ghost sm ${open && panel === 'color' ? 'active' : ''}`} onClick={() => toggle('color')}>Color</button>
-          <button className="ghost sm" onClick={rename} disabled={busy}>Rename</button>
-          <button className="ghost sm danger-text" onClick={() => void remove()} disabled={busy}>Remove</button>
+          {/* One non-wrapping group (KBR-118): these five always share a line. */}
+          <div className="agent-tools">
+            <button className={`ghost sm ${open && panel === 'projects' ? 'active' : ''}`} onClick={() => toggle('projects')}>Projects</button>
+            <button className={`ghost sm ${open && panel === 'keys' ? 'active' : ''}`} onClick={() => toggle('keys')}>Keys</button>
+            <button className={`ghost sm ${open && panel === 'color' ? 'active' : ''}`} onClick={() => toggle('color')}>Color</button>
+            <button className="ghost sm" onClick={rename} disabled={busy}>Rename</button>
+            <button className="ghost sm danger-text" onClick={() => void remove()} disabled={busy}>Remove</button>
+          </div>
         </div>
       </div>
 

@@ -7,6 +7,7 @@ import { attachmentMarkdown, stripAttachmentMarkdown } from '../lib/attachments'
 import { dueInputValue, dueAtFromInput, dueClass } from '../lib/due';
 import { cardUrl } from '../lib/cardLinks';
 import Timeline from './Timeline';
+import Dropdown from './Dropdown';
 import Markdown from './Markdown';
 import MentionTextArea from './MentionTextArea';
 import AttachmentToolbar from './AttachmentToolbar';
@@ -738,12 +739,16 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
             </>
           ) : (
             <>
-              <button className="ghost" onClick={onClose} disabled={busy}>Close</button>
+              {/* When review verdicts are present the footer overflows small
+                  screens, so Close/Approve/Reject condense into one "Action"
+                  popover on mobile (KBR-117) — the inline trio hides via the
+                  review-inline media rule. */}
+              <button className={`ghost${canReview ? ' review-inline' : ''}`} onClick={onClose} disabled={busy}>Close</button>
               <button className="primary" onClick={startEdit}><Pencil /> Edit</button>
               {canReview && (
                 <>
                   <button
-                    className="success"
+                    className="success review-inline"
                     onClick={() => { setReviewComment(''); setReviewing('approve'); }}
                     disabled={busy}
                     data-testid="review-approve"
@@ -751,13 +756,37 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
                     ✓ Approve
                   </button>
                   <button
-                    className="danger"
+                    className="danger review-inline"
                     onClick={() => { setReviewComment(''); setReviewing('reject'); }}
                     disabled={busy}
                     data-testid="review-reject"
                   >
                     Reject
                   </button>
+                  <Dropdown
+                    className="review-action-menu"
+                    align="right"
+                    label="Review actions"
+                    trigger={<>Action <span className="chevron">▴</span></>}
+                  >
+                    <div className="menu-list">
+                      <button className="menu-item" onClick={onClose} data-testid="action-close">Close</button>
+                      <button
+                        className="menu-item action-approve"
+                        onClick={() => { setReviewComment(''); setReviewing('approve'); }}
+                        data-testid="action-approve"
+                      >
+                        ✓ Approve
+                      </button>
+                      <button
+                        className="menu-item action-reject"
+                        onClick={() => { setReviewComment(''); setReviewing('reject'); }}
+                        data-testid="action-reject"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </Dropdown>
                 </>
               )}
             </>

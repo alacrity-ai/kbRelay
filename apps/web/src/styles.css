@@ -940,6 +940,11 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 .handle-tag { color: var(--muted); font-weight: 400; font-size: 0.82rem; }
 .member-actions { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
 .role-select { flex: 0 0 auto; }
+/* Agent tool buttons stay on ONE line (KBR-118): tightened gap + padding, no
+   wrapping inside the group — on narrow widths the whole group drops below
+   the role control as a unit instead of breaking mid-row. */
+.agent-tools { display: flex; align-items: center; gap: 0.25rem; flex-wrap: nowrap; }
+.agent-tools button.sm { padding-left: 0.45rem; padding-right: 0.45rem; white-space: nowrap; }
 /* Pinned role for capped agents (KBR-115): an agent never outranks its owner. */
 .role-pill {
   flex: 0 0 auto; font-size: 0.78rem; color: var(--muted);
@@ -1498,6 +1503,23 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   .activity-wrap { padding: 0.6rem 0.6rem 2rem; }
   .activity-row .tl-time { display: none; }
 }
+
+/* Mobile review actions (KBR-117): with Approve/Reject present the footer
+   overflows small screens, so under 560px the Close/Approve/Reject trio
+   condenses into one "Action" button whose menu opens UPWARD. Right-anchored
+   inside the footer with a viewport-capped width (the bell-dropdown gutter
+   idea), it can't render off screen on either edge. */
+.review-action-menu { display: none; }
+@media (max-width: 560px) {
+  .modal-footer .review-inline { display: none; }
+  .review-action-menu { display: block; }
+}
+.review-action-menu .dropdown-panel {
+  top: auto; bottom: calc(100% + 8px);
+  min-width: 190px; max-width: calc(100vw - 16px);
+}
+.review-action-menu .action-approve { color: var(--ok); font-weight: 600; }
+.review-action-menu .action-reject { color: var(--danger); font-weight: 600; }
 
 /* @-autocomplete over a textarea. */
 .mention-wrap { position: relative; }
