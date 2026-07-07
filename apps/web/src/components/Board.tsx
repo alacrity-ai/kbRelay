@@ -361,6 +361,7 @@ export default function Board({ projectId, users, meId, tenantSlug, reloadNonce 
           isAdmin={isAdmin}
           onDelete={modal.mode === 'view' && isAdmin ? deleteCard : undefined}
           onClose={() => { setModal(null); setScrollTo(undefined); }}
+          onReviewed={() => load({ silent: true })}
         />
       )}
     </>

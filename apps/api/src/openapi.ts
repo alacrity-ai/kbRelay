@@ -867,6 +867,38 @@ export const OPENAPI_SPEC = {
         responses: { 201: { description: 'created' } },
       },
     },
+    '/api/v1/cards/{id}/review': {
+      post: {
+        summary: "Record the assigned reviewer's verdict (approve / reject)",
+        description:
+          'Reviewer-only (403 otherwise), and only while the card sits in a ' +
+          '`review`-role column (400 otherwise). Posts a `review` timeline event ' +
+          'with meta {decision}; on approve also checks every unchecked ' +
+          'acceptance-criteria checkbox and moves the card to the `done`-role ' +
+          'column; on reject moves it to the `in_progress`-role column. A missing ' +
+          'target column skips the move — the verdict still lands.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['decision'],
+                properties: {
+                  decision: { type: 'string', enum: ['approve', 'reject'] },
+                  body: { type: 'string', description: 'Optional review comment (markdown; @mentions notify).' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'verdict recorded — returns { card, event }' },
+          400: { description: 'card is not in a review-role column' },
+          403: { description: 'caller is not the assigned reviewer' },
+        },
+      },
+    },
     '/api/v1/cards/{id}/attachments': {
       post: {
         summary: 'Upload a file attachment to a card (multipart)',

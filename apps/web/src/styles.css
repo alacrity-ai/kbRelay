@@ -128,6 +128,10 @@ button.primary:hover { background: var(--accent-hover); border-color: var(--acce
 button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
 button.danger:hover { background: var(--danger-hover); border-color: var(--danger-hover); }
 
+/* Green go-button (KBR-110: the reviewer's Approve). */
+button.success { background: var(--ok); border-color: var(--ok); color: #fff; }
+button.success:hover { background: #059669; border-color: #059669; }
+
 button.ghost { background: transparent; border-color: transparent; color: var(--text-dim); }
 button.ghost:hover { background: var(--surface-2); color: var(--text); }
 
@@ -794,6 +798,18 @@ select {
   border-color: #10b98155; background: #10b9811a;
   border-left: 3px solid var(--ok);
 }
+/* Reviewer verdict (KBR-110) — purple, the review counterpart to the
+   handoff's green. The chip carries the decision. */
+.tl-comment.review {
+  border-color: #8b5cf655; background: #8b5cf61a;
+  border-left: 3px solid #8b5cf6;
+}
+.review-chip {
+  font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.45rem;
+  border-radius: var(--r-pill); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.review-chip.approved { background: #10b98126; color: #34d399; }
+.review-chip.rejected { background: #f59e0b26; color: #fbbf24; }
 .tl-comment-head { display: flex; align-items: center; gap: 0.5rem; }
 .tl-author { font-weight: 600; font-size: 0.85rem; flex: 1; display: inline-flex; align-items: center; gap: 0.4rem; }
 .tl-summary { font-weight: 600; }

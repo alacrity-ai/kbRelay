@@ -76,6 +76,30 @@ export function isChecklistOnlyEdit(before: string | null, after: string | null)
 }
 
 /**
+ * Check every unchecked task item (KBR-110: an Approve review completes the
+ * acceptance criteria). Fence-aware like the counters — a `- [ ]` inside a
+ * code block is literal text and stays untouched. Returns the rewritten text,
+ * or null when there was nothing to check (callers skip the write).
+ */
+export function checkAllTasks(text: string | null | undefined): string | null {
+  if (!text) return null;
+  let inFence = false;
+  let changed = false;
+  const lines = text.split('\n').map((line) => {
+    if (FENCE_RE.test(line)) {
+      inFence = !inFence;
+      return line;
+    }
+    if (inFence) return line;
+    const m = TASK_LINE_RE.exec(line);
+    if (!m || m[2] !== ' ') return line;
+    changed = true;
+    return line.replace(TASK_LINE_RE, '$1x$3');
+  });
+  return changed ? lines.join('\n') : null;
+}
+
+/**
  * Toggle the task item on a specific source line (1-based, as reported by the
  * markdown parser's node position). Returns the rewritten text, or null if
  * that line is not a task item (stale render, concurrent edit) — callers must

@@ -5,11 +5,12 @@ import { z } from 'zod';
  *
  * A row is either a `system` event (auto-emitted on create/move/assign/edit —
  * the durable who-did-what-when history) or a user-authored comment, which is
- * either a plain `note` or a structured `handoff` (the "here's what shipped,
- * how it was verified, what it spun off" hand-back at In Review).
+ * either a plain `note`, a structured `handoff` (the "here's what shipped,
+ * how it was verified, what it spun off" hand-back at In Review), or a
+ * `review` (KBR-110: the reviewer's Approve/Reject verdict — meta {decision}).
  */
 
-export type CardEventKind = 'system' | 'note' | 'handoff';
+export type CardEventKind = 'system' | 'note' | 'handoff' | 'review';
 /** `reviewer` (v0.17.0): the reviewer pointer changed — meta {from, to}.
  *  `due` (v0.17.0, KBR-63): the due date changed — meta {from, to} epoch ms.
  *  `task` (v0.17.0, KBR-72): a checkbox-only edit — meta {fields, done, total}.
@@ -96,3 +97,18 @@ export const createCommentInput = z.object({
   attachmentIds: z.array(z.string().min(1).max(64)).max(20).optional(),
 });
 export type CreateCommentInput = z.infer<typeof createCommentInput>;
+
+/** POST /cards/:id/review — the assigned reviewer's verdict (KBR-110).
+ *  Only the card's reviewer may call it, and only while the card sits in a
+ *  `review`-role column (the handler enforces both). `body` is optional —
+ *  an empty comment still records the decision. */
+export const reviewCardInput = z.object({
+  decision: z.enum(['approve', 'reject']),
+  body: z.string().trim().max(20_000).optional(),
+});
+export type ReviewCardInput = z.infer<typeof reviewCardInput>;
+
+/** Meta payload stored on a `review` timeline event. */
+export interface ReviewMeta {
+  decision: 'approved' | 'rejected';
+}

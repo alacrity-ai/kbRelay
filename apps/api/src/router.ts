@@ -41,6 +41,7 @@ import {
   handleListTimeline,
   handleAddComment,
   handleRedactComment,
+  handleReviewCard,
 } from './routes/cards';
 import {
   handleRegister,
@@ -238,6 +239,8 @@ export const routes: Route[] = [
   { method: 'GET', pattern: '/api/v1/cards/:id/timeline', access: { kind: 'card', param: 'id' }, handler: handleListTimeline },
   { method: 'POST', pattern: '/api/v1/cards/:id/comments', access: { kind: 'card', param: 'id' }, handler: handleAddComment },
   { method: 'DELETE', pattern: '/api/v1/cards/:id/comments/:commentId', access: { kind: 'card', param: 'id' }, handler: handleRedactComment },
+  // Reviewer verdict (KBR-110): review event + AC completion + column move.
+  { method: 'POST', pattern: '/api/v1/cards/:id/review', access: { kind: 'card', param: 'id' }, handler: handleReviewCard },
 
   // ── Attachments (v0.16.0) ── upload is card-scoped; the rest resolve
   // attachment → card → project via the `attachment` access scope.

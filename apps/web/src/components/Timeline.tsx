@@ -252,6 +252,9 @@ function TimelineEntry({
   }
 
   const isHandoff = event.kind === 'handoff';
+  // Reviewer verdict (KBR-110): purple row + an Approved / Changes-requested chip.
+  const isReview = event.kind === 'review';
+  const approved = isReview && event.meta?.decision === 'approved';
   const meta = event.meta ?? {};
   const summary = typeof meta.summary === 'string' ? meta.summary : '';
   const evidence = asStrings(meta.evidence);
@@ -259,14 +262,19 @@ function TimelineEntry({
   const spunOff = asStrings(meta.spunOff);
 
   return (
-    <div id={`tl-${event.id}`} className={`tl-comment ${isHandoff ? 'handoff' : ''}`}>
+    <div id={`tl-${event.id}`} className={`tl-comment ${isHandoff ? 'handoff' : ''} ${isReview ? 'review' : ''}`}>
       <div className="tl-comment-head">
         <span className="avatar sm" style={{ background: author?.color ?? '#64748b' }}>
           {author ? initials(author.name) : '?'}
         </span>
         <span className="tl-author">
-          {isHandoff && '✅ Handoff from '}{author?.name ?? 'someone'}
+          {isHandoff && '✅ Handoff from '}{isReview && '🔍 Review by '}{author?.name ?? 'someone'}
           {author?.kind && <span className={`kind-badge ${author.kind}`}>{author.kind}</span>}
+          {isReview && (
+            <span className={`review-chip ${approved ? 'approved' : 'rejected'}`}>
+              {approved ? '✓ Approved' : '↩ Changes requested'}
+            </span>
+          )}
         </span>
         <span className="tl-time">{when}</span>
         {event.authorUserId === meId && (

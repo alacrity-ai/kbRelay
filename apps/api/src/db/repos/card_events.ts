@@ -216,6 +216,52 @@ export async function addComment(
 }
 
 /**
+ * Add the reviewer's verdict to a card's timeline (KBR-110): a `review`-kind
+ * event carrying `meta {decision}`. Same mention mechanics as a comment —
+ * an @-mention in the review body notifies — but only the review endpoint
+ * writes this kind (the composer's POST /comments stays note|handoff).
+ */
+export async function addReviewEvent(
+  env: Env,
+  tenantId: string,
+  cardId: string,
+  userId: string,
+  decision: 'approved' | 'rejected',
+  body: string | null,
+  triggers?: WebhookTrigger[],
+): Promise<CardEventDto> {
+  const id = newId('evt');
+
+  const card = await env.db.prepare('SELECT project_id FROM cards WHERE id = ? AND tenant_id = ?')
+    .bind(cardId, tenantId)
+    .first<{ project_id: string }>();
+  const users = body && card ? await mentionableUsers(env, tenantId, card.project_id) : [];
+  const mentionStmts = body
+    ? await reconcileMentionStmts(
+        env,
+        { tenantId, cardId, authorId: userId, sourceKind: 'comment', sourceId: id, text: body },
+        users,
+        triggers,
+      )
+    : [];
+
+  await env.db.batch([
+    env.db.prepare(
+      `INSERT INTO card_events
+         (id, tenant_id, card_id, author_user_id, kind, event_type, body, meta_json, created_at)
+       VALUES (?, ?, ?, ?, 'review', NULL, ?, ?, ?)`,
+    ).bind(id, tenantId, cardId, userId, body, JSON.stringify({ decision }), Date.now()),
+    ...mentionStmts,
+  ]);
+
+  const row = await env.db.prepare('SELECT * FROM card_events WHERE id = ? AND tenant_id = ?')
+    .bind(id, tenantId)
+    .first<CardEventRow>();
+  if (!row) throw new Error('Review insert did not return row');
+  return toDto(row);
+}
+
+/**
  * Redact a comment (soft-delete): null its body + meta, keep the row as a
  * tombstone, and retract the mentions it authored. Append-only-safe — only the
  * author may redact, system events are refused, and it's idempotent.

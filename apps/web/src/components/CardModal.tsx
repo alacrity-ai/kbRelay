@@ -39,6 +39,9 @@ interface Props {
   /** False for member roles (KBR-101): hides Archive and locks the spec of
    *  cards the viewer didn't create. */
   isAdmin?: boolean;
+  /** Called after a review verdict lands (KBR-110) so the board reconciles the
+   *  card's new column; the modal closes itself right after. */
+  onReviewed?: () => void | Promise<void>;
 }
 
 function Chain() {
@@ -67,7 +70,7 @@ function Pencil() {
  *  - Edit: the form. Reached via the Edit button, or immediately when creating.
  * Saving an existing card returns to View; creating closes the modal.
  */
-export default function CardModal({ card, columns, users, meId, tenantSlug, projectLabels = [], createInColumnId, scrollTo, onSave, onDelete, onClose, isAdmin = true }: Props) {
+export default function CardModal({ card, columns, users, meId, tenantSlug, projectLabels = [], createInColumnId, scrollTo, onSave, onDelete, onClose, isAdmin = true, onReviewed }: Props) {
   const isNew = !card;
   const [editing, setEditing] = useState(isNew);
   const descRef = useRef<HTMLDivElement>(null);
@@ -309,6 +312,37 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
       if (next != null) await onSave({ [field]: next });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update checklist');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Reviewer verdict (KBR-110). The buttons render only for the card's
+  // assigned reviewer while it sits in a `review`-role column; the server
+  // enforces the same rules (403/400), so the gate here is purely UX.
+  const canReview =
+    !isNew &&
+    !editing &&
+    !card!.archivedAt &&
+    card!.reviewerUserId === meId &&
+    columns.find((c) => c.id === card!.columnId)?.role === 'review';
+  const [reviewing, setReviewing] = useState<'approve' | 'reject' | null>(null);
+  const [reviewComment, setReviewComment] = useState('');
+
+  async function submitReview() {
+    if (!card || !reviewing || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.reviewCard(card.id, {
+        decision: reviewing,
+        ...(reviewComment.trim() ? { body: reviewComment.trim() } : {}),
+      });
+      setReviewing(null);
+      await onReviewed?.(); // board reconciles the move…
+      onClose();            // …then the modal closes on the fresh board
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Review failed');
     } finally {
       setBusy(false);
     }
@@ -706,9 +740,84 @@ export default function CardModal({ card, columns, users, meId, tenantSlug, proj
             <>
               <button className="ghost" onClick={onClose} disabled={busy}>Close</button>
               <button className="primary" onClick={startEdit}><Pencil /> Edit</button>
+              {canReview && (
+                <>
+                  <button
+                    className="success"
+                    onClick={() => { setReviewComment(''); setReviewing('approve'); }}
+                    disabled={busy}
+                    data-testid="review-approve"
+                  >
+                    ✓ Approve
+                  </button>
+                  <button
+                    className="danger"
+                    onClick={() => { setReviewComment(''); setReviewing('reject'); }}
+                    disabled={busy}
+                    data-testid="review-reject"
+                  >
+                    Reject
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
+
+        {/* Review dialog (KBR-110): comment + submit. Approve completes the AC
+            checklist and moves to Done; Reject sends the card back to In
+            Progress. Both post a purple `review` event on the timeline. */}
+        {reviewing && (
+          <div className="dialog-backdrop" onClick={() => !busy && setReviewing(null)}>
+            <div
+              className="dialog-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="review-dlg-title"
+              onClick={(e) => e.stopPropagation()}
+              data-testid="review-dialog"
+            >
+              <div className="modal-header">
+                <span className="modal-accent" style={{ background: reviewing === 'approve' ? 'var(--ok)' : 'var(--danger)' }} />
+                <h2 className="modal-title" id="review-dlg-title">
+                  {reviewing === 'approve' ? `Approve ${card!.key ?? 'card'}` : `Request changes on ${card!.key ?? 'card'}`}
+                </h2>
+              </div>
+              <div className="modal-body">
+                <p className="muted-note">
+                  {reviewing === 'approve'
+                    ? 'Approving checks off the remaining acceptance criteria and moves the card to Done.'
+                    : 'Rejecting moves the card back to In Progress for another pass.'}
+                </p>
+                <div className="field">
+                  <label htmlFor="review-comment">Review comment</label>
+                  <textarea
+                    id="review-comment"
+                    rows={4}
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder={reviewing === 'approve' ? 'What was verified, anything worth noting… (optional)' : 'What needs to change before this can be approved…'}
+                    data-testid="review-comment"
+                    autoFocus
+                  />
+                </div>
+                {error && <div className="error-text">{error}</div>}
+              </div>
+              <div className="modal-footer">
+                <div className="spacer" />
+                <button className="ghost" onClick={() => setReviewing(null)} disabled={busy}>Cancel</button>
+                <button
+                  className={reviewing === 'approve' ? 'success' : 'danger'}
+                  onClick={() => void submitReview()}
+                  disabled={busy}
+                  data-testid="review-submit"
+                >
+                  {busy ? 'Submitting…' : reviewing === 'approve' ? 'Submit & approve' : 'Submit & reject'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

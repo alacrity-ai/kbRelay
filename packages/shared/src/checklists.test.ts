@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { countTaskItems, countCardTasks, toggleTaskAtLine, isChecklistOnlyEdit } from './checklists';
+import { countTaskItems, countCardTasks, toggleTaskAtLine, checkAllTasks, isChecklistOnlyEdit } from './checklists';
 
 /** KBR-72: classify checkbox-only edits so they log as quiet `task` events. */
 describe('isChecklistOnlyEdit', () => {
@@ -52,6 +52,32 @@ describe('countTaskItems', () => {
 
   it('countCardTasks sums both fields', () => {
     expect(countCardTasks('- [ ] a', '- [x] b\n- [x] c')).toEqual({ done: 2, total: 3 });
+  });
+});
+
+/** KBR-110: an Approve review completes the acceptance criteria. */
+describe('checkAllTasks', () => {
+  it('checks every unchecked item across marker styles, keeping the rest intact', () => {
+    const md = '# AC\n- [ ] one\n* [x] two\n1. [ ] three\ntext';
+    expect(checkAllTasks(md)).toBe('# AC\n- [x] one\n* [x] two\n1. [x] three\ntext');
+  });
+
+  it('leaves task syntax inside fenced code blocks alone', () => {
+    const md = '- [ ] real\n```\n- [ ] literal\n```\n- [ ] also real';
+    expect(checkAllTasks(md)).toBe('- [x] real\n```\n- [ ] literal\n```\n- [x] also real');
+  });
+
+  it('returns null when there is nothing to check (no write)', () => {
+    expect(checkAllTasks('- [x] done\n* [X] also done')).toBeNull();
+    expect(checkAllTasks('no tasks here')).toBeNull();
+    expect(checkAllTasks('')).toBeNull();
+    expect(checkAllTasks(null)).toBeNull();
+    expect(checkAllTasks(undefined)).toBeNull();
+  });
+
+  it('is a checklist-only edit (logs as a quiet task event, KBR-72)', () => {
+    const md = '- [ ] a\n- [x] b';
+    expect(isChecklistOnlyEdit(md, checkAllTasks(md)!)).toBe(true);
   });
 });
 

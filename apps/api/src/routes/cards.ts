@@ -1,4 +1,4 @@
-import { createCardInput, patchCardInput, createCommentInput, countCardTasks, type WebhookTrigger } from '@kbrelay/shared';
+import { createCardInput, patchCardInput, createCommentInput, reviewCardInput, countCardTasks, checkAllTasks, type WebhookTrigger } from '@kbrelay/shared';
 import type { RouteContext } from '../router';
 import { jsonResponse, HttpError } from '../http';
 import { parseJson } from '../validate';
@@ -6,7 +6,8 @@ import { tenantScope } from '../auth/tenant-scope';
 import { requireAdmin } from '../auth/access';
 import { getProject } from '../db/repos/projects';
 import { listCards, getCard, createCard, patchCard, deleteCard, autoArchiveDone } from '../db/repos/cards';
-import { listTimeline, addComment, redactComment } from '../db/repos/card_events';
+import { listColumns } from '../db/repos/columns';
+import { listTimeline, addComment, addReviewEvent, redactComment } from '../db/repos/card_events';
 import { listCardAttachments, attachmentCountsForCards, purgeBlobs } from '../db/repos/attachments';
 import { listCardLinks, linkCountsForCards } from '../db/repos/card-links';
 import { labelsForCards } from '../db/repos/labels';
@@ -141,6 +142,57 @@ export async function handleAddComment(ctx: RouteContext): Promise<Response> {
   const event = await addComment(ctx.env, tenantId, card.id, userId, input, triggers);
   if (triggers.length) ctx.waitUntil(dispatchTriggers(ctx.env, tenantId, card, userId, triggers));
   return jsonResponse(201, { event }, ctx.cors);
+}
+
+/**
+ * POST /api/v1/cards/:id/review — the assigned reviewer's verdict (KBR-110).
+ *
+ * Guards (server-side; hiding the UI buttons is not authorization):
+ *   403 — caller is not the card's assigned reviewer.
+ *   400 — the card is not in a `review`-role column.
+ *
+ * Effects, in one handler so events/mentions/webhooks fire consistently:
+ *   both     → a `review` timeline event with meta {decision} (+ body mentions)
+ *   approve  → every unchecked AC checkbox checked + move to the `done`-role
+ *              column; reject → move to the `in_progress`-role column.
+ *   A missing target column skips the move (the verdict still lands).
+ */
+export async function handleReviewCard(ctx: RouteContext): Promise<Response> {
+  const { tenantId, userId } = tenantScope(ctx.auth);
+  const card = await getCard(ctx.env, tenantId, ctx.params.id!);
+  if (!card) throw new HttpError(404, 'Card not found');
+  if (card.reviewerUserId !== userId) {
+    throw new HttpError(403, 'Only the assigned reviewer can review this card');
+  }
+  const columns = await listColumns(ctx.env, tenantId, card.projectId);
+  const current = columns.find((c) => c.id === card.columnId);
+  if (current?.role !== 'review') {
+    throw new HttpError(400, 'Card is not in a review column');
+  }
+  const input = await parseJson(ctx.request, reviewCardInput);
+
+  const triggers: WebhookTrigger[] = [];
+  const decision = input.decision === 'approve' ? 'approved' : 'rejected';
+  const event = await addReviewEvent(
+    ctx.env, tenantId, card.id, userId, decision, input.body?.trim() || null, triggers,
+  );
+
+  // Build the follow-up patch: AC completion (approve only) + the column move.
+  const patch: { acceptanceCriteria?: string; columnId?: string } = {};
+  if (input.decision === 'approve') {
+    const checked = checkAllTasks(card.acceptanceCriteria);
+    if (checked != null) patch.acceptanceCriteria = checked;
+  }
+  const targetRole = input.decision === 'approve' ? 'done' : 'in_progress';
+  const target = columns.find((c) => c.role === targetRole);
+  if (target && target.id !== card.columnId) patch.columnId = target.id;
+
+  const updated = Object.keys(patch).length
+    ? await patchCard(ctx.env, tenantId, card.id, userId, patch, triggers)
+    : card;
+
+  if (triggers.length) ctx.waitUntil(dispatchTriggers(ctx.env, tenantId, updated, userId, triggers));
+  return jsonResponse(200, { card: updated, event }, ctx.cors);
 }
 
 /** DELETE /api/v1/cards/:id/comments/:commentId — redact (soft-delete) a comment. */

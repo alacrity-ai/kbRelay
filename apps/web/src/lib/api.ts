@@ -7,6 +7,7 @@ import type {
   CardDto,
   CardEventDto,
   CreateCommentInput,
+  ReviewCardInput,
   ProjectStatus,
   MentionsResponse,
   MentionsStatus,
@@ -262,6 +263,9 @@ export const addComment = (cardId: string, body: CreateCommentInput) =>
   request<{ event: CardEventDto }>('POST', `/v1/cards/${cardId}/comments`, body);
 export const redactComment = (cardId: string, commentId: string) =>
   request<{ event: CardEventDto }>('DELETE', `/v1/cards/${cardId}/comments/${commentId}`);
+/** Reviewer verdict (KBR-110): review event + AC completion + column move. */
+export const reviewCard = (cardId: string, body: ReviewCardInput) =>
+  request<{ card: CardDto; event: CardEventDto }>('POST', `/v1/cards/${cardId}/review`, body);
 
 // ── Attachments (v0.16.0) ──
 /** Same-origin bytes URL for an attachment (append ?download=1 to force download). */
