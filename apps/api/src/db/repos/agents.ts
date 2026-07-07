@@ -23,6 +23,7 @@ interface AgentRow {
   color: string | null;
   owner_user_id: string | null;
   owner_name: string | null;
+  role: string;
   created_at: number;
 }
 
@@ -30,7 +31,8 @@ interface AgentRow {
 export async function listAgents(env: Env, tenantId: string): Promise<AgentSummary[]> {
   const rs = await env.db.prepare(
     `SELECT u.id AS id, u.name AS name, u.handle AS handle, u.color AS color,
-            u.owner_user_id AS owner_user_id, o.name AS owner_name, u.created_at AS created_at
+            u.owner_user_id AS owner_user_id, o.name AS owner_name, m.role AS role,
+            u.created_at AS created_at
        FROM users u
        JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
        LEFT JOIN users o ON o.id = u.owner_user_id
@@ -72,6 +74,7 @@ export async function listAgents(env: Env, tenantId: string): Promise<AgentSumma
     ownerName: r.owner_name,
     projectIds: projectsByUser.get(r.id) ?? [],
     tokenCount: tokensByUser.get(r.id) ?? 0,
+    role: r.role as AgentSummary['role'],
     createdAt: r.created_at,
   }));
 }
@@ -141,6 +144,7 @@ export async function createAgent(
     ownerName: null,
     projectIds: validProjects,
     tokenCount: 0,
+    role: 'member', // admin is an explicit promotion (KBR-113)
     createdAt: now,
   };
 }

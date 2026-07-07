@@ -470,6 +470,19 @@ function AgentCard({
           </div>
         </div>
         <div className="member-actions">
+          {/* Workspace role (KBR-113) — same control as People, same endpoint;
+              the server's last-admin 409 surfaces via the tab's error strip. */}
+          <select
+            className="role-select"
+            value={agent.role}
+            disabled={busy}
+            onChange={(e) => void guarded(() => api.setMemberRole(agent.id, e.target.value as MembershipRole))}
+            aria-label={`Workspace role for ${agent.name}`}
+            data-testid={`agent-role-${agent.id}`}
+          >
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
           <button className={`ghost sm ${open && panel === 'projects' ? 'active' : ''}`} onClick={() => toggle('projects')}>Projects</button>
           <button className={`ghost sm ${open && panel === 'keys' ? 'active' : ''}`} onClick={() => toggle('keys')}>Keys</button>
           <button className={`ghost sm ${open && panel === 'color' ? 'active' : ''}`} onClick={() => toggle('color')}>Color</button>

@@ -10,6 +10,7 @@
  */
 
 import { z } from 'zod';
+import type { MembershipRole } from './accounts.ts';
 
 /** Create an agent user. Optionally grant it access to projects up front. */
 export const createAgentInput = z.object({
@@ -45,6 +46,9 @@ export interface AgentSummary {
   projectIds: string[];
   /** Count of live (non-revoked) API keys. */
   tokenCount: number;
+  /** Workspace membership role (KBR-113). Admin agents see every project and
+   *  can manage the team — change it via PATCH /team/members/:userId. */
+  role: MembershipRole;
   createdAt: number;
 }
 

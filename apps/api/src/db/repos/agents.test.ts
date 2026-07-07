@@ -8,6 +8,7 @@ import { registerTenant, createToken, listTokens } from './auth';
 import { createProject } from './projects';
 import { authenticate } from '../../auth/authenticate';
 import { listAgents, createAgent, patchAgent, removeAgent, assertAgentInTenant } from './agents';
+import { setMemberRole } from './team';
 
 /**
  * Agent-user repo tests (v0.14.0, KBR-3). Runs against an in-memory libsql DB
@@ -56,6 +57,30 @@ describe('agent users', () => {
     expect(agents[0]!.ownerUserId).toBe(ownerId);
     expect(agents[0]!.ownerName).toBe('Ada Admin');
     expect(agents[0]!.tokenCount).toBe(0);
+  });
+
+  // KBR-113 — agents carry their workspace role and are promoted/demoted
+  // through the same membership path as humans.
+  it('agents surface their membership role and can be promoted to admin', async () => {
+    const created = await createAgent(env, tenantId, ownerId, 'Roley');
+    expect(created.role).toBe('member'); // create seeds member; admin is an explicit promotion
+
+    await setMemberRole(env, tenantId, created.id, 'admin');
+    let agents = await listAgents(env, tenantId);
+    expect(agents.find((a) => a.id === created.id)!.role).toBe('admin');
+
+    // An agent admin counts toward the last-admin guard: with the agent
+    // promoted, the human admin can step down…
+    await setMemberRole(env, tenantId, ownerId, 'member');
+    // …and now the agent IS the last admin — demoting it must 409.
+    await expect(setMemberRole(env, tenantId, created.id, 'member')).rejects.toMatchObject({ status: 409 });
+
+    // Restore for the rest of the suite.
+    await setMemberRole(env, tenantId, ownerId, 'admin');
+    await setMemberRole(env, tenantId, created.id, 'member');
+    agents = await listAgents(env, tenantId);
+    expect(agents.find((a) => a.id === created.id)!.role).toBe('member');
+    await removeAgent(env, tenantId, created.id);
   });
 
   it('create grants a handle, membership, and the requested project access', async () => {
