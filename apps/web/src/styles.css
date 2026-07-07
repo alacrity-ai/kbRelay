@@ -932,6 +932,11 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 .member-name { font-weight: 600; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .member-email { color: var(--muted); font-size: 0.8rem; }
 .you-tag { color: var(--muted); font-weight: 400; }
+.owner-badge {
+  font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  color: #d97706; border: 1px solid #d9770655; background: #d977061a;
+  border-radius: 999px; padding: 0.05rem 0.45rem;
+}
 .handle-tag { color: var(--muted); font-weight: 400; font-size: 0.82rem; }
 .member-actions { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
 .role-select { flex: 0 0 auto; }

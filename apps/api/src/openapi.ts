@@ -436,7 +436,7 @@ export const OPENAPI_SPEC = {
       },
     },
     '/api/v1/team': {
-      get: { summary: 'Team members + their project access + pending invites (admin)', responses: { 200: { description: 'ok' } } },
+      get: { summary: 'Team members (with `isOwner`) + their project access + pending invites (admin)', responses: { 200: { description: 'ok' } } },
     },
     '/api/v1/team/invites': {
       post: {
@@ -461,7 +461,7 @@ export const OPENAPI_SPEC = {
     },
     '/api/v1/team/members/{userId}': {
       patch: {
-        summary: "Change a member's role (admin) — can't demote the last admin",
+        summary: "Change a member's role (admin) — can't demote the last admin or the workspace owner",
         requestBody: {
           required: true,
           content: {
@@ -470,9 +470,9 @@ export const OPENAPI_SPEC = {
             },
           },
         },
-        responses: { 200: { description: 'ok' }, 409: { description: 'last admin' } },
+        responses: { 200: { description: 'ok' }, 409: { description: 'last admin or workspace owner' } },
       },
-      delete: { summary: "Remove a member (admin) — can't remove the last admin", responses: { 200: { description: 'ok' } } },
+      delete: { summary: "Remove a member (admin) — can't remove the last admin or the workspace owner", responses: { 200: { description: 'ok' } } },
     },
     '/api/v1/team/members/{userId}/projects': {
       put: {
@@ -577,7 +577,7 @@ export const OPENAPI_SPEC = {
       delete: { summary: 'Revoke one of your API tokens', responses: { 200: { description: 'ok' } } },
     },
     '/api/v1/me': {
-      get: { summary: 'Whoami for the current token', responses: { 200: { description: 'ok' } } },
+      get: { summary: 'Whoami for the current token — includes `tenant.ownerUserId` (the workspace owner)', responses: { 200: { description: 'ok' } } },
       patch: {
         summary: 'Set your own color and/or profile (token is tied to a user)',
         requestBody: {

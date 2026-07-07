@@ -126,10 +126,13 @@ export async function registerTenant(
   const agentHandle = await uniqueHandle(env, tenantId, 'assistant', [humanHandle]);
 
   await env.db.batch([
-    env.db.prepare('INSERT INTO tenants (id, name, slug, created_at) VALUES (?, ?, ?, ?)').bind(
+    // owner_user_id makes the registrant the tenant owner (KBR-114): an admin
+    // who additionally outranks other admins and can never be demoted/removed.
+    env.db.prepare('INSERT INTO tenants (id, name, slug, owner_user_id, created_at) VALUES (?, ?, ?, ?, ?)').bind(
       tenantId,
       input.tenantName,
       slug,
+      userId,
       now,
     ),
     // Owner (human). Legacy role 'owner' mirrors the seed; membership role 'admin' governs.
@@ -267,10 +270,11 @@ export async function createTenantForUser(
   const agentHandle = await uniqueHandle(env, tenantId, 'assistant');
 
   await env.db.batch([
-    env.db.prepare('INSERT INTO tenants (id, name, slug, created_at) VALUES (?, ?, ?, ?)').bind(
+    env.db.prepare('INSERT INTO tenants (id, name, slug, owner_user_id, created_at) VALUES (?, ?, ?, ?, ?)').bind(
       tenantId,
       tenantName,
       slug,
+      userId,
       now,
     ),
     env.db.prepare(

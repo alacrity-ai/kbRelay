@@ -43,6 +43,8 @@ export interface TeamMember {
   email: string | null;
   kind: UserKind;
   role: MembershipRole;
+  /** The tenant owner (KBR-114): un-demotable, un-removable. */
+  isOwner: boolean;
   /** Project ids this member can access. Admins: all (the UI shows "all"). */
   projectIds: string[];
 }

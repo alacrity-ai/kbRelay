@@ -51,7 +51,7 @@ async function authMeBody(env: Env, tenantId: string, userId: string): Promise<A
     getTenant(env, tenantId),
   ]);
   if (!user || !tenant) throw new HttpError(500, 'Account state inconsistent');
-  return { user, tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug } };
+  return { user, tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, ownerUserId: tenant.owner_user_id } };
 }
 
 // ── POST /api/v1/auth/register ────────────────────────────────

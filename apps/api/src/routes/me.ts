@@ -21,7 +21,7 @@ export async function handleMe(ctx: RouteContext): Promise<Response> {
   if (!tenant) return errorResponse(404, 'Tenant not found', cors);
 
   const body: MeResponse = {
-    tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
+    tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, ownerUserId: tenant.owner_user_id },
     user: { id: auth.userId, name: auth.userName, kind: auth.userKind, role: auth.role, color: auth.color, profile },
   };
   return jsonResponse(200, body, cors);
@@ -76,7 +76,7 @@ export async function handlePatchMe(ctx: RouteContext): Promise<Response> {
   if (!tenant) return errorResponse(404, 'Tenant not found', cors);
 
   const body: MeResponse = {
-    tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
+    tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, ownerUserId: tenant.owner_user_id },
     user: {
       id: auth.userId,
       name: auth.userName,

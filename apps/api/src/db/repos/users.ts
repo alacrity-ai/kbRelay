@@ -6,6 +6,7 @@ interface TenantRow {
   id: string;
   name: string;
   slug: string;
+  owner_user_id: string | null;
 }
 
 interface UserRow {
@@ -19,9 +20,18 @@ interface UserRow {
 }
 
 export async function getTenant(env: Env, tenantId: string): Promise<TenantRow | null> {
-  return env.db.prepare('SELECT id, name, slug FROM tenants WHERE id = ?')
+  return env.db.prepare('SELECT id, name, slug, owner_user_id FROM tenants WHERE id = ?')
     .bind(tenantId)
     .first<TenantRow>();
+}
+
+/** The tenant owner's user id (KBR-114). Null only for pre-0025 tenants that
+ *  had no human admin to backfill from. */
+export async function tenantOwnerId(env: Env, tenantId: string): Promise<string | null> {
+  const row = await env.db.prepare('SELECT owner_user_id FROM tenants WHERE id = ?')
+    .bind(tenantId)
+    .first<{ owner_user_id: string | null }>();
+  return row?.owner_user_id ?? null;
 }
 
 /**

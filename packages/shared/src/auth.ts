@@ -36,7 +36,11 @@ export interface AuthContext {
 
 /** Wire shape of GET /api/v1/me. */
 export interface MeResponse {
-  tenant: { id: string; name: string; slug: string };
+  /** ownerUserId: the tenant owner (KBR-114) — an admin who outranks other
+   *  admins. Public to every member so the UI can gate owner-only controls
+   *  without the admin-only /team endpoint. Null only for pre-0025 rows that
+   *  had no human admin to backfill from. */
+  tenant: { id: string; name: string; slug: string; ownerUserId: string | null };
   user: { id: string; name: string; kind: UserKind; role: Role | null; color: string; profile: string | null };
 }
 

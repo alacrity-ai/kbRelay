@@ -110,7 +110,8 @@ export interface AuthUser {
 /** Response of GET /auth/me and POST /auth/{register,login}. */
 export interface AuthMeResponse {
   user: AuthUser;
-  tenant: { id: string; name: string; slug: string };
+  /** ownerUserId: the tenant owner (KBR-114); see MeResponse. */
+  tenant: { id: string; name: string; slug: string; ownerUserId: string | null };
 }
 
 // ── Multi-workspace (v0.18.0, KBR-96) ─────────────────────────

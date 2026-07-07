@@ -69,14 +69,11 @@ describe('agent users', () => {
     let agents = await listAgents(env, tenantId);
     expect(agents.find((a) => a.id === created.id)!.role).toBe('admin');
 
-    // An agent admin counts toward the last-admin guard: with the agent
-    // promoted, the human admin can step down…
-    await setMemberRole(env, tenantId, ownerId, 'member');
-    // …and now the agent IS the last admin — demoting it must 409.
-    await expect(setMemberRole(env, tenantId, created.id, 'member')).rejects.toMatchObject({ status: 409 });
+    // Since KBR-114 the tenant owner is un-demotable, so an admin human always
+    // exists and an agent can never become the LAST admin — the owner guard
+    // fires before the last-admin guard ever could.
+    await expect(setMemberRole(env, tenantId, ownerId, 'member')).rejects.toMatchObject({ status: 409 });
 
-    // Restore for the rest of the suite.
-    await setMemberRole(env, tenantId, ownerId, 'admin');
     await setMemberRole(env, tenantId, created.id, 'member');
     agents = await listAgents(env, tenantId);
     expect(agents.find((a) => a.id === created.id)!.role).toBe('member');

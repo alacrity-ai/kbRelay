@@ -194,7 +194,9 @@ export default function TenantSettings({
                             <span className="avatar sm" aria-hidden>{initials(m.name)}</span>
                             <div className="member-ident">
                               <div className="member-name">
-                                {m.name}{isMe && <span className="you-tag"> (you)</span>}
+                                {m.name}
+                                {m.isOwner && <span className="owner-badge" title="Workspace owner — can't be demoted or removed">Owner</span>}
+                                {isMe && <span className="you-tag"> (you)</span>}
                               </div>
                               <div className="member-email">{m.email ?? '—'}</div>
                             </div>
@@ -203,7 +205,8 @@ export default function TenantSettings({
                             <select
                               className="role-select"
                               value={m.role}
-                              disabled={busy}
+                              disabled={busy || m.isOwner}
+                              title={m.isOwner ? "The workspace owner's role can't be changed" : undefined}
                               onChange={(e) => changeRole(m, e.target.value as MembershipRole)}
                             >
                               <option value="member">Member</option>
@@ -214,7 +217,7 @@ export default function TenantSettings({
                                 {open ? 'Hide projects' : 'Projects'}
                               </button>
                             )}
-                            {!isMe && (
+                            {!isMe && !m.isOwner && (
                               <button className="ghost sm danger-text" onClick={() => void remove(m)}>Remove</button>
                             )}
                           </div>

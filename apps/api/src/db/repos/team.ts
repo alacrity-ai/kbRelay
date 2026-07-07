@@ -6,6 +6,7 @@ import { newId } from '../ids';
 import { sha256Hex } from '../../auth/authenticate';
 import { hashPassword, PASSWORD_ALGO } from '../../lib/password';
 import { randomToken, deriveHandle, uniqueHandle } from './auth';
+import { tenantOwnerId } from './users';
 
 /**
  * Team management + project-access data ops (v0.11.0). All the admin-gated
@@ -76,6 +77,7 @@ export async function replaceMemberProjectAccess(
 // ── Team listing ──────────────────────────────────────────────
 
 export async function listTeam(env: Env, tenantId: string): Promise<TeamResponse> {
+  const ownerId = await tenantOwnerId(env, tenantId);
   const membersRs = await env.db.prepare(
     `SELECT u.id AS id, u.name AS name, u.email AS email, u.kind AS kind, m.role AS role
        FROM memberships m JOIN users u ON u.id = m.user_id
@@ -102,6 +104,7 @@ export async function listTeam(env: Env, tenantId: string): Promise<TeamResponse
     email: m.email,
     kind: m.kind as UserKind,
     role: m.role as MembershipRole,
+    isOwner: m.id === ownerId,
     projectIds: byUser.get(m.id) ?? [],
   }));
 
@@ -283,6 +286,11 @@ export async function setMemberRole(
 ): Promise<void> {
   const current = await memberRole(env, tenantId, userId);
   if (!current) throw new HttpError(404, 'Member not found');
+  // The tenant owner sits above every admin (KBR-114) — no caller may demote
+  // them. Ownership transfer is an intentional omit.
+  if (role !== 'admin' && userId === (await tenantOwnerId(env, tenantId))) {
+    throw new HttpError(409, "The workspace owner's role can't be changed");
+  }
   if (current === 'admin' && role !== 'admin' && (await adminCount(env, tenantId)) <= 1) {
     throw new HttpError(409, "You can't demote the last admin");
   }
@@ -294,6 +302,9 @@ export async function setMemberRole(
 export async function removeMember(env: Env, tenantId: string, userId: string): Promise<void> {
   const current = await memberRole(env, tenantId, userId);
   if (!current) throw new HttpError(404, 'Member not found');
+  if (userId === (await tenantOwnerId(env, tenantId))) {
+    throw new HttpError(409, "The workspace owner can't be removed");
+  }
   if (current === 'admin' && (await adminCount(env, tenantId)) <= 1) {
     throw new HttpError(409, "You can't remove the last admin");
   }
