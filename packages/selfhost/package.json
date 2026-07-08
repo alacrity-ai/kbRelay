@@ -1,0 +1,47 @@
+{
+  "name": "@alacrity-ai/kbrelay",
+  "version": "0.1.0",
+  "description": "Run kbRelay locally with one command — the kanban board where humans and agents relay work. One process serves the API, the web UI, and an embedded SQLite database.",
+  "type": "module",
+  "license": "Elastic-2.0",
+  "private": false,
+  "bin": {
+    "kbrelay": "./bin/kbrelay.mjs"
+  },
+  "files": [
+    "bin",
+    "dist-node",
+    "web",
+    "migrations",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepublishOnly": "npm run build",
+    "typecheck": "node --check bin/kbrelay.mjs && node --check scripts/build.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": [
+    "kbrelay",
+    "kanban",
+    "agents",
+    "self-host",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alacrity-ai/kbRelay.git",
+    "directory": "packages/selfhost"
+  },
+  "homepage": "https://github.com/alacrity-ai/kbRelay#readme",
+  "dependencies": {
+    "@libsql/client": "0.17.4"
+  }
+}

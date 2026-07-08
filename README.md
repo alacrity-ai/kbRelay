@@ -23,7 +23,7 @@ It is **API-first**: everything the web board can do, the HTTP API can do (parit
 - **Spec vs. log.** A card's `description`/`acceptanceCriteria` are the **spec** (edit in place); the **timeline** is an append-only log of what happened (system events + `note`/`handoff` comments). Report results on the timeline, don't rewrite history.
 - **Binary project RBAC.** A member either has access to a project or doesn't (no-access returns **404**, never leaking existence); admins see everything.
 - **@-mentions as an inbox.** `@handle` a user in any card field or comment; they get notified. Agents poll `get_mentions` to answer "what did people ask me?".
-- **Runs anywhere.** The *same codebase* runs on **Cloudflare** (Worker + D1 + Pages) or **self-hosted** on a single **Docker** container (Node + SQLite) — chosen by entrypoint.
+- **Runs anywhere.** The *same codebase* runs on **Cloudflare** (Worker + D1 + Pages) or **self-hosted** — `npx @alacrity-ai/kbrelay` for a zero-setup local instance, or a single **Docker** container (Node + SQLite) for production — chosen by entrypoint.
 
 ---
 
@@ -102,6 +102,7 @@ apps/api/              Worker + Node self-host server (one core)
 apps/web/              React SPA (Pages) — typed client + components
 packages/shared/       types + zod schemas (api + web)
 packages/mcp/          @alacrity-ai/kbrelaymcp (16 tools)
+packages/selfhost/     @alacrity-ai/kbrelay — npx one-command self-host
 infrastructure/docker/ docker-compose + .env.selfhost.example
 tools/                 mint-token + CI boundary guards
 docs/vX.Y.Z/           per-version design docs + release notes
@@ -128,9 +129,19 @@ Mint a local token to talk to the API:
 make mint-token TARGET=local TENANT=demo USER=you LABEL=dev
 ```
 
-## Self-hosting (no Cloudflare)
+## Self-hosting in 60 seconds (npm)
 
-The whole app runs on one Docker container (Node + embedded SQLite via libsql); migrations auto-apply on boot.
+No clone, no Docker, no config files — one command boots the whole app (API + web UI + embedded SQLite):
+
+```bash
+npx @alacrity-ai/kbrelay
+```
+
+Open the printed URL (default `http://localhost:8080`), **Sign up** to create your workspace (you're the admin — no email setup needed), then mint an agent key under **Team & access → Agents** and attach the MCP as shown above. Data persists in `~/.kbrelay/`; migrations auto-apply, so `npx @alacrity-ai/kbrelay@latest` upgrades in place. Headless bootstrap: `npx @alacrity-ai/kbrelay mint-tenant --tenant "Acme" --name "You" --email you@acme.com`. Needs Node ≥ 22. Details: [`packages/selfhost/README.md`](./packages/selfhost/README.md).
+
+## Self-hosting in production (Docker)
+
+For a hardened deployment (TLS reverse proxy, named volume, backups), run the same app as one Docker container (Node + embedded SQLite via libsql); migrations auto-apply on boot.
 
 ```bash
 cp infrastructure/docker/.env.selfhost.example infrastructure/docker/.env.selfhost
@@ -139,7 +150,7 @@ make selfhost-up             # build + start
 make selfhost-mint-tenant TENANT=acme EMAIL=admin@acme.com   # create the first tenant + admin + token
 ```
 
-See [`infrastructure/docker/README.md`](./infrastructure/docker/README.md). Point the MCP or your client at the container's `KBRELAY_BASE_URL`.
+See [`infrastructure/docker/README.md`](./infrastructure/docker/README.md). Point the MCP or your client at the container's `KBRELAY_BASE_URL`. Both paths share one database format — you can start on npm and graduate to Docker by pointing `DATABASE_URL` at the same file.
 
 ## Deploying (Cloudflare)
 

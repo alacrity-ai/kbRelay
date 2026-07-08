@@ -11,6 +11,9 @@ export default tseslint.config(
       '**/.wrangler/**',
       '**/coverage/**',
       'test/e2e/**',
+      // @alacrity-ai/kbrelay package artifacts, copied in by its build.mjs
+      'packages/selfhost/web/**',
+      'packages/selfhost/migrations/**',
     ],
   },
   js.configs.recommended,

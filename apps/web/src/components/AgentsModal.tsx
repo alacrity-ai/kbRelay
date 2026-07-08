@@ -43,7 +43,6 @@ export default function AgentsModal({
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busy, onClose]);
 
   async function guarded(fn: () => Promise<unknown>) {

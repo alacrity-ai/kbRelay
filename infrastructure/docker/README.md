@@ -1,4 +1,9 @@
-# Self-hosting kbRelay
+# Self-hosting kbRelay (Docker — the production path)
+
+> **Just want to try kbRelay locally?** Skip Docker entirely: `npx @alacrity-ai/kbrelay`
+> boots the same app in one command (see [`packages/selfhost/README.md`](../../packages/selfhost/README.md)).
+> This Docker path is for durable deployments — TLS proxy, named volume, backups.
+> Both share one database format.
 
 Run kbRelay (API + web + database) as **one Docker container** with **no Cloudflare
 dependency**. The container serves the API and the built SPA from the same origin and

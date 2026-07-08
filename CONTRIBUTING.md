@@ -91,6 +91,13 @@ make test
 5. A maintainer reviews. Address comments with additional commits (avoid force-push during review — it preserves the thread).
 6. After approval, the maintainer squash- or rebase-merges.
 
+## Publishing npm packages (maintainers)
+
+Two packages publish from this repo, both manually, with the `@alacrity-ai` CI token:
+
+- **`packages/mcp`** → `@alacrity-ai/kbrelaymcp`: bump `version`, then `npm publish --access public` (its `prepublishOnly` runs the TypeScript build).
+- **`packages/selfhost`** → `@alacrity-ai/kbrelay`: bump `version`, then `npm publish --access public` **from a repo checkout** — its `prepublishOnly` runs `scripts/build.mjs`, which rebuilds the SPA + Node bundle and copies `dist-node/`, `web/`, and `migrations/` into the package. Smoke-test the tarball first: `npm pack`, install it in a clean dir, and check `kbrelay --port <free> --data-dir <tmp>` boots and answers `/api/health`.
+
 ## License headers (optional)
 
 If you want to mark new files, the canonical block is:

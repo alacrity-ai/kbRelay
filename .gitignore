@@ -16,8 +16,13 @@ node_modules/
 # ── Build output ────────────────────────────────────────────────
 dist/
 apps/web/dist/
-apps/api/dist-node/        # self-host bundle
+# self-host bundle
+apps/api/dist-node/
 packages/*/dist/
+# @alacrity-ai/kbrelay package artifacts, copied in by its build.mjs
+packages/selfhost/dist-node/
+packages/selfhost/web/
+packages/selfhost/migrations/
 *.tsbuildinfo
 
 # ── Wrangler / Cloudflare ───────────────────────────────────────

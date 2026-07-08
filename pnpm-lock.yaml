@@ -160,6 +160,12 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@24.13.2)(jsdom@29.1.1)(lightningcss@1.32.0)
 
+  packages/selfhost:
+    dependencies:
+      '@libsql/client':
+        specifier: 0.17.4
+        version: 0.17.4
+
   packages/shared:
     dependencies:
       zod:
