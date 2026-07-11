@@ -49,6 +49,13 @@ token is the path for scripts, agents, and the MCP server.
 | **Attachments & links** | Files (≤25 MB, R2-backed) and typed external references (e.g. a Jira ticket) hang off a card. |
 | **Webhooks** | Per-tenant subscriptions that POST card events to your endpoint for real-time reaction. |
 
+**Address things the way you talk about them (KBR-128):** wherever a path takes a
+card id you may pass its **ticket key** (\`/api/v1/cards/KBR-12\`), and wherever it
+takes a project id you may pass its **code** (\`/api/v1/projects/KBR/board\`) —
+resolved in-tenant with identical RBAC/404 semantics. Card create/move accepts
+\`columnRole\` instead of \`columnId\`, and \`GET /projects/{id}/board\` returns the
+whole board (columns + card digests) in one compact call.
+
 ## The relay workflow (the handback contract)
 
 The board is the source of truth, so status changes carry meaning:

@@ -1,4 +1,4 @@
-import { createCardInput, patchCardInput, createCommentInput, reviewCardInput, countCardTasks, checkAllTasks, type WebhookTrigger } from '@kbrelay/shared';
+import { createCardInput, patchCardInput, createCommentInput, reviewCardInput, countCardTasks, checkAllTasks, type ColumnRole, type WebhookTrigger } from '@kbrelay/shared';
 import type { RouteContext } from '../router';
 import { jsonResponse, HttpError } from '../http';
 import { parseJson } from '../validate';
@@ -60,11 +60,76 @@ export async function handleListCards(ctx: RouteContext): Promise<Response> {
   return jsonResponse(200, { cards: withCounts }, ctx.cors);
 }
 
+/**
+ * GET /api/v1/projects/:id/board — the whole board in one compact call
+ * (KBR-128). Project + columns (with roles) + card DIGESTS: everything an
+ * agent needs to orient except the token-heavy spec bodies. `hasDescription` /
+ * `hasAcceptanceCriteria` say whether a follow-up `GET /cards/:id` has a spec
+ * to fetch. Excludes archived cards; applies the same lazy done-column
+ * hygiene as the card list.
+ */
+export async function handleGetBoard(ctx: RouteContext): Promise<Response> {
+  const { tenantId } = tenantScope(ctx.auth);
+  const project = await getProject(ctx.env, tenantId, ctx.params.id!);
+  if (!project) throw new HttpError(404, 'Project not found');
+  if (project.autoArchiveDoneDays != null) {
+    await autoArchiveDone(ctx.env, tenantId, project.id, project.autoArchiveDoneDays);
+  }
+  const [columns, cards] = await Promise.all([
+    listColumns(ctx.env, tenantId, project.id),
+    listCards(ctx.env, tenantId, project.id, { archived: false }),
+  ]);
+  const [labels, counts] = await Promise.all([
+    labelsForCards(ctx.env, tenantId, cards.map((c) => c.id)),
+    attachmentCountsForCards(ctx.env, tenantId, cards.map((c) => c.id)),
+  ]);
+  const digests = cards.map((c) => {
+    const tasks = countCardTasks(c.description, c.acceptanceCriteria);
+    return {
+      id: c.id,
+      key: c.key,
+      seq: c.seq,
+      summary: c.summary,
+      columnId: c.columnId,
+      position: c.position,
+      assigneeUserId: c.assigneeUserId,
+      reviewerUserId: c.reviewerUserId,
+      dueAt: c.dueAt,
+      createdBy: c.createdBy,
+      updatedBy: c.updatedBy,
+      updatedAt: c.updatedAt,
+      labels: labels[c.id] ?? [],
+      attachmentCounts: counts[c.id],
+      hasDescription: Boolean(c.description),
+      hasAcceptanceCriteria: Boolean(c.acceptanceCriteria),
+      ...(tasks.total > 0 ? { taskCounts: tasks } : {}),
+    };
+  });
+  return jsonResponse(200, { project, columns, cards: digests }, ctx.cors);
+}
+
+/** Resolve a `columnRole` (KBR-128) to the project's role column, or 400. */
+async function columnIdForRole(
+  ctx: RouteContext,
+  tenantId: string,
+  projectId: string,
+  role: ColumnRole,
+): Promise<string> {
+  const columns = await listColumns(ctx.env, tenantId, projectId);
+  const target = columns.find((c) => c.role === role);
+  if (!target) throw new HttpError(400, `Project has no column with role '${role}'`);
+  return target.id;
+}
+
 export async function handleCreateCard(ctx: RouteContext): Promise<Response> {
   const { tenantId, userId } = tenantScope(ctx.auth);
   const project = await getProject(ctx.env, tenantId, ctx.params.id!);
   if (!project) throw new HttpError(404, 'Project not found');
-  const input = await parseJson(ctx.request, createCardInput);
+  const { columnRole, ...input } = await parseJson(ctx.request, createCardInput);
+  // `columnRole` targets a lane by role (KBR-128); an explicit columnId wins.
+  if (columnRole && input.columnId === undefined) {
+    input.columnId = await columnIdForRole(ctx, tenantId, project.id, columnRole);
+  }
   const triggers: WebhookTrigger[] = [];
   const card = await createCard(ctx.env, tenantId, project.id, userId, input, triggers);
   if (triggers.length) ctx.waitUntil(dispatchTriggers(ctx.env, tenantId, card, userId, triggers));
@@ -85,7 +150,12 @@ export async function handleGetCard(ctx: RouteContext): Promise<Response> {
 
 export async function handlePatchCard(ctx: RouteContext): Promise<Response> {
   const { tenantId, userId } = tenantScope(ctx.auth);
-  const input = await parseJson(ctx.request, patchCardInput);
+  const { columnRole, ...input } = await parseJson(ctx.request, patchCardInput);
+  if (columnRole && input.columnId === undefined) {
+    const target = await getCard(ctx.env, tenantId, ctx.params.id!);
+    if (!target) throw new HttpError(404, 'Card not found');
+    input.columnId = await columnIdForRole(ctx, tenantId, target.projectId, columnRole);
+  }
   // Archiving AND restoring are board hygiene → admin-only (KBR-101; KBR-94
   // originally gated only restore, but members archiving live work is wrong too).
   if (input.archived !== undefined) requireAdmin(ctx.auth);

@@ -34,6 +34,19 @@ interface UploadedAttachment {
   attachment: { id: string; kind: string; filename: string; url: string };
 }
 
+/** Lane roles a card move/create can target (KBR-128) — resolved server-side. */
+const columnRole = z.enum(['ready', 'in_progress', 'review', 'done', 'blocked']).optional();
+
+/** Cached own-user id for `assignee: "me"` (one /v1/me per process). */
+let cachedMeId: string | null = null;
+async function myUserId(c: import('../client.js').KbRelayClient): Promise<string> {
+  if (!cachedMeId) {
+    const me = await c.request<{ user: { id: string } }>('GET', '/v1/me');
+    cachedMeId = me.user.id;
+  }
+  return cachedMeId;
+}
+
 export const allTools: Tool[] = [
   // ── Identity ──
   defineTool({
@@ -58,9 +71,15 @@ export const allTools: Tool[] = [
   }),
   defineTool({
     name: 'get_project',
-    description: 'Get a project (name, code, description, color, status) + its columns, each with an optional `role`. Read `description` for context. Resolve target columns by `role`, never by hardcoded name.',
+    description: 'Get a project (name, code, description, color, status) + its columns with roles. projectId accepts the project code (e.g. KBR) or id. For topology + cards in one call, prefer get_board.',
     inputSchema: z.object({ projectId: z.string() }),
     handler: (a, c) => c.request('GET', `/v1/projects/${enc(a.projectId)}`),
+  }),
+  defineTool({
+    name: 'get_board',
+    description: 'One-call compact board snapshot: project + columns (roles) + card digests (key, summary, lane, assignee, labels, due — no spec bodies). projectId accepts the code (KBR) or id. Orient with this.',
+    inputSchema: z.object({ projectId: z.string() }),
+    handler: (a, c) => c.request('GET', `/v1/projects/${enc(a.projectId)}/board`),
   }),
   defineTool({
     name: 'create_project',
@@ -93,7 +112,7 @@ export const allTools: Tool[] = [
   // ── Cards ──
   defineTool({
     name: 'list_cards',
-    description: 'List cards in a project. Optional filters: column (id), assignee (user id), q (text search on summary/description), archived=true (archived cards only; default excludes them).',
+    description: 'List cards (full bodies — prefer get_board to orient). projectId accepts code or id; assignee accepts "me" or a user id; column (id), q (text search), archived=true (archived only).',
     inputSchema: z.object({
       projectId: z.string(),
       column: z.string().optional(),
@@ -101,24 +120,27 @@ export const allTools: Tool[] = [
       q: z.string().optional(),
       archived: z.boolean().optional(),
     }),
-    handler: (a, c) =>
-      c.request('GET', `/v1/projects/${enc(a.projectId)}/cards${qs({ column: a.column, assignee: a.assignee, q: a.q, archived: a.archived ? '1' : undefined })}`),
+    handler: async (a, c) => {
+      const assignee = a.assignee === 'me' ? await myUserId(c) : a.assignee;
+      return c.request('GET', `/v1/projects/${enc(a.projectId)}/cards${qs({ column: a.column, assignee, q: a.q, archived: a.archived ? '1' : undefined })}`);
+    },
   }),
   defineTool({
     name: 'get_card',
-    description: 'Get one card by id (summary, description, acceptanceCriteria, column, assignee, ticket key). Read the spec before working it.',
+    description: 'Get one card: summary, description, acceptanceCriteria, column, assignee, attachments, links. cardId accepts the ticket key (e.g. KBR-12) or the id. Read the spec before working it.',
     inputSchema: z.object({ cardId: z.string() }),
     handler: (a, c) => c.request('GET', `/v1/cards/${enc(a.cardId)}`),
   }),
   defineTool({
     name: 'create_card',
-    description: 'Create a card (defaults to the first column). Write summary plain; description/acceptanceCriteria in markdown; @handle to notify. dueAt = epoch-ms deadline; labels = names (400 on unknown).',
+    description: 'Create a card. projectId accepts code or id; columnRole targets a lane (e.g. "ready") without knowing ids. Summary plain; description/AC markdown; @handle notifies; labels = names.',
     inputSchema: z.object({
       projectId: z.string(),
       summary: z.string(),
       description: z.string().nullish(),
       acceptanceCriteria: z.string().nullish(),
       columnId: z.string().optional(),
+      columnRole,
       assigneeUserId: z.string().nullish(),
       reviewerUserId: z.string().nullish(),
       dueAt: z.number().nullish(),
@@ -134,13 +156,14 @@ export const allTools: Tool[] = [
   }),
   defineTool({
     name: 'update_card',
-    description: 'Edit and/or move a card (status = column). Pickup → in_progress; finish → review + set reviewerUserId (default: card creator); done only when told; stuck → blocked. Log via add_comment.',
+    description: 'Edit/move a card (status = column). cardId accepts the ticket key (KBR-12); columnRole moves by role with no prior reads: pickup → "in_progress"; finish → "review" + reviewerUserId; stuck → "blocked".',
     inputSchema: z.object({
       cardId: z.string(),
       summary: z.string().optional(),
       description: z.string().nullish(),
       acceptanceCriteria: z.string().nullish(),
       columnId: z.string().optional(),
+      columnRole,
       assigneeUserId: z.string().nullish(),
       reviewerUserId: z.string().nullish(),
       dueAt: z.number().nullish(),
@@ -166,7 +189,7 @@ export const allTools: Tool[] = [
   defineTool({
     name: 'get_project_activity',
     description:
-      'Project activity feed: newest-first card events across the board (creates/moves/assigns/comments) with cardKey + cardSummary. Catch up on "what happened while I was away"; nextCursor pages older.',
+      'Project activity feed: newest-first card events across the board (creates/moves/assigns/comments) with cardKey + cardSummary. projectId accepts code or id; nextCursor pages older.',
     inputSchema: z.object({
       projectId: z.string(),
       since: z.number().optional(),
@@ -187,13 +210,13 @@ export const allTools: Tool[] = [
   // ── Timeline ──
   defineTool({
     name: 'get_timeline',
-    description: 'The card\'s activity log (system events + comments), oldest→newest — the who-did-what-when history.',
+    description: 'The card\'s activity log (system events + comments), oldest→newest — the who-did-what-when history. cardId accepts the ticket key (KBR-12) or the id.',
     inputSchema: z.object({ cardId: z.string() }),
     handler: (a, c) => c.request('GET', `/v1/cards/${enc(a.cardId)}/timeline`),
   }),
   defineTool({
     name: 'add_comment',
-    description: 'Report results ON the timeline (not by editing the description). A note or a structured handoff. Body is markdown; @handle to notify; attachmentIds links files uploaded via add_attachment.',
+    description: 'Report results ON the timeline (not by editing the description). A note or structured handoff. cardId accepts the ticket key; body is markdown; @handle notifies; attachmentIds links uploads.',
     inputSchema: z.object({
       cardId: z.string(),
       type: z.enum(['note', 'handoff']).default('note'),

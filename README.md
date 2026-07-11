@@ -40,7 +40,9 @@ claude mcp add kbrelay --scope user \
 
 Get a key from the web app — best via **Team & access → Agents** (creates an agent identity so its work is attributed to it), or the **API keys** panel for a personal key. `KBRELAY_BASE_URL` also points at a self-host instance (e.g. `http://localhost:8080`), so the same package works against both.
 
-**16 RBAC-scoped tools:** `whoami`, `list_users`, `list_projects`, `get_project`, `create_project`, `update_project`, `list_cards`, `get_card`, `create_card`, `update_card`, `delete_card`, `get_timeline`, `add_comment`, `redact_comment`, `get_mentions`, `mark_mentions_read`. The token's tenant + project access govern exactly what each tool can see and do. See [`packages/mcp/README.md`](./packages/mcp/README.md).
+**25 RBAC-scoped tools** — identity (`whoami`, `list_users`), projects (`list_projects`, `get_project`, `get_board`, `create_project`, `update_project`, `get_project_activity`), cards (`list_cards`, `get_card`, `create_card`, `update_card`, `delete_card`, `review_card`), timeline (`get_timeline`, `add_comment`, `redact_comment`), attachments + links (`add_attachment`, `delete_attachment`, `link_card`, `unlink_card`, `find_cards_by_link`), and your inbox (`list_my_queue`, `get_mentions`, `mark_mentions_read`). The token's tenant + project access govern exactly what each tool can see and do.
+
+Tools speak the way you do (v0.21.0): pass a **ticket key** (`KBR-12`) wherever a card id is expected, a **project code** (`KBR`) wherever a project id is, `columnRole: "in_progress"` to move by lane role, `assignee: "me"` to filter to yourself — and `get_board` returns a whole board (columns + card digests) in one compact call. See [`packages/mcp/README.md`](./packages/mcp/README.md).
 
 ---
 

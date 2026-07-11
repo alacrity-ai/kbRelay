@@ -34,6 +34,7 @@ import {
 } from './routes/columns';
 import {
   handleListCards,
+  handleGetBoard,
   handleCreateCard,
   handleGetCard,
   handlePatchCard,
@@ -231,6 +232,8 @@ export const routes: Route[] = [
   { method: 'PUT', pattern: '/api/v1/projects/:id/project-labels', access: { kind: 'project', param: 'id' }, handler: handleSetProjectLabels },
 
   // ── Cards ──
+  // One-call compact board snapshot (KBR-128): project + columns + card digests.
+  { method: 'GET', pattern: '/api/v1/projects/:id/board', access: { kind: 'project', param: 'id' }, handler: handleGetBoard },
   { method: 'GET', pattern: '/api/v1/projects/:id/cards', access: { kind: 'project', param: 'id' }, handler: handleListCards },
   { method: 'POST', pattern: '/api/v1/projects/:id/cards', access: { kind: 'project', param: 'id' }, handler: handleCreateCard },
   { method: 'GET', pattern: '/api/v1/cards/:id', access: { kind: 'card', param: 'id' }, handler: handleGetCard },

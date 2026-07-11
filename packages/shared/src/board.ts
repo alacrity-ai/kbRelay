@@ -192,11 +192,16 @@ export type PatchColumnInput = z.infer<typeof patchColumnInput>;
 const labelIds = z.array(idRef).max(12).optional();
 const labelNames = z.array(z.string().trim().min(1).max(32)).max(12).optional();
 
+/** Target lane by role instead of columnId (KBR-128) — resolved server-side to
+ *  the project's column with that role (400 if none). `columnId` wins if both. */
+const cardColumnRole = z.enum(COLUMN_ROLES as [ColumnRole, ...ColumnRole[]]).optional();
+
 export const createCardInput = z.object({
   summary: name,
   description: longText,
   acceptanceCriteria: longText,
   columnId: idRef.optional(), // defaults to the first column server-side
+  columnRole: cardColumnRole,
   assigneeUserId: idRef.nullable().optional(),
   reviewerUserId: idRef.nullable().optional(),
   dueAt,
@@ -212,6 +217,7 @@ export const patchCardInput = z.object({
   description: longText,
   acceptanceCriteria: longText,
   columnId: idRef.optional(),
+  columnRole: cardColumnRole,
   assigneeUserId: idRef.nullable().optional(),
   reviewerUserId: idRef.nullable().optional(),
   dueAt,

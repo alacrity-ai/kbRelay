@@ -58,6 +58,44 @@ export async function resolveProjectId(
   return row?.project_id ?? null;
 }
 
+/**
+ * Human-ref normalization (KBR-128): card-scoped params accept ticket keys
+ * (`KBR-12`) and project-scoped params accept project codes (`KBR`), resolved
+ * to canonical ids IN-TENANT before the RBAC check, so handlers only ever see
+ * ids and the no-access-is-404 invariant is untouched. The grammar is
+ * unambiguous — real ids always carry a `prefix_`, keys/codes never contain
+ * `_`. Unresolvable refs are left as-is and fall through to the existing 404.
+ */
+const TICKET_KEY_RE = /^([A-Za-z0-9]{2,6})-([1-9][0-9]*)$/;
+const PROJECT_CODE_RE = /^[A-Za-z0-9]{2,6}$/;
+
+export async function normalizeRefParams(
+  env: Env,
+  tenantId: string,
+  scope: AccessScope,
+  params: Record<string, string>,
+): Promise<void> {
+  const ref = params[scope.param];
+  if (!ref || ref.includes('_')) return;
+  if (scope.kind === 'card') {
+    const m = TICKET_KEY_RE.exec(ref);
+    if (!m) return;
+    const row = await env.db.prepare(
+      `SELECT c.id FROM cards c JOIN projects p ON p.id = c.project_id
+        WHERE c.tenant_id = ? AND p.code = ? AND c.seq = ?`,
+    )
+      .bind(tenantId, m[1]!.toUpperCase(), Number(m[2]))
+      .first<{ id: string }>();
+    if (row) params[scope.param] = row.id;
+  } else if (scope.kind === 'project') {
+    if (!PROJECT_CODE_RE.test(ref)) return;
+    const row = await env.db.prepare('SELECT id FROM projects WHERE tenant_id = ? AND code = ?')
+      .bind(tenantId, ref.toUpperCase())
+      .first<{ id: string }>();
+    if (row) params[scope.param] = row.id;
+  }
+}
+
 /** Does the CALLER have access to this project? Admin ⇒ any existing project. */
 export async function callerHasProjectAccess(
   env: Env,

@@ -746,6 +746,17 @@ export const OPENAPI_SPEC = {
       patch: { summary: 'Rename / recolor / reorder / set the role of a column — admin-only (KBR-94)', responses: { 200: { description: 'ok' } } },
       delete: { summary: 'Delete an empty column — admin-only (KBR-94)', responses: { 200: { description: 'ok' } } },
     },
+    '/api/v1/projects/{id}/board': {
+      get: {
+        summary: 'One-call board snapshot — project + columns + card digests (KBR-128)',
+        description:
+          'Everything needed to orient on a board in one compact call. Card digests carry key/summary/' +
+          'column/assignee/reviewer/due/labels + hasDescription/hasAcceptanceCriteria flags — no spec bodies ' +
+          '(fetch one card\'s spec with GET /cards/{id}). Excludes archived cards. `{id}` accepts the ' +
+          'project id or its code (e.g. `KBR`).',
+        responses: { 200: { description: 'ok' } },
+      },
+    },
     '/api/v1/projects/{id}/cards': {
       get: {
         summary: 'List cards in a project',
@@ -760,7 +771,14 @@ export const OPENAPI_SPEC = {
         ],
         responses: { 200: { description: 'ok' } },
       },
-      post: { summary: 'Create a card', responses: { 201: { description: 'created' } } },
+      post: {
+        summary: 'Create a card',
+        description:
+          'Optional `columnRole` (ready|in_progress|review|done|blocked) targets a lane by role instead of ' +
+          '`columnId` — resolved server-side, 400 if the project has no column in that role; `columnId` wins ' +
+          'if both are sent (KBR-128).',
+        responses: { 201: { description: 'created' }, 400: { description: 'no column with that role' } },
+      },
     },
     '/api/v1/projects/{id}/labels': {
       get: { summary: 'List a project\'s labels (max 12)', responses: { 200: { description: 'ok' } } },
@@ -800,7 +818,8 @@ export const OPENAPI_SPEC = {
         description:
           'RBAC (KBR-101): content fields (summary, description, acceptanceCriteria, labelIds, dueAt) ' +
           'require being the card\'s creator or a tenant admin; `archived` (either direction) is admin-only. ' +
-          'Workflow fields (columnId, position, assigneeUserId, reviewerUserId) are open to any member with access.',
+          'Workflow fields (columnId, position, assigneeUserId, reviewerUserId) are open to any member with access. ' +
+          'Optional `columnRole` (ready|in_progress|review|done|blocked) moves by role instead of columnId (KBR-128).',
         responses: { 200: { description: 'ok' }, 403: { description: 'content edit by non-creator, or archive by non-admin' } },
       },
       delete: { summary: 'Delete a card (cascades; admin-only since KBR-94)', responses: { 200: { description: 'ok' }, 403: { description: 'members cannot delete — archive instead' } } },

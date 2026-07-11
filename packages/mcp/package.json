@@ -1,6 +1,6 @@
 {
   "name": "@alacrity-ai/kbrelaymcp",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "MCP server for kbRelay — give an agent kanban powers (projects, cards, timeline, mentions) over the kbRelay API.",
   "type": "module",
   "license": "MIT",

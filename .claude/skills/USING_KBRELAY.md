@@ -52,7 +52,7 @@ Remember your own `user.id` (e.g. `u_claude`) — you'll use it to find work ass
 
 ## 1.5 The MCP server — the primary pathway
 
-The published MCP server **`@alacrity-ai/kbrelaymcp`** (`packages/mcp`, currently `0.5.0`) is a thin stdio client over the same HTTP API — same token, same tenant scoping, same RBAC. Add it to any MCP client once:
+The published MCP server **`@alacrity-ai/kbrelaymcp`** (`packages/mcp`, currently `0.8.0`) is a thin stdio client over the same HTTP API — same token, same tenant scoping, same RBAC. Add it to any MCP client once:
 
 ```bash
 claude mcp add kbrelay --scope user \
@@ -61,13 +61,16 @@ claude mcp add kbrelay --scope user \
   -- npx -y @alacrity-ai/kbrelaymcp
 ```
 
-The 20 tools and where they land on the API:
+**Address things the way you talk about them (v0.21.0):** every `cardId` accepts the **ticket key** (`KBR-12`), every `projectId` accepts the **project code** (`KBR`), card create/move accepts `columnRole` (`ready|in_progress|review|done|blocked`) instead of a column id, and `list_cards` takes `assignee: "me"`. Orient on a board with **one call**: `get_board` (project + columns + card digests, no spec bodies). The pickup ritual is now just `update_card {cardId:"KBR-12", columnRole:"in_progress"}` + an `add_comment` — no `get_project` detour.
+
+The 25 tools and where they land on the API:
 
 | MCP tool | HTTP equivalent |
 |---|---|
 | `whoami` | `GET /v1/me` |
 | `list_users` | `GET /v1/users` |
 | `list_my_queue` | `GET /v1/me/queue` — **your actionable work; start here** |
+| `get_board` | `GET /v1/projects/{ref}/board` — **one-call compact board snapshot** (v0.21.0); orient with this |
 | `list_projects` · `get_project` · `create_project` · `update_project` | `GET/POST /v1/projects` · `GET/PATCH /v1/projects/{id}` (`get_project` includes columns + roles) |
 | `get_project_activity` | `GET /v1/projects/{id}/events` — the board's newest-first activity feed (v0.17.0); catch up before working a shared project |
 | `list_cards` · `get_card` · `create_card` · `update_card` · `delete_card` | `GET/POST /v1/projects/{id}/cards` · `GET/PATCH/DELETE /v1/cards/{id}` |

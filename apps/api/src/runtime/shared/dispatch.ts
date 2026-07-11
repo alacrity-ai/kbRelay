@@ -3,7 +3,7 @@ import { getCorsHeaders, jsonResponse, errorResponse, HttpError } from '../../ht
 import { routes } from '../../router';
 import { authenticate } from '../../auth/authenticate';
 import { authenticateSession } from '../../auth/session';
-import { enforceProjectAccess } from '../../auth/access';
+import { enforceProjectAccess, normalizeRefParams } from '../../auth/access';
 
 /**
  * The runtime-neutral request dispatcher (v0.12.0). Both entrypoints call this:
@@ -45,7 +45,11 @@ export async function dispatch(
 
         // Project RBAC: enforce caller access for project-scoped routes
         // (throws 404 on missing or no-access) before the handler runs.
-        if (r.access) await enforceProjectAccess(env, auth, r.access, params);
+        // Ticket keys / project codes normalize to ids first (KBR-128).
+        if (r.access) {
+          await normalizeRefParams(env, auth.tenantId, r.access, params);
+          await enforceProjectAccess(env, auth, r.access, params);
+        }
       }
 
       return await r.handler({ request, env, url, params, cors, auth, waitUntil });

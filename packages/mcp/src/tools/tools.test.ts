@@ -6,7 +6,7 @@ const byName = (n: string) => allTools.find((t) => t.name === n)!;
 
 describe('tool registry', () => {
   it('exposes the full surface with unique names and short descriptions', () => {
-    expect(allTools.length).toBe(24);
+    expect(allTools.length).toBe(25);
     const names = allTools.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length); // no duplicates
     for (const t of allTools) {
@@ -18,7 +18,7 @@ describe('tool registry', () => {
 
   it('expected tools are present', () => {
     for (const n of [
-      'whoami', 'list_users', 'list_projects', 'get_project', 'create_project', 'update_project',
+      'whoami', 'list_users', 'list_projects', 'get_project', 'get_board', 'create_project', 'update_project',
       'list_cards', 'get_card', 'create_card', 'update_card', 'delete_card',
       'get_timeline', 'add_comment', 'review_card', 'redact_comment', 'get_mentions', 'mark_mentions_read',
       'list_my_queue', 'get_project_activity', 'add_attachment', 'delete_attachment',
