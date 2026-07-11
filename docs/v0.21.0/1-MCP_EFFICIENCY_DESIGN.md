@@ -96,7 +96,7 @@ of today's `list_cards`.
   the root README still says 16; it's 25 after `get_board`), plus the
   `.claude/skills/USING_KBRELAY.md` agent guide gains the "address by
   key/code/role" section.
-- Version bump `@alacrity-ai/kbrelaymcp` `0.5.0 → 0.6.0`, npm publish.
+- Version bump `@alacrity-ai/kbrelaymcp` `0.7.0 → 0.8.0`, npm publish.
 
 ## 3. Call-count impact
 
@@ -149,9 +149,9 @@ of today's `list_cards`.
    untouched). Smoke with a bearer token: `GET /v1/cards/KBR-127` (by key),
    `GET /v1/projects/KBR/board`, `PATCH` a scratch card by `columnRole`, and
    `/api/health`.
-4. **Publish `@alacrity-ai/kbrelaymcp@0.6.0`** (npm CI token via agentsecrets,
+4. **Publish `@alacrity-ai/kbrelaymcp@0.8.0`** (npm CI token via agentsecrets,
    injected as env — never printed). Verify `npm view` shows 0.6.0. Existing
    `npx -y` configs pick it up on next session start.
 5. Evidence + handoff on the ticket. Rollback: API is backward-compatible by
-   construction (`git revert` + redeploy if needed); npm keeps 0.5.0
+   construction (`git revert` + redeploy if needed); npm keeps 0.7.0
    installable via pin.
