@@ -39,8 +39,12 @@ links, or the two self-host paths. Executes as KBR-124 (page) + KBR-125
   `dist/` by Vite) carries one **200 rewrite**:
 
   ```
-  / /landing.html 200
+  / /landing 200
   ```
+
+  (Extension-less target on purpose — rewriting to `/landing.html` trips
+  Pages' pretty-URL normalization into a `308 → /landing` redirect instead of
+  serving the content at `/`; verified both ways on kbrelay-dev.pages.dev.)
 
   On Pages, redirect rules are evaluated **before** static-asset serving, so
   `/` serves the landing's content (URL unchanged, status 200 — correct for

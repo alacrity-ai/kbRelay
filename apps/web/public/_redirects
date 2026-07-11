@@ -2,4 +2,7 @@
 # The SEO landing (landing.html) owns the domain root; the SPA stays at
 # index.html and is reached at /app (and any non-asset path) via Pages'
 # SPA fallback — which is also what keeps emailed /auth/* deep links working.
-/ /landing.html 200
+# The rewrite targets the extension-less form: pointing at `/landing.html`
+# trips Pages' pretty-URL normalization into a 308 → /landing instead of
+# serving the content at `/` (verified on kbrelay-dev.pages.dev).
+/ /landing 200

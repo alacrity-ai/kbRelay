@@ -58,7 +58,9 @@ describe('landing.html SEO surface', () => {
 
 describe('routing + crawl files', () => {
   it('_redirects rewrites the root to the landing page', () => {
-    expect(redirects).toMatch(/^\/ \/landing\.html 200$/m);
+    // Extension-less target on purpose: `/landing.html` trips Pages'
+    // pretty-URL normalization into a 308 redirect instead of a rewrite.
+    expect(redirects).toMatch(/^\/ \/landing 200$/m);
   });
 
   it('robots.txt allows crawling and points at the sitemap', () => {
