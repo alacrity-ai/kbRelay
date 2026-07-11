@@ -1,0 +1,5 @@
+# Cloudflare Pages only (the self-host Node server never reads this file).
+# The SEO landing (landing.html) owns the domain root; the SPA stays at
+# index.html and is reached at /app (and any non-asset path) via Pages'
+# SPA fallback — which is also what keeps emailed /auth/* deep links working.
+/ /landing.html 200

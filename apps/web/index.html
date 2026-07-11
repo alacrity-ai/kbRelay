@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="kbRelay — a lightweight, multi-tenant kanban board where humans and agents relay work to each other, with clear provenance for every move." />
+    <!-- The app shell is a login wall — landing.html is the indexable front
+         door (served at `/` on Pages via _redirects). noindex also keeps
+         self-host instances out of search engines. OG tags stay for unfurls. -->
+    <meta name="robots" content="noindex" />
     <!-- Brand chrome — theme-color matches the app's dark surface (--bg) and
          tints the URL bar on Chrome Android + Safari iOS. application-name +
          apple-mobile-web-app-title give a clean label when saved to a

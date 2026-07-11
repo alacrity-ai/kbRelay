@@ -12,6 +12,9 @@ type Mode = 'sign-in' | 'register' | 'forgot' | 'reset' | 'token' | 'accept-invi
  *
  * `resetToken` is the token parsed from a /auth/reset/<token> deep link; when
  * present we open straight into the reset form.
+ *
+ * `?mode=register` (the landing page's "Get started" CTA) opens the
+ * Create-workspace tab; deep-link tokens win over it.
  */
 export default function AuthShell({
   onAuthed,
@@ -23,7 +26,13 @@ export default function AuthShell({
   inviteToken?: string | null;
 }) {
   const [mode, setMode] = useState<Mode>(
-    resetToken ? 'reset' : inviteToken ? 'accept-invite' : 'sign-in',
+    resetToken
+      ? 'reset'
+      : inviteToken
+        ? 'accept-invite'
+        : new URLSearchParams(window.location.search).get('mode') === 'register'
+          ? 'register'
+          : 'sign-in',
   );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -81,7 +90,9 @@ export default function AuthShell({
     void run(async () => {
       await api.resetPassword(resetToken ?? '', password);
       // Drop the token from the URL so a refresh doesn't re-open reset mode.
-      window.history.replaceState(null, '', '/');
+      // Land on /app, not / — on Cloudflare the root now serves the landing
+      // page, and /app resolves to the SPA on both Pages and self-host.
+      window.history.replaceState(null, '', '/app');
       setPassword('');
       setNotice('Password updated. Sign in with your new password.');
       setMode('sign-in');
@@ -95,7 +106,7 @@ export default function AuthShell({
         name: name.trim() || undefined,
         password: password || undefined,
       });
-      window.history.replaceState(null, '', '/');
+      window.history.replaceState(null, '', '/app');
       onAuthed();
     });
   };

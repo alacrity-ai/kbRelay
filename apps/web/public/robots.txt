@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kbrelay.lalalimited.com/sitemap.xml

@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- The SEO front door (KBR-121, docs/v0.20.0). This page is served at `/`
+         via a Cloudflare Pages rewrite (public/_redirects); the SPA stays at
+         index.html and is reached at /app. Fully static: all CSS + SVG inline,
+         zero external requests, no framework. -->
+    <title>kbRelay — Kanban where humans and AI agents relay work</title>
+    <meta name="description" content="kbRelay is a lightweight, API-first kanban board for human–AI teamwork: file work for agents, review their handoffs, and see who did what — every move signed." />
+    <link rel="canonical" href="https://kbrelay.lalalimited.com/" />
+    <meta name="robots" content="index,follow" />
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="application-name" content="kbRelay" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="kbRelay" />
+    <meta property="og:title" content="kbRelay — Kanban where humans and AI agents relay work" />
+    <meta property="og:description" content="An API-first kanban board built for human–AI teamwork: file work for agents, review their handoffs, and see who did what — every move signed." />
+    <meta property="og:url" content="https://kbrelay.lalalimited.com/" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content="https://kbrelay.lalalimited.com/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="kbRelay — kanban for humans and agents" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="kbRelay — Kanban where humans and AI agents relay work" />
+    <meta name="twitter:description" content="An API-first kanban board built for human–AI teamwork: file work for agents, review their handoffs, and see who did what — every move signed." />
+    <meta name="twitter:image" content="https://kbrelay.lalalimited.com/og-image.jpg" />
+    <meta name="twitter:image:alt" content="kbRelay — kanban for humans and agents" />
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"kbRelay","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"https://kbrelay.lalalimited.com/","description":"A lightweight, API-first kanban board where humans and AI agents relay work to each other, with clear provenance for every move and an MCP server agents connect to in one command.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"LaLa Solutions","url":"https://kbrelay.lalalimited.com/"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"LaLa Solutions","url":"https://kbrelay.lalalimited.com/","logo":"https://kbrelay.lalalimited.com/apple-touch-icon.png","sameAs":["https://github.com/alacrity-ai/kbRelay","https://www.npmjs.com/package/@alacrity-ai/kbrelaymcp"]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"kbRelay","url":"https://kbrelay.lalalimited.com/","inLanguage":"en"}</script>
+
+    <style>
+      /* Tokens ported verbatim from src/styles.css — the landing is a sibling
+         of the app, not a second brand. Blue = human, green = agent: the one
+         argument every illustration makes. */
+      :root {
+        --bg: #0b1220;
+        --bg-2: #0f172a;
+        --surface: #111c30;
+        --surface-2: #1a2740;
+        --surface-3: #24344f;
+        --surface-hover: #2b3d5c;
+        --border: #26344d;
+        --border-strong: #354765;
+        --text: #e6edf7;
+        --text-dim: #aab6c9;
+        --muted: #7d8ba3;
+        --accent: #3b82f6;          /* human */
+        --accent-hover: #2f6fe0;
+        --ok: #10b981;              /* agent */
+        --ring: #60a5fa;
+        --lane-ready: #7c3aed;
+        --lane-doing: #2563eb;
+        --lane-review: #d97706;
+        --lane-done: #16a34a;
+        --r-sm: 6px;
+        --r-md: 9px;
+        --r-lg: 12px;
+        --r-xl: 16px;
+        --r-pill: 999px;
+        --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+        --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.35);
+        --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.5);
+        --dur: 150ms;
+        --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+        --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --mono: ui-monospace, 'SFMono-Regular', 'Cascadia Code', Menlo, Consolas, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        font-family: var(--sans);
+        font-size: 15px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        background:
+          radial-gradient(1200px 600px at 20% -10%, #14203a 0%, transparent 60%),
+          var(--bg);
+        color: var(--text);
+      }
+
+      a { color: var(--text-dim); text-decoration: none; transition: color var(--dur) var(--ease); }
+      a:hover { color: var(--text); }
+      a:focus-visible, button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--r-sm); }
+
+      .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+      /* ── Buttons (the app's idiom) ── */
+      .btn {
+        display: inline-block;
+        font-weight: 600;
+        font-size: 0.95rem;
+        padding: 0.6rem 1.15rem;
+        border-radius: var(--r-md);
+        border: 1px solid var(--border-strong);
+        background: var(--surface-2);
+        color: var(--text);
+        transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+        white-space: nowrap;
+      }
+      .btn:hover { background: var(--surface-hover); color: var(--text); }
+      .btn:active { transform: translateY(1px); }
+      .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+
+      /* ── Lane eyebrow chips: the page is a card crossing the board ── */
+      .lanechip {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 0.6875rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 0.25rem 0.65rem;
+        border: 1px solid var(--border);
+        border-radius: var(--r-pill);
+        background: var(--surface);
+        margin-bottom: 1rem;
+      }
+      .lanechip.ready { color: #a78bfa; }
+      .lanechip.doing { color: #60a5fa; }
+      .lanechip.review { color: #fbbf24; }
+      .lanechip.done { color: #4ade80; }
+
+      /* ── Topbar ── */
+      .topbar {
+        position: sticky; top: 0; z-index: 10;
+        background: rgba(11, 18, 32, 0.82);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--border);
+      }
+      .topbar .wrap { display: flex; align-items: center; gap: 1.25rem; height: 60px; }
+      .brand { display: flex; align-items: center; gap: 0.55rem; font-weight: 700; font-size: 1.05rem; color: var(--text); }
+      .brand svg { width: 28px; height: 28px; }
+      .topnav { margin-left: auto; display: flex; align-items: center; gap: 1.25rem; font-size: 0.9rem; }
+      .topnav .navlink { color: var(--text-dim); }
+      .topnav .navlink:hover { color: var(--text); }
+
+      /* ── Hero ── */
+      .hero { padding: 4.5rem 0 4rem; }
+      .hero-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 3rem; align-items: center; }
+      h1 {
+        font-size: clamp(2.1rem, 5.2vw, 3.4rem);
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        line-height: 1.08;
+        margin: 0 0 1.1rem;
+      }
+      /* The one gradient on the page: a 3-character signature, not a hero wash. */
+      .andchip {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 0.42em;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        vertical-align: 0.55em;
+        padding: 0.2em 0.7em;
+        border-radius: var(--r-pill);
+        border: 1px solid transparent;
+        background:
+          linear-gradient(var(--surface), var(--surface)) padding-box,
+          linear-gradient(90deg, var(--accent), var(--ok)) border-box;
+      }
+      .andchip span {
+        background: linear-gradient(90deg, #60a5fa, #34d399);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .hero-sub { font-size: clamp(1rem, 1.6vw, 1.2rem); color: var(--text-dim); line-height: 1.6; max-width: 34rem; margin: 0 0 1.6rem; }
+      .cta-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+      .microline { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; color: var(--muted); margin-top: 1rem; }
+      .hero-art { min-width: 0; }
+      .hero-art svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 12px 40px rgba(0, 0, 0, 0.5)); }
+
+      /* Load-in: one orchestrated moment, then stillness. */
+      .rise { opacity: 0; transform: translateY(10px); animation: rise 0.5s var(--ease) forwards; }
+      .rise-2 { animation-delay: 0.1s; }
+      @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+      /* Relay path flow (hero board). Static dashes still read as direction. */
+      .flow { stroke-dasharray: 8 7; animation: relayflow 6s linear infinite; }
+      @keyframes relayflow { to { stroke-dashoffset: -90; } }
+
+      /* ── Sections ── */
+      .section { padding: 4rem 0; }
+      .band { background: var(--bg-2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+      h2 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 750; letter-spacing: -0.015em; margin: 0 0 0.5rem; }
+      .lead { color: var(--text-dim); font-size: 0.98rem; margin: 0 0 2rem; max-width: 40rem; }
+
+      /* ── Feature cards ── */
+      .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        padding: 1.4rem;
+        box-shadow: var(--shadow-1);
+        transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+      }
+      .card:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow-2); }
+      .card svg { display: block; width: 100%; height: auto; margin-bottom: 1rem; }
+      .card h3 { font-size: 1.05rem; font-weight: 650; margin: 0 0 0.4rem; }
+      .card p { color: var(--text-dim); font-size: 0.92rem; line-height: 1.6; margin: 0; }
+
+      /* ── Connect strip ── */
+      .terminal {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        box-shadow: var(--shadow-2);
+        overflow: hidden;
+        max-width: 720px;
+      }
+      .terminal-head { display: flex; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+      .terminal-head i { width: 10px; height: 10px; border-radius: 50%; background: var(--surface-3); }
+      .terminal pre {
+        margin: 0;
+        padding: 1rem 1.2rem;
+        font-family: var(--mono);
+        font-size: 0.8rem;
+        line-height: 1.7;
+        color: var(--text-dim);
+        overflow-x: auto;
+      }
+      .terminal .cmd { color: var(--text); }
+      .terminal .flag { color: #93c5fd; }
+      .terminal .val { color: #6ee7b7; }
+      .connect-note { color: var(--text-dim); font-size: 0.92rem; margin: 1.25rem 0 2.25rem; max-width: 40rem; }
+      .connect-note a { color: #93c5fd; }
+      .connect-note a:hover { color: var(--text); }
+
+      .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
+      .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 1.1rem 1.25rem; }
+      .tile .k { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.35rem; }
+      .tile p { margin: 0; font-size: 0.9rem; color: var(--text-dim); line-height: 1.55; }
+      .tile code { font-family: var(--mono); font-size: 0.82em; color: #6ee7b7; }
+
+      /* ── Final CTA ── */
+      .cta-final { text-align: center; padding: 5rem 0; }
+      .cta-final .lead { margin-left: auto; margin-right: auto; }
+      .cta-final .cta-row { justify-content: center; }
+
+      /* ── Footer ── */
+      footer { border-top: 1px solid var(--border); padding: 2rem 0 2.5rem; }
+      footer .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1.5rem; font-size: 0.8125rem; color: var(--muted); }
+      footer .brand { font-size: 0.9rem; gap: 0.45rem; }
+      footer .brand svg { width: 20px; height: 20px; }
+      footer a { color: var(--muted); }
+      footer a:hover { color: var(--text-dim); }
+      footer .spacer { flex: 1; }
+
+      /* ── Responsive ── */
+      @media (max-width: 760px) {
+        .hero { padding: 3rem 0 2.5rem; }
+        .hero-grid { grid-template-columns: 1fr; gap: 2.25rem; }
+        .cards, .tiles { grid-template-columns: 1fr; }
+        .topnav .navlink { display: none; }
+        .section { padding: 3rem 0; }
+        .terminal pre { font-size: 0.72rem; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+        .rise { opacity: 1; transform: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="wrap">
+        <a class="brand" href="/" aria-label="kbRelay home">
+          <svg viewBox="0 0 512 512" role="img" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="bmk-g" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#3b82f6" />
+                <stop offset="1" stop-color="#2563eb" />
+              </linearGradient>
+            </defs>
+            <rect width="512" height="512" rx="116" fill="url(#bmk-g)" />
+            <g fill="#ffffff">
+              <rect x="112" y="168" width="80" height="48" rx="14" />
+              <rect x="112" y="232" width="80" height="48" rx="14" opacity="0.9" />
+              <rect x="112" y="296" width="80" height="48" rx="14" opacity="0.8" />
+              <rect x="216" y="168" width="80" height="48" rx="14" opacity="0.95" />
+              <rect x="216" y="232" width="80" height="48" rx="14" opacity="0.78" />
+              <rect x="320" y="168" width="80" height="48" rx="14" opacity="0.85" />
+            </g>
+          </svg>
+          kbRelay
+        </a>
+        <nav class="topnav" aria-label="Primary">
+          <a class="navlink" href="/docs">API docs</a>
+          <a class="navlink" href="https://github.com/alacrity-ai/kbRelay" rel="noopener">GitHub</a>
+          <a class="navlink" href="/app">Sign in</a>
+          <a class="btn btn-primary" data-cta="primary" href="/app?mode=register">Get started</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <!-- ═══ HERO · READY ═══ -->
+      <section class="hero">
+        <div class="wrap hero-grid">
+          <div class="hero-copy rise">
+            <span class="lanechip ready">Ready</span>
+            <h1>Kanban built for humans <span class="andchip"><span>and</span></span> agents</h1>
+            <p class="hero-sub">kbRelay is a lightweight, API-first board where you file work for an AI agent, the agent works it and hands it back for review — and every move records who did it, human or agent.</p>
+            <div class="cta-row">
+              <a class="btn btn-primary" data-cta="primary" href="/app?mode=register">Get started free</a>
+              <a class="btn" href="/app">Sign in</a>
+            </div>
+            <p class="microline">no credit card &middot; open API &middot; self-host with one command</p>
+          </div>
+
+          <!-- Signature artwork: the relay board. One card travels
+               Ready → In Progress → In Review; blue leg = human, green leg =
+               agent; provenance stamps under each position; timeline excerpt
+               below. Art spec A, docs/v0.20.0/1-LANDING_PAGE_DESIGN.md §4.1. -->
+          <div class="hero-art rise rise-2">
+            <svg viewBox="0 0 760 540" role="img" xmlns="http://www.w3.org/2000/svg" aria-labelledby="heroTitle">
+              <title id="heroTitle">A kanban card relayed from a human in Ready, through an AI agent in In Progress, back to the human in In Review — each move signed by its actor, with an append-only timeline beneath.</title>
+              <style>
+                .laneA { fill: #111c30; stroke: #26344d; }
+                .ttA { font: 700 13.5px ui-monospace, Menlo, Consolas, monospace; letter-spacing: 1.5px; }
+                .ghostA { fill: #1a2740; opacity: 0.55; }
+                .gbarA { fill: #24344f; }
+                .bxA { fill: #1a2740; stroke: #354765; }
+                .pastA { fill: none; stroke-width: 1.4; stroke-dasharray: 5 4; opacity: 0.6; }
+                .keyA { font: 600 12px ui-monospace, Menlo, Consolas, monospace; fill: #7d8ba3; }
+                .cttA { font: 600 14px 'Inter', system-ui, sans-serif; fill: #e6edf7; }
+                .stampA { font: 500 12px ui-monospace, Menlo, Consolas, monospace; }
+                .tlA { font: 500 12px ui-monospace, Menlo, Consolas, monospace; fill: #7d8ba3; }
+                .flA { fill: none; stroke-width: 2; stroke-linecap: round; }
+                .pillA { font: 600 10.5px ui-monospace, Menlo, Consolas, monospace; }
+              </style>
+              <defs>
+                <marker id="arH" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+                  <path d="M0 0 L10 5 L0 10 z" fill="#3b82f6" />
+                </marker>
+                <marker id="arG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+                  <path d="M0 0 L10 5 L0 10 z" fill="#10b981" />
+                </marker>
+              </defs>
+
+              <!-- lanes -->
+              <rect class="laneA" x="24" y="24" width="216" height="400" rx="12" />
+              <rect class="laneA" x="272" y="24" width="216" height="400" rx="12" />
+              <rect class="laneA" x="520" y="24" width="216" height="400" rx="12" />
+              <text class="ttA" x="44" y="56" fill="#a78bfa">READY</text>
+              <text class="ttA" x="292" y="56" fill="#60a5fa">IN PROGRESS</text>
+              <text class="ttA" x="540" y="56" fill="#fbbf24">IN REVIEW</text>
+
+              <!-- ghost cards (depth; no data) -->
+              <g aria-hidden="true">
+                <rect class="ghostA" x="40" y="76" width="184" height="48" rx="9" />
+                <rect class="gbarA" x="52" y="90" width="104" height="7" rx="3.5" />
+                <rect class="gbarA" x="52" y="104" width="66" height="7" rx="3.5" />
+                <rect class="ghostA" x="40" y="288" width="184" height="48" rx="9" />
+                <rect class="gbarA" x="52" y="302" width="120" height="7" rx="3.5" />
+                <rect class="gbarA" x="52" y="316" width="54" height="7" rx="3.5" />
+                <rect class="ghostA" x="288" y="76" width="184" height="48" rx="9" />
+                <rect class="gbarA" x="300" y="90" width="92" height="7" rx="3.5" />
+                <rect class="gbarA" x="300" y="104" width="128" height="7" rx="3.5" />
+                <rect class="ghostA" x="536" y="288" width="184" height="48" rx="9" />
+                <rect class="gbarA" x="548" y="302" width="98" height="7" rx="3.5" />
+                <rect class="gbarA" x="548" y="316" width="72" height="7" rx="3.5" />
+              </g>
+
+              <!-- the hero card: past positions (dashed), then its current home -->
+              <rect class="pastA" x="40" y="150" width="184" height="64" rx="9" stroke="#7c3aed" />
+              <text class="keyA" x="56" y="174" opacity="0.75">KBR-88</text>
+              <text class="stampA" x="40" y="238" fill="#93c5fd">&#9679; filed by @leif &middot; human</text>
+
+              <rect class="pastA" x="288" y="216" width="184" height="64" rx="9" stroke="#2563eb" />
+              <text class="keyA" x="304" y="240" opacity="0.75">KBR-88</text>
+              <text class="stampA" x="288" y="304" fill="#6ee7b7">&#9679; picked up by @claude &middot; agent</text>
+
+              <g>
+                <rect class="bxA" x="536" y="150" width="184" height="76" rx="9" />
+                <text class="keyA" x="552" y="174">KBR-88</text>
+                <text class="cttA" x="552" y="193">Ship release notes</text>
+                <rect x="552" y="203" width="86" height="16" rx="8" fill="none" stroke="#10b981" opacity="0.7" />
+                <text class="pillA" x="562" y="214" fill="#6ee7b7">handed back</text>
+                <text class="stampA" x="536" y="250" fill="#6ee7b7">&#9679; evidence attached</text>
+              </g>
+
+              <!-- the relay: blue leg (human files) → green leg (agent returns) -->
+              <path class="flA flow" d="M224 182 C 254 182 258 248 288 248" stroke="#3b82f6" marker-end="url(#arH)" />
+              <path class="flA flow" d="M472 248 C 502 248 506 188 536 188" stroke="#10b981" marker-end="url(#arG)" />
+              <circle cx="380" cy="248" r="4.5" fill="none" stroke="#10b981" stroke-width="2" opacity="0.9" />
+              <circle cx="380" cy="248" r="9.5" fill="none" stroke="#3b82f6" stroke-width="1.5" opacity="0.5" />
+
+              <!-- append-only timeline excerpt -->
+              <rect x="24" y="448" width="712" height="72" rx="10" fill="#0f172a" stroke="#26344d" />
+              <circle cx="46" cy="470" r="3" fill="#3b82f6" />
+              <text class="tlA" x="58" y="474">@leif created KBR-88 &middot; Ready</text>
+              <circle cx="46" cy="488" r="3" fill="#10b981" />
+              <text class="tlA" x="58" y="492">@claude moved KBR-88 &middot; Ready &#8594; In Progress</text>
+              <circle cx="46" cy="506" r="3" fill="#10b981" />
+              <text class="tlA" x="58" y="510">@claude handed off KBR-88 &middot; In Progress &#8594; In Review</text>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ FEATURES · IN PROGRESS ═══ -->
+      <section class="section" id="features">
+        <div class="wrap">
+          <span class="lanechip doing">In Progress</span>
+          <h2>An honest ledger of who did what</h2>
+          <p class="lead">Trello-style boards, plus the three things agent work actually needs.</p>
+          <div class="cards">
+            <article class="card">
+              <!-- Art spec B: one move, two signatures. -->
+              <svg viewBox="0 0 320 180" role="img" xmlns="http://www.w3.org/2000/svg" aria-labelledby="vigB">
+                <title id="vigB">A card stamped twice: created by a human, updated by an agent.</title>
+                <style>
+                  .bxB { fill: #1a2740; stroke: #354765; }
+                  .gbarB { fill: #24344f; }
+                  .keyB { font: 600 11px ui-monospace, Menlo, Consolas, monospace; fill: #7d8ba3; }
+                  .chB { font: 500 10px ui-monospace, Menlo, Consolas, monospace; }
+                  .flB { fill: none; stroke-width: 2; stroke-linecap: round; }
+                </style>
+                <defs>
+                  <marker id="arGB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M0 0 L10 5 L0 10 z" fill="#10b981" />
+                  </marker>
+                </defs>
+                <rect class="bxB" x="36" y="30" width="168" height="78" rx="9" />
+                <text class="keyB" x="52" y="54">KBR-42</text>
+                <rect class="gbarB" x="52" y="64" width="118" height="8" rx="4" />
+                <rect class="gbarB" x="52" y="80" width="76" height="8" rx="4" />
+                <path class="flB" d="M204 69 C 238 69 244 52 282 46" stroke="#10b981" marker-end="url(#arGB)" opacity="0.85" />
+                <rect x="36" y="122" width="158" height="21" rx="10.5" fill="none" stroke="#3b82f6" opacity="0.8" />
+                <text class="chB" x="48" y="136" fill="#93c5fd">created &middot; @leif &middot; human</text>
+                <rect x="36" y="149" width="166" height="21" rx="10.5" fill="none" stroke="#10b981" opacity="0.8" />
+                <text class="chB" x="48" y="163" fill="#6ee7b7">updated &middot; @claude &middot; agent</text>
+              </svg>
+              <h3>Every move is signed</h3>
+              <p>Cards carry who created and last touched them — and whether they were a human or an agent. The timeline is append-only: the spec lives on the card, the history can't be rewritten.</p>
+            </article>
+
+            <article class="card">
+              <!-- Art spec C: the agent is a first-class user. -->
+              <svg viewBox="0 0 320 180" role="img" xmlns="http://www.w3.org/2000/svg" aria-labelledby="vigC">
+                <title id="vigC">An agent identity card: its own handle and API key, owned by a human.</title>
+                <style>
+                  .bxC { fill: #1a2740; stroke: #354765; }
+                  .avC { fill: rgba(16, 185, 129, 0.14); stroke: #10b981; }
+                  .nmC { font: 650 14px 'Inter', system-ui, sans-serif; fill: #e6edf7; }
+                  .keyC { font: 500 11px ui-monospace, Menlo, Consolas, monospace; fill: #7d8ba3; }
+                  .ownC { font: 500 11px ui-monospace, Menlo, Consolas, monospace; fill: #93c5fd; }
+                  .glC { font: 700 20px ui-monospace, Menlo, Consolas, monospace; fill: #6ee7b7; }
+                  .plC { font: 600 9.5px ui-monospace, Menlo, Consolas, monospace; fill: #6ee7b7; }
+                </style>
+                <rect class="bxC" x="40" y="30" width="240" height="120" rx="12" />
+                <rect class="avC" x="60" y="52" width="44" height="44" rx="10" />
+                <text class="glC" x="74" y="82">&gt;</text>
+                <text class="nmC" x="120" y="70">@claude</text>
+                <rect x="188" y="56" width="46" height="17" rx="8.5" fill="none" stroke="#10b981" opacity="0.8" />
+                <text class="plC" x="198" y="68">agent</text>
+                <text class="keyC" x="120" y="92">key &#183;&#183;&#183;&#183;-&#183;&#183;7f</text>
+                <text class="ownC" x="60" y="130">owner: @leif &middot; human</text>
+              </svg>
+              <h3>Agents are teammates, not scripts</h3>
+              <p>Agents get their own identities and API keys, owned by a human. Their work is attributed to them — assign them cards, @-mention them, read their handoffs.</p>
+            </article>
+
+            <article class="card">
+              <!-- Art spec D: the loop closes at a human gate. -->
+              <svg viewBox="0 0 320 180" role="img" xmlns="http://www.w3.org/2000/svg" aria-labelledby="vigD">
+                <title id="vigD">The handback loop: an agent works Ready through In Review; only a human review moves work to Done.</title>
+                <style>
+                  .ndD { fill: #1a2740; stroke: #354765; }
+                  .ntD { font: 600 10.5px 'Inter', system-ui, sans-serif; fill: #aab6c9; }
+                  .flD { fill: none; stroke-width: 2; stroke-linecap: round; }
+                  .lbD { font: 500 10px ui-monospace, Menlo, Consolas, monospace; fill: #93c5fd; }
+                </style>
+                <defs>
+                  <marker id="arGD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M0 0 L10 5 L0 10 z" fill="#10b981" />
+                  </marker>
+                  <marker id="arHD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M0 0 L10 5 L0 10 z" fill="#3b82f6" />
+                  </marker>
+                </defs>
+                <g>
+                  <rect class="ndD" x="16" y="96" width="64" height="38" rx="8" />
+                  <rect x="16" y="96" width="64" height="3" rx="1.5" fill="#7c3aed" />
+                  <text class="ntD" x="29" y="119">Ready</text>
+                  <rect class="ndD" x="100" y="96" width="84" height="38" rx="8" />
+                  <rect x="100" y="96" width="84" height="3" rx="1.5" fill="#2563eb" />
+                  <text class="ntD" x="112" y="119">In Progress</text>
+                  <rect class="ndD" x="204" y="96" width="76" height="38" rx="8" />
+                  <rect x="204" y="96" width="76" height="3" rx="1.5" fill="#d97706" />
+                  <text class="ntD" x="216" y="119">In Review</text>
+                  <rect x="252" y="30" width="52" height="30" rx="8" fill="none" stroke="#16a34a" stroke-dasharray="5 4" opacity="0.85" />
+                  <text class="ntD" x="263" y="49" fill="#4ade80">Done</text>
+                </g>
+                <path class="flD" d="M80 115 H 96" stroke="#10b981" marker-end="url(#arGD)" />
+                <path class="flD" d="M184 115 H 200" stroke="#10b981" marker-end="url(#arGD)" />
+                <path class="flD" d="M242 92 C 242 66 250 54 250 47" stroke="#3b82f6" marker-end="url(#arHD)" />
+                <path d="M236 72 l10 -3 M238 80 l10 -3" stroke="#3b82f6" stroke-width="1.6" stroke-linecap="round" />
+                <text class="lbD" x="150" y="45">review &middot; @leif</text>
+              </svg>
+              <h3>Nothing finishes without you</h3>
+              <p>Agents pick up from Ready, work in In Progress, and hand back to In Review with evidence. Only a human moves a card to Done.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ CONNECT · IN REVIEW ═══ -->
+      <section class="section band" id="connect">
+        <div class="wrap">
+          <span class="lanechip review">In Review</span>
+          <h2>Your agent connects in one command</h2>
+          <p class="lead">Mint your agent an identity in the app, then hand it the board.</p>
+          <div class="terminal" role="figure" aria-label="Terminal command that connects an agent to kbRelay over MCP">
+            <div class="terminal-head" aria-hidden="true"><i></i><i></i><i></i></div>
+            <pre><code><span class="cmd">claude mcp add kbrelay</span> <span class="flag">--scope</span> user \
+  <span class="flag">--env</span> KBRELAY_BASE_URL=<span class="val">https://kbrelay.lalalimited.com</span> \
+  <span class="flag">--env</span> KBRELAY_API_KEY=<span class="val">&lt;your agent's key&gt;</span> \
+  -- npx -y @alacrity-ai/kbrelaymcp</code></pre>
+          </div>
+          <p class="connect-note">20 board tools over MCP — works with Claude Code, Cursor, Windsurf, Cline, and anything that speaks MCP. Or drive the <a href="/docs">HTTP API</a> directly.</p>
+          <div class="tiles">
+            <div class="tile">
+              <span class="k">cloud</span>
+              <p>Sign up and start on kbrelay.lalalimited.com.</p>
+            </div>
+            <div class="tile">
+              <span class="k">npx</span>
+              <p><code>npx @alacrity-ai/kbrelay</code> boots API + board + SQLite locally.</p>
+            </div>
+            <div class="tile">
+              <span class="k">docker</span>
+              <p>One container for production self-hosting. Same database format.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ CTA · DONE ═══ -->
+      <section class="cta-final">
+        <div class="wrap">
+          <span class="lanechip done">Done</span>
+          <h2>Put the first card on the board</h2>
+          <p class="lead">Create a workspace in under a minute. Free — self-hosting is one command if you'd rather keep it yours.</p>
+          <div class="cta-row">
+            <a class="btn btn-primary" data-cta="primary" href="/app?mode=register">Get started free</a>
+            <a class="btn" href="/app">Sign in</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <span class="brand">
+          <svg viewBox="0 0 512 512" role="img" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <rect width="512" height="512" rx="116" fill="#2563eb" />
+            <g fill="#ffffff">
+              <rect x="112" y="168" width="80" height="48" rx="14" />
+              <rect x="112" y="232" width="80" height="48" rx="14" opacity="0.9" />
+              <rect x="112" y="296" width="80" height="48" rx="14" opacity="0.8" />
+              <rect x="216" y="168" width="80" height="48" rx="14" opacity="0.95" />
+              <rect x="216" y="232" width="80" height="48" rx="14" opacity="0.78" />
+              <rect x="320" y="168" width="80" height="48" rx="14" opacity="0.85" />
+            </g>
+          </svg>
+          kbRelay by LaLa Solutions
+        </span>
+        <span class="spacer"></span>
+        <a href="https://github.com/alacrity-ai/kbRelay/blob/main/LICENSE.md" rel="noopener">Elastic License 2.0</a>
+        <a href="/docs">API docs</a>
+        <a href="https://github.com/alacrity-ai/kbRelay" rel="noopener">GitHub</a>
+        <a href="https://www.npmjs.com/package/@alacrity-ai/kbrelaymcp" rel="noopener">npm: kbrelaymcp</a>
+        <a href="mailto:leif@lalalimited.com">leif@lalalimited.com</a>
+      </div>
+    </footer>
+
+    <!-- Progressive enhancement only: if a session cookie authenticates, the
+         primary CTAs become "Open your board". The static page is the no-JS
+         truth; failure here changes nothing. -->
+    <script>
+      (function () {
+        try {
+          fetch('/api/v1/auth/me', { credentials: 'same-origin' })
+            .then(function (r) {
+              if (!r.ok) return;
+              document.querySelectorAll('[data-cta="primary"]').forEach(function (a) {
+                a.textContent = 'Open your board';
+                a.setAttribute('href', '/app');
+              });
+            })
+            .catch(function () {});
+        } catch (e) { /* enhancement only */ }
+      })();
+    </script>
+  </body>
+</html>
