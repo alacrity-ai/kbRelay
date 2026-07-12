@@ -232,12 +232,16 @@ export const getMyQueue = (projectId?: string) =>
     `/v1/me/queue${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`,
   );
 
-// ── Global quick-find (v0.17.0; archived opt-in KBR-130) ──
-export const search = (q: string, opts: { limit?: number; archived?: boolean } = {}) =>
+// ── Global quick-find (v0.17.0; archived opt-in KBR-130; paginated KBR-133) ──
+export const search = (
+  q: string,
+  opts: { limit?: number; offset?: number; archived?: boolean } = {},
+) =>
   request<SearchResponse>(
     'GET',
     `/v1/search?q=${encodeURIComponent(q)}` +
       (opts.limit != null ? `&limit=${opts.limit}` : '') +
+      (opts.offset != null ? `&offset=${opts.offset}` : '') +
       (opts.archived ? '&archived=1' : ''),
   );
 

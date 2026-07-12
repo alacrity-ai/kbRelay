@@ -1,6 +1,6 @@
 import type { Env } from '../../env';
 import type { CardMatchField, CardSearchHit, ProjectSearchHit, SearchHit } from '@kbrelay/shared';
-import { SNIPPET_MARK } from '@kbrelay/shared';
+import { SEARCH_MAX_RESULTS, SNIPPET_MARK } from '@kbrelay/shared';
 
 /**
  * Global quick-find (v0.17.0, KBR-68; deepened KBR-130). Three cheap LIKE
@@ -111,14 +111,36 @@ const CARD_COLS = `c.id, c.seq, c.summary, c.description, c.acceptance_criteria,
               c.project_id, p.code AS project_code, p.name AS project_name,
               col.name AS column_name, c.archived_at`;
 
+/** One page of merged results — see SearchResponse in @kbrelay/shared. */
+export interface SearchPage {
+  hits: SearchHit[];
+  hasMore: boolean;
+  nextOffset: number | null;
+  truncated: boolean;
+}
+
+/**
+ * Pagination (KBR-133) is overfetch-and-slice: the pipeline fills toward
+ * `scanTarget = pageEnd + 1` merged hits and the page is `[offset, pageEnd)`
+ * of that run. Correct because every probe's ORDER BY is a *total* order
+ * (immutable id tie-breakers) and stages run in a fixed order, so a
+ * larger-budget run is always a prefix-extension of a smaller one. The +1
+ * lookahead row makes `hasMore` exact; it must be filled by the PIPELINE
+ * (any stage), not by one probe fetching an extra row.
+ */
 export async function searchTenant(
   env: Env,
   tenantId: string,
   q: string,
   access: { userId: string; isAdmin: boolean; includeArchived?: boolean },
-  limitArg?: number,
-): Promise<SearchHit[]> {
-  const limit = Math.min(Math.max(Math.trunc(limitArg ?? DEFAULT_LIMIT), 1), MAX_LIMIT);
+  page: { limit?: number; offset?: number } = {},
+): Promise<SearchPage> {
+  const limit = Math.min(Math.max(Math.trunc(page.limit ?? DEFAULT_LIMIT), 1), MAX_LIMIT);
+  // Offsets are validated (rejected, not clamped) at the route; the floor here
+  // is defense against direct callers, not a contract.
+  const offset = Math.max(Math.trunc(page.offset ?? 0), 0);
+  const pageEnd = Math.min(offset + limit, SEARCH_MAX_RESULTS);
+  const scanTarget = pageEnd + 1;
   // RBAC in-query: members only see granted projects; admins see the tenant.
   const accessClause = access.isAdmin
     ? ''
@@ -146,7 +168,7 @@ export async function searchTenant(
         ORDER BY (CAST(c.seq AS TEXT) = ?) DESC, c.seq ASC, c.id ASC
         LIMIT ?`,
     )
-      .bind(tenantId, code, `${seqPrefix}%`, ...accessBinds, seqPrefix, limit)
+      .bind(tenantId, code, `${seqPrefix}%`, ...accessBinds, seqPrefix, scanTarget)
       .all<CardHitRow>();
     for (const r of rs.results ?? []) {
       hits.push(cardHit(r, q, true));
@@ -157,7 +179,7 @@ export async function searchTenant(
   // 2) Project probe — name substring or code prefix (board jumps).
   const like = `%${likeEscape(q.trim())}%`;
   const codePrefix = `${likeEscape(q.trim().toUpperCase())}%`;
-  if (hits.length < limit) {
+  if (hits.length < scanTarget) {
     const rs = await env.db.prepare(
       `SELECT p.id, p.name, p.code, p.color
          FROM projects p
@@ -165,7 +187,7 @@ export async function searchTenant(
         ORDER BY p.name ASC, p.id ASC
         LIMIT ?`,
     )
-      .bind(tenantId, like, codePrefix, ...accessBinds, limit - hits.length)
+      .bind(tenantId, like, codePrefix, ...accessBinds, scanTarget - hits.length)
       .all<ProjectHitRow>();
     for (const r of rs.results ?? []) {
       hits.push({ kind: 'project', id: r.id, name: r.name, code: r.code, color: r.color } satisfies ProjectSearchHit);
@@ -174,7 +196,7 @@ export async function searchTenant(
 
   // 3) Card body probe — summary / description / acceptance criteria (KBR-130).
   //    Live cards rank above archived; newest-touched first within each.
-  if (hits.length < limit) {
+  if (hits.length < scanTarget) {
     const rs = await env.db.prepare(
       `SELECT ${CARD_COLS}
          FROM cards c
@@ -187,14 +209,21 @@ export async function searchTenant(
         ORDER BY (c.archived_at IS NOT NULL) ASC, c.updated_at DESC, c.id ASC
         LIMIT ?`,
     )
-      .bind(tenantId, like, like, like, ...accessBinds, limit - hits.length + seenCards.size)
+      .bind(tenantId, like, like, like, ...accessBinds, scanTarget - hits.length + seenCards.size)
       .all<CardHitRow>();
     for (const r of rs.results ?? []) {
       if (seenCards.has(r.id)) continue;
-      if (hits.length >= limit) break;
+      if (hits.length >= scanTarget) break;
       hits.push(cardHit(r, q, false));
     }
   }
 
-  return hits;
+  const moreExist = hits.length > pageEnd;
+  const atCap = pageEnd >= SEARCH_MAX_RESULTS;
+  return {
+    hits: hits.slice(offset, pageEnd),
+    hasMore: moreExist && !atCap,
+    nextOffset: moreExist && !atCap ? pageEnd : null,
+    truncated: moreExist && atCap,
+  };
 }

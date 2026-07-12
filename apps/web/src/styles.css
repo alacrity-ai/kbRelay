@@ -1475,6 +1475,35 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 }
 .qf-archived input { accent-color: var(--accent, #3b82f6); cursor: pointer; }
 .qf-empty { padding: 1.1rem 0.8rem; color: var(--muted, #94a3b8); }
+/* KBR-133: pagination affordances */
+.qf-load-more {
+  min-height: 1.6rem;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  color: var(--muted, #94a3b8);
+  text-align: center;
+}
+.qf-load-retry {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.7rem;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-sm, 6px);
+  color: #93c5fd;
+  font-size: 0.78rem;
+  text-align: center;
+  cursor: pointer;
+}
+.qf-load-retry:hover { background: #3b82f622; }
+.qf-truncated {
+  padding: 0.45rem 0.7rem;
+  font-size: 0.75rem;
+  color: var(--muted, #94a3b8);
+  text-align: center;
+  font-style: italic;
+}
+
 .qf-footer {
   display: flex;
   gap: 1rem;

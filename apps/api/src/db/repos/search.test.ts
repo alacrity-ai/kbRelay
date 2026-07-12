@@ -8,6 +8,10 @@ import { registerTenant } from './auth';
 import { createProject } from './projects';
 import { createCard } from './cards';
 import { searchTenant } from './search';
+
+/** These assertions predate pagination (KBR-133) — unwrap to the hits array. */
+const searchHits = async (...args: Parameters<typeof searchTenant>) =>
+  (await searchTenant(...args)).hits;
 import { SNIPPET_MARK } from '@kbrelay/shared';
 
 /**
@@ -72,7 +76,7 @@ beforeAll(async () => {
 
 describe('quick-find', () => {
   it('ranks the exact key above its prefix matches', async () => {
-    const hits = await searchTenant(env, tenantId, 'ALW-3', { userId: ownerId, isAdmin: true });
+    const hits = await searchHits(env, tenantId, 'ALW-3', { userId: ownerId, isAdmin: true });
     const cardHits = hits.filter((h) => h.kind === 'card');
     expect(cardHits[0]!.id).toBe(card3Id);
     expect(cardHits.map((h) => h.id)).toContain(card30Id);
@@ -81,33 +85,33 @@ describe('quick-find', () => {
   });
 
   it('matches projects by name and by code prefix', async () => {
-    const byName = await searchTenant(env, tenantId, 'alpha wid', { userId: ownerId, isAdmin: true });
+    const byName = await searchHits(env, tenantId, 'alpha wid', { userId: ownerId, isAdmin: true });
     expect(byName.some((h) => h.kind === 'project' && h.id === alphaId)).toBe(true);
-    const byCode = await searchTenant(env, tenantId, 'BS', { userId: ownerId, isAdmin: true });
+    const byCode = await searchHits(env, tenantId, 'BS', { userId: ownerId, isAdmin: true });
     expect(byCode.some((h) => h.kind === 'project' && h.id === betaId)).toBe(true);
   });
 
   it('matches card summaries by substring, capped by limit', async () => {
-    const hits = await searchTenant(env, tenantId, 'Widget task', { userId: ownerId, isAdmin: true }, 5);
+    const hits = await searchHits(env, tenantId, 'Widget task', { userId: ownerId, isAdmin: true }, { limit: 5 });
     expect(hits.length).toBeLessThanOrEqual(5);
     expect(hits.every((h) => h.kind === 'card')).toBe(true);
   });
 
   it('escapes LIKE wildcards in the query', async () => {
-    const hits = await searchTenant(env, tenantId, '100%', { userId: ownerId, isAdmin: true });
+    const hits = await searchHits(env, tenantId, '100%', { userId: ownerId, isAdmin: true });
     expect(hits.some((h) => h.kind === 'card' && h.summary.includes('100%'))).toBe(true);
     // A bare % must NOT act as match-everything.
-    const wild = await searchTenant(env, tenantId, '%%', { userId: ownerId, isAdmin: true });
+    const wild = await searchHits(env, tenantId, '%%', { userId: ownerId, isAdmin: true });
     expect(wild.filter((h) => h.kind === 'card')).toHaveLength(0);
   });
 
   it('matches inside descriptions and acceptance criteria (KBR-130)', async () => {
-    const desc = await searchTenant(env, tenantId, 'zebra', { userId: ownerId, isAdmin: true });
+    const desc = await searchHits(env, tenantId, 'zebra', { userId: ownerId, isAdmin: true });
     const dHit = desc.find((h) => h.kind === 'card' && h.summary === 'Plain card');
     expect(dHit && dHit.kind === 'card' && dHit.matchedField).toBe('description');
     expect(dHit && dHit.kind === 'card' && dHit.snippet).toContain(SNIPPET_MARK);
 
-    const ac = await searchTenant(env, tenantId, 'pangolin', { userId: ownerId, isAdmin: true });
+    const ac = await searchHits(env, tenantId, 'pangolin', { userId: ownerId, isAdmin: true });
     const aHit = ac.find((h) => h.kind === 'card' && h.summary === 'Criteria card');
     expect(aHit && aHit.kind === 'card' && aHit.matchedField).toBe('acceptanceCriteria');
     expect(aHit && aHit.kind === 'card' && aHit.snippet).toContain('pangolin');
@@ -115,17 +119,17 @@ describe('quick-find', () => {
 
   it('ranks a summary match above a body match; summary hits have no snippet', async () => {
     // "card" appears in many summaries AND in bodies — summary must win, no snippet.
-    const hits = await searchTenant(env, tenantId, 'Plain card', { userId: ownerId, isAdmin: true });
+    const hits = await searchHits(env, tenantId, 'Plain card', { userId: ownerId, isAdmin: true });
     const hit = hits.find((h) => h.kind === 'card' && h.summary === 'Plain card');
     expect(hit && hit.kind === 'card' && hit.matchedField).toBe('summary');
     expect(hit && hit.kind === 'card' && hit.snippet).toBeNull();
   });
 
   it('excludes archived cards by default, includes them only when asked (KBR-130)', async () => {
-    const off = await searchTenant(env, tenantId, 'aardvark', { userId: ownerId, isAdmin: true });
+    const off = await searchHits(env, tenantId, 'aardvark', { userId: ownerId, isAdmin: true });
     expect(off.filter((h) => h.kind === 'card')).toHaveLength(0);
 
-    const on = await searchTenant(
+    const on = await searchHits(
       env, tenantId, 'aardvark', { userId: ownerId, isAdmin: true, includeArchived: true },
     );
     const hit = on.find((h) => h.kind === 'card');
@@ -137,9 +141,9 @@ describe('quick-find', () => {
     await env.db.prepare('UPDATE cards SET archived_at = ? WHERE id = ?')
       .bind(Date.now(), card3Id).run();
     try {
-      const off = await searchTenant(env, tenantId, 'ALW-3', { userId: ownerId, isAdmin: true });
+      const off = await searchHits(env, tenantId, 'ALW-3', { userId: ownerId, isAdmin: true });
       expect(off.some((h) => h.kind === 'card' && h.id === card3Id)).toBe(false);
-      const on = await searchTenant(
+      const on = await searchHits(
         env, tenantId, 'ALW-3', { userId: ownerId, isAdmin: true, includeArchived: true },
       );
       expect(on.some((h) => h.kind === 'card' && h.id === card3Id)).toBe(true);
@@ -163,11 +167,11 @@ describe('quick-find', () => {
       'INSERT INTO project_access (tenant_id, project_id, user_id, created_at) VALUES (?, ?, ?, ?)',
     ).bind(tenantId, alphaId, memberId, now).run();
 
-    const hits = await searchTenant(env, tenantId, 'Widget task', { userId: memberId, isAdmin: false }, 50);
+    const hits = await searchHits(env, tenantId, 'Widget task', { userId: memberId, isAdmin: false }, { limit: 50 });
     expect(hits.length).toBeGreaterThan(0);
     expect(hits.every((h) => h.kind === 'card' && h.projectId === alphaId)).toBe(true);
     // The beta project is invisible by name too.
-    const beta = await searchTenant(env, tenantId, 'Beta Secrets', { userId: memberId, isAdmin: false });
+    const beta = await searchHits(env, tenantId, 'Beta Secrets', { userId: memberId, isAdmin: false });
     expect(beta).toHaveLength(0);
   });
 });

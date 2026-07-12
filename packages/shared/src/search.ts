@@ -48,9 +48,30 @@ export interface ProjectSearchHit {
 
 export type SearchHit = CardSearchHit | ProjectSearchHit;
 
+/**
+ * One page of results (KBR-133). `nextOffset` is server-issued — clients must
+ * pass it back verbatim and never derive the next offset from how many rows
+ * they rendered (client-side dedupe makes those diverge when a row moves
+ * between pages). Invariant: `hasMore === (nextOffset !== null)`. `truncated`
+ * is distinct from exhaustion: matches exist past SEARCH_MAX_RESULTS, but the
+ * window is closed — refine the query.
+ */
 export interface SearchResponse {
   hits: SearchHit[];
+  hasMore: boolean;
+  nextOffset: number | null;
+  truncated: boolean;
 }
 
 /** Minimum query length the endpoint accepts (400 below it). */
 export const SEARCH_MIN_QUERY = 2;
+
+/** Page size the QuickFind modal requests (server default stays 20). */
+export const SEARCH_PAGE_SIZE = 50;
+
+/**
+ * The result window (KBR-133): pagination may walk at most this many merged
+ * hits. Offsets >= this are rejected with 400 (never clamped — a silently
+ * clamped offset returns a valid-looking but wrong page).
+ */
+export const SEARCH_MAX_RESULTS = 1000;

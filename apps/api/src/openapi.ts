@@ -834,13 +834,18 @@ export const OPENAPI_SPEC = {
           'criteria (KBR-130), returning `matchedField` and a `snippet` (excerpt ' +
           'with the match wrapped in a U+0001 sentinel; null for key/summary hits). ' +
           'Comments are NOT searched. Archived cards are excluded unless `archived=1`. ' +
-          '`q` min 2 chars (400 below); `limit` default 20, max 50.',
+          '`q` min 2 chars (400 below); `limit` default 20, max 50 (page size). ' +
+          'Paginated (KBR-133): pass `offset` from the previous response\'s `nextOffset` ' +
+          '(never computed client-side). Responses carry `hasMore`, `nextOffset` (null when ' +
+          'done), and `truncated` (matches exist past the 1000-result window — refine the ' +
+          'query). Invalid offsets (negative, fractional, >= 1000) are rejected with 400.',
         parameters: [
           { name: 'q', in: 'query', required: true, schema: { type: 'string', minLength: 2 } },
           { name: 'limit', in: 'query', schema: { type: 'integer', default: 20, maximum: 50 } },
+          { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0, maximum: 999 }, description: 'Continuation position — pass the previous response\'s nextOffset verbatim (KBR-133).' },
           { name: 'archived', in: 'query', schema: { type: 'string', enum: ['1'] }, description: '1 = include archived cards (default excludes them) — KBR-130.' },
         ],
-        responses: { 200: { description: 'ok' }, 400: { description: 'q too short' } },
+        responses: { 200: { description: 'ok' }, 400: { description: 'q too short, or invalid offset' } },
       },
     },
     '/api/v1/analytics': {
