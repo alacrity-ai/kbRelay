@@ -143,7 +143,7 @@ export async function searchTenant(
          JOIN columns col ON col.id = c.column_id AND col.tenant_id = c.tenant_id
         WHERE c.tenant_id = ? AND p.code = ?
           AND CAST(c.seq AS TEXT) LIKE ?${archivedClause}${accessClause}
-        ORDER BY (CAST(c.seq AS TEXT) = ?) DESC, c.seq ASC
+        ORDER BY (CAST(c.seq AS TEXT) = ?) DESC, c.seq ASC, c.id ASC
         LIMIT ?`,
     )
       .bind(tenantId, code, `${seqPrefix}%`, ...accessBinds, seqPrefix, limit)
@@ -162,7 +162,7 @@ export async function searchTenant(
       `SELECT p.id, p.name, p.code, p.color
          FROM projects p
         WHERE p.tenant_id = ? AND (p.name LIKE ? ESCAPE '\\' OR p.code LIKE ? ESCAPE '\\')${accessClause}
-        ORDER BY p.name ASC
+        ORDER BY p.name ASC, p.id ASC
         LIMIT ?`,
     )
       .bind(tenantId, like, codePrefix, ...accessBinds, limit - hits.length)
@@ -184,7 +184,7 @@ export async function searchTenant(
           AND (c.summary LIKE ? ESCAPE '\\'
                OR c.description LIKE ? ESCAPE '\\'
                OR c.acceptance_criteria LIKE ? ESCAPE '\\')${archivedClause}${accessClause}
-        ORDER BY (c.archived_at IS NOT NULL) ASC, c.updated_at DESC
+        ORDER BY (c.archived_at IS NOT NULL) ASC, c.updated_at DESC, c.id ASC
         LIMIT ?`,
     )
       .bind(tenantId, like, like, like, ...accessBinds, limit - hits.length + seenCards.size)
