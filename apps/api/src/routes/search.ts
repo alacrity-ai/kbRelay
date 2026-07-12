@@ -23,6 +23,8 @@ export async function handleSearch(ctx: RouteContext): Promise<Response> {
   const hits = await searchTenant(ctx.env, tenantId, q, {
     userId,
     isAdmin: ctx.auth?.role === 'admin',
+    // Opt-in archived (KBR-130); anything but "1" excludes them.
+    includeArchived: ctx.url.searchParams.get('archived') === '1',
   }, limit);
   return jsonResponse(200, { hits }, ctx.cors);
 }

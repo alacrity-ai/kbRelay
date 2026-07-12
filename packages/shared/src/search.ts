@@ -1,9 +1,21 @@
 /**
- * Global quick-find (v0.17.0, KBR-68) — GET /v1/search?q=&limit=.
- * Tenant-wide, RBAC-filtered to the caller's accessible projects. v1 scope:
- * ticket-key prefix, card summary substring, and project name/code — NOT
- * descriptions/comments (a later upgrade behind the same endpoint).
+ * Global quick-find (v0.17.0, KBR-68) — GET /v1/search?q=&limit=&archived=.
+ * Tenant-wide, RBAC-filtered to the caller's accessible projects. Matches
+ * ticket keys, project name/code, and card summary/description/acceptance
+ * criteria (KBR-130 widened this from summary-only). Comments stay out.
+ * `archived=1` includes archived cards (default excludes them).
  */
+
+/** Which card field the query matched (KBR-130). Ranked in this order. */
+export type CardMatchField = 'key' | 'summary' | 'description' | 'acceptanceCriteria';
+
+/**
+ * Snippet sentinel (KBR-130): the matched span in `snippet` is wrapped in
+ * U+0001 … U+0001 — a control char that cannot occur in card text — so the
+ * client does `snippet.split(SNIPPET_MARK)` → [before, match, after] with no
+ * HTML in the wire layer and no escaping.
+ */
+export const SNIPPET_MARK = '\u0001';
 
 export interface CardSearchHit {
   kind: 'card';
@@ -16,6 +28,14 @@ export interface CardSearchHit {
   projectName: string;
   /** Where the card currently sits — status at a glance. */
   columnName: string;
+  /** Which field the query hit (KBR-130). */
+  matchedField: CardMatchField;
+  /** Excerpt around the match with the term wrapped in {@link SNIPPET_MARK};
+   *  null for key/summary hits (the summary is already shown). */
+  snippet: string | null;
+  /** True if the card is archived (KBR-130) — only present when the caller
+   *  opted into archived results. */
+  archived: boolean;
 }
 
 export interface ProjectSearchHit {

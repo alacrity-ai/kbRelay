@@ -826,15 +826,19 @@ export const OPENAPI_SPEC = {
     },
     '/api/v1/search': {
       get: {
-        summary: 'Global quick-find — cards by key/summary, projects by name/code',
+        summary: 'Global quick-find — cards by key/summary/description/AC, projects by name/code',
         description:
           'Tenant-wide, RBAC-filtered to your accessible projects. Ranks an exact ' +
           'ticket key ("KBR-3") above key prefixes, then project name/code hits, ' +
-          'then card-summary substrings. v1 does NOT search descriptions/comments. ' +
+          'then card hits. Card hits match summary, description, AND acceptance ' +
+          'criteria (KBR-130), returning `matchedField` and a `snippet` (excerpt ' +
+          'with the match wrapped in a U+0001 sentinel; null for key/summary hits). ' +
+          'Comments are NOT searched. Archived cards are excluded unless `archived=1`. ' +
           '`q` min 2 chars (400 below); `limit` default 20, max 50.',
         parameters: [
           { name: 'q', in: 'query', required: true, schema: { type: 'string', minLength: 2 } },
           { name: 'limit', in: 'query', schema: { type: 'integer', default: 20, maximum: 50 } },
+          { name: 'archived', in: 'query', schema: { type: 'string', enum: ['1'] }, description: '1 = include archived cards (default excludes them) — KBR-130.' },
         ],
         responses: { 200: { description: 'ok' }, 400: { description: 'q too short' } },
       },

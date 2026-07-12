@@ -1,6 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ProjectDto, SearchHit } from '@kbrelay/shared';
+import type { CardMatchField, CardSearchHit, ProjectDto, SearchHit } from '@kbrelay/shared';
+import { SNIPPET_MARK } from '@kbrelay/shared';
 import * as api from '../lib/api';
+
+/** Human label for a body match; summary/key hits show no badge. */
+const FIELD_LABEL: Partial<Record<CardMatchField, string>> = {
+  description: 'in description',
+  acceptanceCriteria: 'in acceptance criteria',
+};
+
+/** Render a snippet: split on the sentinel and mark the middle span. */
+function Snippet({ text }: { text: string }) {
+  const [before, match, after] = text.split(SNIPPET_MARK);
+  if (match === undefined) return <span className="qf-snippet">{text}</span>;
+  return (
+    <span className="qf-snippet">
+      {before}
+      <mark className="qf-hit">{match}</mark>
+      {after}
+    </span>
+  );
+}
 
 /** A row the keyboard can land on — either a live search hit or a recent project. */
 type Row =
@@ -26,6 +46,7 @@ export default function QuickFind({
   onClose: () => void;
 }) {
   const [q, setQ] = useState('');
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
   const [active, setActive] = useState(0);
@@ -35,6 +56,7 @@ export default function QuickFind({
   useEffect(() => inputRef.current?.focus(), []);
 
   // Debounced server search; a stale response never clobbers a newer one.
+  // Re-runs when the archived toggle flips (it's a search input too).
   useEffect(() => {
     const query = q.trim();
     if (query.length < 2) {
@@ -45,7 +67,7 @@ export default function QuickFind({
     setSearching(true);
     const seq = ++seqRef.current;
     const t = setTimeout(() => {
-      api.search(query)
+      api.search(query, { archived: includeArchived })
         .then((r) => {
           if (seq !== seqRef.current) return;
           setHits(r.hits);
@@ -57,7 +79,7 @@ export default function QuickFind({
         });
     }, 180);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [q, includeArchived]);
 
   const rows = useMemo<Row[]>(() => {
     if (q.trim().length >= 2) return hits.map((hit) => ({ type: 'hit', hit }));
@@ -100,16 +122,24 @@ export default function QuickFind({
       return (
         <button key={`p-${p.id}`} className={cls} onMouseEnter={() => setActive(i)} onClick={() => pick(row)}>
           <span className="qf-code" style={{ color: p.color ?? undefined }}>{p.code ?? '□'}</span>
-          <span className="qf-text">{p.name}</span>
+          <span className="qf-text"><span className="qf-text-main">{p.name}</span></span>
           <span className="qf-hint">board</span>
         </button>
       );
     }
-    const h = row.hit;
+    const h = row.hit as CardSearchHit;
+    const fieldLabel = FIELD_LABEL[h.matchedField];
     return (
       <button key={`c-${h.id}`} className={cls} onMouseEnter={() => setActive(i)} onClick={() => pick(row)}>
         <span className="qf-code">{h.key ?? '—'}</span>
-        <span className="qf-text">{h.summary}</span>
+        <span className="qf-text">
+          <span className="qf-text-main">
+            {h.summary}
+            {h.archived && <span className="qf-tag qf-tag-archived">archived</span>}
+            {fieldLabel && <span className="qf-tag qf-tag-field">{fieldLabel}</span>}
+          </span>
+          {h.snippet && <Snippet text={h.snippet} />}
+        </span>
         <span className="qf-hint">{h.projectCode ?? h.projectName} · {h.columnName}</span>
       </button>
     );
@@ -126,6 +156,14 @@ export default function QuickFind({
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={onKeyDown}
         />
+        <label className="qf-archived">
+          <input
+            type="checkbox"
+            checked={includeArchived}
+            onChange={(e) => setIncludeArchived(e.target.checked)}
+          />
+          Include archived
+        </label>
         <div className="qf-results">
           {q.trim().length < 2 && projectRows.length > 0 && (
             <div className="qf-section-label">Recent projects</div>
