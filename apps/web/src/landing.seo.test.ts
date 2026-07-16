@@ -15,7 +15,7 @@ const redirects = read('../public/_redirects');
 const robots = read('../public/robots.txt');
 const sitemap = read('../public/sitemap.xml');
 
-const CANONICAL = 'https://kbrelay.lalalimited.com/';
+const CANONICAL = 'https://kbrelay.com/';
 
 describe('landing.html SEO surface', () => {
   it('has a title, meta description, and canonical', () => {

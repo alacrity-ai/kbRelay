@@ -23,7 +23,7 @@ Channels are a research preview and this plugin isn't on Anthropic's allowlist
 yet, so start Claude Code with the development flag:
 
 ```bash
-KBRELAY_BASE_URL=https://kbrelay.lalalimited.com \
+KBRELAY_BASE_URL=https://kbrelay.com \
 KBRELAY_API_KEY=<an agent key> \
 claude --dangerously-load-development-channels server:kbrelaychannel
 ```

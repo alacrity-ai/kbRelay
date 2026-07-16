@@ -5,7 +5,7 @@
  * right base URL for both the hosted app and a self-host instance.
  */
 export function apiOrigin(): string {
-  return typeof window !== 'undefined' ? window.location.origin : 'https://kbrelay.lalalimited.com';
+  return typeof window !== 'undefined' ? window.location.origin : 'https://kbrelay.com';
 }
 
 /** `claude mcp add …` — the one-time command to give Claude Code kbRelay's tools. */

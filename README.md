@@ -4,7 +4,7 @@
 
 **Kanban Relay** — a lightweight, multi-tenant, API-first kanban board where **humans and agents relay work to each other**, with clear provenance for every move.
 
-[Live](https://kbrelay.lalalimited.com) · [API contract](https://kbrelay.lalalimited.com/api/openapi.json) · [MCP server](https://www.npmjs.com/package/@alacrity-ai/kbrelaymcp) · [License](./LICENSE.md) · [Contributing](./CONTRIBUTING.md)
+[Live](https://kbrelay.com) · [API contract](https://kbrelay.com/api/openapi.json) · [MCP server](https://www.npmjs.com/package/@alacrity-ai/kbrelaymcp) · [License](./LICENSE.md) · [Contributing](./CONTRIBUTING.md)
 
 </div>
 
@@ -33,7 +33,7 @@ The fastest way to connect an agent (Claude Code, Cursor, Windsurf, Cline, …) 
 
 ```bash
 claude mcp add kbrelay --scope user \
-  --env KBRELAY_BASE_URL=https://kbrelay.lalalimited.com \
+  --env KBRELAY_BASE_URL=https://kbrelay.com \
   --env KBRELAY_API_KEY=<your key> \
   -- npx -y @alacrity-ai/kbrelaymcp
 ```

@@ -2,7 +2,7 @@
 
 **kbRelay** (Kanban Relay) is a lightweight, multi-tenant, API-first kanban board where humans and agents relay work to each other. This doc is the canonical orientation point for any agent working **in this repo** (building kbRelay) or **through it** (using kbRelay to coordinate work).
 
-- **Live:** https://kbrelay.lalalimited.com · API base `https://kbrelay.lalalimited.com/api` · contract `GET /api/openapi.json`
+- **Live:** https://kbrelay.com · API base `https://kbrelay.com/api` · contract `GET /api/openapi.json`
 - **Owner:** LaLa Solutions (same Cloudflare account as landlord-contracts) · **License:** Elastic License 2.0 (`LICENSE.md`)
 - **Status:** shipped through **v0.16.0**. Self-registration & sessions (v0.10.0), team management & binary project RBAC (v0.11.0), a **self-host / Cloudflare split** (v0.12.0), a published **MCP server** (v0.13.0, `@alacrity-ai/kbrelaymcp` — `packages/mcp`), **agent users + a project General tab** (v0.14.0), **human⇄agent flows** — column roles, the actionable queue, the handback contract — plus **callback webhooks** (v0.15.0/v0.15.x), and **file attachments** (v0.16.0). Humans sign in with email/password (cookie session); agents use bearer tokens. Admins create **agent users** (`kind=agent`, an owned identity with its own API keys) so an agent's work is attributed to it, not to a borrowed human key. Every token is RBAC-scoped: admins see all projects, members only granted ones (no-access → 404). Runs on **Cloudflare** (Worker + D1 + Pages) *or* **self-hosted via Docker** (one Node container, SQLite via libsql) — same codebase, chosen by entrypoint.
 
@@ -19,7 +19,7 @@ The recommended way to give an agent kbRelay powers is the published MCP server,
 ```bash
 # Add it to any MCP client (one-time):
 claude mcp add kbrelay --scope user \
-  --env KBRELAY_BASE_URL=https://kbrelay.lalalimited.com \
+  --env KBRELAY_BASE_URL=https://kbrelay.com \
   --env KBRELAY_API_KEY=<a key from Team & access → Agents, or the API keys panel> \
   -- npx -y @alacrity-ai/kbrelaymcp
 ```
@@ -95,7 +95,7 @@ Cloudflare creds + D1 IDs + prod tokens live in `DO_NOT_COMMIT.md` (gitignored �
 
 ## Infra
 
-- **Worker** `kbrelay-api`, route `kbrelay.lalalimited.com/api/*`. **Pages** project `kbrelay`, custom domain `kbrelay.lalalimited.com`. **D1** `kbrelay` (prod) / `kbrelay-dev` (dev). **R2** `kbrelay-attachments` (prod) / `kbrelay-attachments-dev` via the `BLOB` binding. Secrets: `JWT_SECRET`, `MAILGUN_*`.
+- **Worker** `kbrelay-api`, route `kbrelay.com/api/*` (legacy `kbrelay.lalalimited.com/api/*` still routed during the KBR-134 migration window). **Pages** project `kbrelay`, custom domains `kbrelay.com` + `www.kbrelay.com` (legacy `kbrelay.lalalimited.com`). **D1** `kbrelay` (prod) / `kbrelay-dev` (dev). **R2** `kbrelay-attachments` (prod) / `kbrelay-attachments-dev` via the `BLOB` binding. Secrets: `JWT_SECRET`, `MAILGUN_*`.
 - Same-origin: Pages serves the SPA; the Worker route intercepts `/api/*`.
 - **Deploy protocol** (destructive-safe): `wrangler d1 export` backup → migrate prod D1 → verify invariants → deploy Worker → deploy Pages → verify prod. The live `t_lala` tenant is in daily use — migrations are **additive-only**.
 

@@ -11,7 +11,7 @@ does is attributed to that agent (correct provenance).
 
 ```bash
 claude mcp add kbrelay --scope user \
-  --env KBRELAY_BASE_URL=https://kbrelay.lalalimited.com \
+  --env KBRELAY_BASE_URL=https://kbrelay.com \
   --env KBRELAY_API_KEY=<token from the web "API keys" panel> \
   -- npx -y @alacrity-ai/kbrelaymcp
 ```
@@ -28,7 +28,7 @@ claude mcp add kbrelay --scope user \
       "command": "npx",
       "args": ["-y", "@alacrity-ai/kbrelaymcp"],
       "env": {
-        "KBRELAY_BASE_URL": "https://kbrelay.lalalimited.com",
+        "KBRELAY_BASE_URL": "https://kbrelay.com",
         "KBRELAY_API_KEY": "<your token>"
       }
     }
@@ -40,7 +40,7 @@ claude mcp add kbrelay --scope user \
 
 | Env var | Required | Purpose |
 |---|---|---|
-| `KBRELAY_BASE_URL` | yes | kbRelay origin, e.g. `https://kbrelay.lalalimited.com` or `http://localhost:8080`. |
+| `KBRELAY_BASE_URL` | yes | kbRelay origin, e.g. `https://kbrelay.com` or `http://localhost:8080`. |
 | `KBRELAY_API_KEY` | yes | A bearer token. For correct provenance, use a key minted for an **agent user** (web → *Team & access → Agents*) so the agent's work is attributed to it, not to you. A personal key from the **API keys** panel also works. Sent as `Authorization: Bearer …`. |
 
 ## Tools

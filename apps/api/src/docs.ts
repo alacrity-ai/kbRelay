@@ -11,7 +11,7 @@ import type { RouteContext } from './router';
  *
  * Served by the Worker (not the Pages SPA): the spec lives here, it's colocated
  * with the API contract, and it works identically in the self-host runtime. The
- * `kbrelay.lalalimited.com/docs` Worker route (wrangler.toml) points this path at
+ * `kbrelay.com/docs` Worker route (wrangler.toml) points this path at
  * the Worker; everything else on the host stays with Pages.
  */
 

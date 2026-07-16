@@ -13,7 +13,7 @@ relay work to each other**, with clear provenance for every move. This page is t
 full reference: a functionality tour, the authenticated REST API below, and how to
 wire an AI agent in over **MCP**.
 
-- **Web app:** [kbrelay.lalalimited.com](https://kbrelay.lalalimited.com)
+- **Web app:** [kbrelay.com](https://kbrelay.com)
 - **This reference:** \`/docs\` · **Machine-readable spec:** [\`/api/openapi.json\`](/api/openapi.json)
 
 ---
@@ -78,7 +78,7 @@ attach, and move work without touching raw HTTP. Add it once:
 
 \`\`\`bash
 claude mcp add kbrelay --scope user \\
-  --env KBRELAY_BASE_URL=https://kbrelay.lalalimited.com \\
+  --env KBRELAY_BASE_URL=https://kbrelay.com \\
   --env KBRELAY_API_KEY=<your key> \\
   -- npx -y @alacrity-ai/kbrelaymcp
 \`\`\`

@@ -29,7 +29,7 @@ const SHELL_HTML = (title: string, body: string): string => `<!doctype html>
       <h1 style="margin:0 0 16px;font-size:24px;font-weight:650;letter-spacing:-0.01em;color:#f4f6fa;">${escapeHtml(title)}</h1>
       ${body}
       <hr style="border:0;border-top:1px solid #2a2f3a;margin:28px 0 14px;" />
-      <p style="margin:0;font-size:12px;color:#6c7486;">Sent by kbRelay · kbrelay.lalalimited.com</p>
+      <p style="margin:0;font-size:12px;color:#6c7486;">Sent by kbRelay · kbrelay.com</p>
     </div>
   </body>
 </html>`;

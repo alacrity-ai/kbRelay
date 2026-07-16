@@ -27,18 +27,29 @@ workers_dev = false
 preview_urls = false
 
 [env.prod.vars]
-ALLOWED_ORIGINS = "https://kbrelay.lalalimited.com"
-PUBLIC_BASE_URL = "https://kbrelay.lalalimited.com"
+ALLOWED_ORIGINS = "https://kbrelay.com,https://www.kbrelay.com,https://kbrelay.lalalimited.com"
+PUBLIC_BASE_URL = "https://kbrelay.com"
 
 [[env.prod.routes]]
-pattern = "kbrelay.lalalimited.com/api/*"
-zone_name = "lalalimited.com"
+pattern = "kbrelay.com/api/*"
+zone_name = "kbrelay.com"
 
 # Scalar docs (KBR-109). Wildcard (not exact `/docs`) is deliberate: a Pages
 # custom domain shadows a *non-wildcard* Worker route, so an exact `/docs` route
 # lost to the SPA in prod. The `/api/*` route wins precisely because it's a
 # wildcard — mirror that. The router only handles exact `/docs`; `/docs/<x>`
 # 404s from the Worker, which is fine (no such page exists).
+[[env.prod.routes]]
+pattern = "kbrelay.com/docs*"
+zone_name = "kbrelay.com"
+
+# Legacy domain (pre-KBR-134). Kept so existing agent tokens / MCP configs
+# pointed at kbrelay.lalalimited.com keep working during the migration window;
+# drop these routes when the old domain is formally deprecated.
+[[env.prod.routes]]
+pattern = "kbrelay.lalalimited.com/api/*"
+zone_name = "lalalimited.com"
+
 [[env.prod.routes]]
 pattern = "kbrelay.lalalimited.com/docs*"
 zone_name = "lalalimited.com"

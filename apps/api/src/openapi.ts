@@ -17,7 +17,7 @@ export const OPENAPI_SPEC = {
     // /docs and carried in the public spec. See openapi-description.ts.
     description: API_DESCRIPTION,
   },
-  servers: [{ url: 'https://kbrelay.lalalimited.com' }],
+  servers: [{ url: 'https://kbrelay.com' }],
   security: [{ bearerAuth: [] }],
   components: {
     securitySchemes: {

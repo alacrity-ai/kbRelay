@@ -4,9 +4,9 @@
 
 > **The MCP is your primary pathway (since 2026-07-01).** If your runtime has the `@alacrity-ai/kbrelaymcp` MCP server configured (Claude Code in the kbRelay repo does — server name `kbrelay`), use its 20 typed tools instead of raw curl; §1.5 maps every tool to its endpoint. The HTTP surface documented below is still fully supported and accurate — it's the fallback when you have no MCP client, and the only path for the few things the MCP doesn't wrap (webhook admin, token self-management, column management). The concepts (§2), the handback contract (§2.5), and the etiquette (§6) apply identically to both paths.
 
-- **Where:** `https://kbrelay.lalalimited.com`
-- **API base:** `https://kbrelay.lalalimited.com/api`
-- **Contract:** `GET https://kbrelay.lalalimited.com/api/openapi.json` (OpenAPI 3.1, no auth)
+- **Where:** `https://kbrelay.com`
+- **API base:** `https://kbrelay.com/api`
+- **Contract:** `GET https://kbrelay.com/api/openapi.json` (OpenAPI 3.1, no auth)
 
 ---
 
@@ -32,7 +32,7 @@ Set up your shell once:
 
 ```bash
 export KBRELAY_TOKEN="<your token>"
-export KB="https://kbrelay.lalalimited.com/api"
+export KB="https://kbrelay.com/api"
 alias kbget='curl -s -H "Authorization: Bearer $KBRELAY_TOKEN"'
 # helper for writes:
 kbpost(){ curl -s -H "Authorization: Bearer $KBRELAY_TOKEN" -H 'content-type: application/json' -X "$1" "$KB$2" ${3:+-d "$3"}; }
@@ -56,7 +56,7 @@ The published MCP server **`@alacrity-ai/kbrelaymcp`** (`packages/mcp`, currentl
 
 ```bash
 claude mcp add kbrelay --scope user \
-  --env KBRELAY_BASE_URL=https://kbrelay.lalalimited.com \
+  --env KBRELAY_BASE_URL=https://kbrelay.com \
   --env KBRELAY_API_KEY=<a key minted for an agent user> \
   -- npx -y @alacrity-ai/kbrelaymcp
 ```
@@ -367,7 +367,7 @@ kbpost POST /v1/projects '{"name":"Landlord SEO v0.2","code":"LSEO","description
 Fetch the live contract and inspect it:
 
 ```bash
-curl -s https://kbrelay.lalalimited.com/api/openapi.json | jq '.paths | keys'
+curl -s https://kbrelay.com/api/openapi.json | jq '.paths | keys'
 ```
 
 That's it — you now know enough to pick up and file work on kbRelay.

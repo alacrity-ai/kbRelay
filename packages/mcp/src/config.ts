@@ -15,7 +15,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const apiKey = env.KBRELAY_API_KEY;
   if (!baseUrl) {
     throw new ConfigError(
-      'KBRELAY_BASE_URL is not set — e.g. https://kbrelay.lalalimited.com (or http://localhost:8080 for self-host).',
+      'KBRELAY_BASE_URL is not set — e.g. https://kbrelay.com (or http://localhost:8080 for self-host).',
     );
   }
   if (!apiKey) {
