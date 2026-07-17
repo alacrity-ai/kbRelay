@@ -29,6 +29,8 @@ import {
 } from '../db/repos/auth';
 import { acceptInvite } from '../db/repos/team';
 import { getTenant } from '../db/repos/users';
+import { billingEnabled } from '../services/square';
+import { trialEndsAtFrom } from '../services/billing';
 
 /**
  * Human auth surface (v0.10.0): register / login / logout / forgot / reset,
@@ -59,7 +61,13 @@ export async function handleRegister(ctx: RouteContext): Promise<Response> {
   const { env, cors, request, waitUntil } = ctx;
   const input = await parseJson(request, registerInput);
 
-  const { tenantId, userId } = await registerTenant(env, input);
+  // Hosted deployments start every new workspace on a 30-day trial (KBR-135);
+  // self-host (billing unconfigured) creates no billing row at all.
+  const { tenantId, userId } = await registerTenant(
+    env,
+    input,
+    billingEnabled(env) ? { trialEndsAt: trialEndsAtFrom(Date.now()) } : {},
+  );
   const cookie = await mintSessionCookie(env, userId, tenantId);
   const body = await authMeBody(env, tenantId, userId);
 
@@ -122,7 +130,12 @@ export async function handleCreateTenant(ctx: RouteContext): Promise<Response> {
   if (!auth) return errorResponse(401, 'Authentication required', cors);
   const input = await parseJson(request, createTenantInput);
 
-  const { tenantId } = await createTenantForUser(env, auth.userId, input.tenantName);
+  const { tenantId } = await createTenantForUser(
+    env,
+    auth.userId,
+    input.tenantName,
+    billingEnabled(env) ? { trialEndsAt: trialEndsAtFrom(Date.now()) } : {},
+  );
   const body = await authMeBody(env, tenantId, auth.userId);
   const headers: Record<string, string> = {};
   if (readSessionCookie(request)) {

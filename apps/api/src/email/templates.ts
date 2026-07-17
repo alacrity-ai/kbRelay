@@ -85,6 +85,118 @@ The link expires in 7 days.`;
   return { subject, text, html };
 }
 
+// ── Billing (v0.23.0, KBR-135) ────────────────────────────────
+
+function money(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function shortDate(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+export function receiptEmail(args: {
+  tenantName: string;
+  seats: number;
+  amountCents: number;
+  periodEnd: number;
+  billingUrl: string;
+}): { subject: string; text: string; html: string } {
+  const subject = `kbRelay Cloud receipt — ${money(args.amountCents)}`;
+  const line = `${args.seats} seat${args.seats === 1 ? '' : 's'} · ${money(args.amountCents)} · paid through ${shortDate(args.periodEnd)}`;
+  const text = `Thanks! Your kbRelay Cloud subscription for "${args.tenantName}" is paid.
+
+${line}
+
+Manage billing: ${args.billingUrl}`;
+  const html = SHELL_HTML(
+    'Payment received',
+    `<p style="margin:0 0 12px;line-height:1.6;">Your kbRelay Cloud subscription for <strong>${escapeHtml(args.tenantName)}</strong> is paid.</p>
+     <p style="margin:0 0 12px;line-height:1.6;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">${escapeHtml(line)}</p>
+     ${ctaButton(args.billingUrl, 'Manage billing')}`,
+  );
+  return { subject, text, html };
+}
+
+export function chargeFailedEmail(args: {
+  tenantName: string;
+  graceDays: number;
+  billingUrl: string;
+}): { subject: string; text: string; html: string } {
+  const subject = 'kbRelay Cloud — payment failed';
+  const text = `We couldn't charge the card on file for "${args.tenantName}".
+
+We'll retry over the next few days. Please update your card within ${args.graceDays} days to keep the workspace active — after that it becomes read-only until payment succeeds. Your data is never deleted for a failed payment.
+
+Update card: ${args.billingUrl}`;
+  const html = SHELL_HTML(
+    'Payment failed',
+    `<p style="margin:0 0 12px;line-height:1.6;">We couldn't charge the card on file for <strong>${escapeHtml(args.tenantName)}</strong>.</p>
+     <p style="margin:0 0 12px;line-height:1.6;">We'll retry over the next few days. Please update your card within <strong>${args.graceDays} days</strong> to keep the workspace active — after that it becomes read-only until payment succeeds. Your data is never deleted for a failed payment.</p>
+     ${ctaButton(args.billingUrl, 'Update card')}`,
+  );
+  return { subject, text, html };
+}
+
+export function accountLockedEmail(args: {
+  tenantName: string;
+  billingUrl: string;
+}): { subject: string; text: string; html: string } {
+  const subject = 'kbRelay Cloud — workspace is now read-only';
+  const text = `Payment for "${args.tenantName}" is overdue, so the workspace is now read-only.
+
+Everything is still there and readable — update your card to pick up right where you left off. Your data is yours: reads and export remain available.
+
+Fix billing: ${args.billingUrl}`;
+  const html = SHELL_HTML(
+    'Workspace is read-only',
+    `<p style="margin:0 0 12px;line-height:1.6;">Payment for <strong>${escapeHtml(args.tenantName)}</strong> is overdue, so the workspace is now read-only.</p>
+     <p style="margin:0 0 12px;line-height:1.6;">Everything is still there and readable — update your card to pick up right where you left off. Your data is yours: reads and export remain available.</p>
+     ${ctaButton(args.billingUrl, 'Fix billing')}`,
+  );
+  return { subject, text, html };
+}
+
+export function trialReminderEmail(args: {
+  tenantName: string;
+  daysLeft: number;
+  billingUrl: string;
+}): { subject: string; text: string; html: string } {
+  const when = args.daysLeft <= 1 ? 'tomorrow' : `in ${args.daysLeft} days`;
+  const subject = `Your kbRelay Cloud trial ends ${when}`;
+  const text = `The trial for "${args.tenantName}" ends ${when}.
+
+Subscribe for $5 per person per month ($50/year) to keep going — agents are always free. Or self-host kbRelay for free, forever.
+
+Subscribe: ${args.billingUrl}`;
+  const html = SHELL_HTML(
+    `Trial ends ${when}`,
+    `<p style="margin:0 0 12px;line-height:1.6;">The trial for <strong>${escapeHtml(args.tenantName)}</strong> ends ${escapeHtml(when)}.</p>
+     <p style="margin:0 0 12px;line-height:1.6;">Subscribe for <strong>$5 per person per month</strong> ($50/year) to keep going — agents are always free. Or self-host kbRelay for free, forever.</p>
+     ${ctaButton(args.billingUrl, 'Subscribe')}`,
+  );
+  return { subject, text, html };
+}
+
+export function trialExpiredEmail(args: {
+  tenantName: string;
+  billingUrl: string;
+}): { subject: string; text: string; html: string } {
+  const subject = 'Your kbRelay Cloud trial has ended';
+  const text = `The trial for "${args.tenantName}" has ended, and the workspace is now read-only.
+
+Nothing was deleted: subscribe any time to pick up exactly where you left off, or read and export your data whenever you like.
+
+Subscribe: ${args.billingUrl}`;
+  const html = SHELL_HTML(
+    'Trial ended',
+    `<p style="margin:0 0 12px;line-height:1.6;">The trial for <strong>${escapeHtml(args.tenantName)}</strong> has ended, and the workspace is now read-only.</p>
+     <p style="margin:0 0 12px;line-height:1.6;">Nothing was deleted: subscribe any time to pick up exactly where you left off, or read and export your data whenever you like.</p>
+     ${ctaButton(args.billingUrl, 'Subscribe')}`,
+  );
+  return { subject, text, html };
+}
+
 export interface PasswordResetArgs {
   resetUrl: string;
 }

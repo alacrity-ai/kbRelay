@@ -4,6 +4,7 @@ export * from './analytics.ts';
 export * from './attachments.ts';
 export * from './cardLinks.ts';
 export * from './auth.ts';
+export * from './billing.ts';
 export * from './board.ts';
 export * from './checklists.ts';
 export * from './due.ts';

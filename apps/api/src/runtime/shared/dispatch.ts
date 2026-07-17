@@ -4,6 +4,7 @@ import { routes } from '../../router';
 import { authenticate } from '../../auth/authenticate';
 import { authenticateSession } from '../../auth/session';
 import { enforceProjectAccess, normalizeRefParams } from '../../auth/access';
+import { isTenantLocked } from '../../services/billing';
 
 /**
  * The runtime-neutral request dispatcher (v0.12.0). Both entrypoints call this:
@@ -49,6 +50,24 @@ export async function dispatch(
         if (r.access) {
           await normalizeRefParams(env, auth.tenantId, r.access, params);
           await enforceProjectAccess(env, auth, r.access, params);
+        }
+
+        // Billing lock (v0.23.0, KBR-135): expired/delinquent/canceled tenants
+        // get 402 on writes; reads stay open (data-portability promise), and
+        // auth + billing routes stay open so admins can pay their way out.
+        // Costs one lookup only on non-GET requests of billing-enabled deploys.
+        if (
+          request.method !== 'GET' &&
+          !url.pathname.startsWith('/api/v1/billing') &&
+          !url.pathname.startsWith('/api/v1/auth/') &&
+          (await isTenantLocked(env, auth.tenantId))
+        ) {
+          return errorResponse(
+            402,
+            'This workspace is read-only until its subscription is renewed',
+            cors,
+            { reason: 'payment_required' },
+          );
         }
       }
 

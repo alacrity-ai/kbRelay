@@ -21,6 +21,16 @@ export interface Env {
   MAILGUN_BASE_URL?: string;
   MAILGUN_FROM?: string;
 
+  // Billing / Square (v0.23.0, KBR-135). Set only on the hosted Cloudflare
+  // deployment — billing is enabled iff SQUARE_ACCESS_TOKEN is present; the
+  // Node self-host bindings never set these, so self-host is structurally
+  // billing-free with unlimited seats (same graceful-degrade as MAILGUN_*).
+  SQUARE_ACCESS_TOKEN?: string;
+  SQUARE_ENVIRONMENT?: string; // 'sandbox' | 'production'
+  SQUARE_LOCATION_ID?: string;
+  SQUARE_APP_ID?: string;
+  SQUARE_WEBHOOK_SIGNATURE_KEY?: string;
+
   // The database port (D1 on Cloudflare, libsql when self-hosted).
   db: Db;
 

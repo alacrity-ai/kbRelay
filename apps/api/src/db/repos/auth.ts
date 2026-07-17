@@ -110,6 +110,7 @@ export interface RegisterArgs {
 export async function registerTenant(
   env: Env,
   input: RegisterArgs,
+  opts: { trialEndsAt?: number } = {},
 ): Promise<{ tenantId: string; userId: string }> {
   const existing = await env.db.prepare('SELECT 1 AS ok FROM users WHERE email = ?')
     .bind(input.email)
@@ -152,6 +153,16 @@ export async function registerTenant(
     env.db.prepare(
       `INSERT INTO memberships (id, tenant_id, user_id, role, created_at) VALUES (?, ?, ?, 'member', ?)`,
     ).bind(newId('m'), tenantId, agentId, now),
+    // Billing (v0.23.0, KBR-135): hosted deployments start every new tenant on
+    // a trial, atomically with creation — no row would read as exempt.
+    ...(opts.trialEndsAt !== undefined
+      ? [
+          env.db.prepare(
+            `INSERT INTO billing_state (tenant_id, status, trial_ends_at, created_at, updated_at)
+             VALUES (?, 'trialing', ?, ?, ?)`,
+          ).bind(tenantId, opts.trialEndsAt, now, now),
+        ]
+      : []),
   ]);
 
   return { tenantId, userId };
@@ -257,6 +268,7 @@ export async function createTenantForUser(
   env: Env,
   userId: string,
   tenantName: string,
+  opts: { trialEndsAt?: number } = {},
 ): Promise<{ tenantId: string }> {
   const user = await env.db.prepare('SELECT id, name FROM users WHERE id = ?')
     .bind(userId)
@@ -289,6 +301,15 @@ export async function createTenantForUser(
       `INSERT INTO memberships (id, tenant_id, user_id, role, created_at) VALUES (?, ?, ?, 'member', ?)`,
     ).bind(newId('m'), tenantId, agentId, now),
     env.db.prepare('UPDATE users SET last_tenant_id = ? WHERE id = ?').bind(tenantId, userId),
+    // Billing (v0.23.0, KBR-135): same trial-at-birth as registerTenant.
+    ...(opts.trialEndsAt !== undefined
+      ? [
+          env.db.prepare(
+            `INSERT INTO billing_state (tenant_id, status, trial_ends_at, created_at, updated_at)
+             VALUES (?, 'trialing', ?, ?, ?)`,
+          ).bind(tenantId, opts.trialEndsAt, now, now),
+        ]
+      : []),
   ]);
 
   return { tenantId };

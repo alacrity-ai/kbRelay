@@ -21,6 +21,11 @@ export interface CfBindings {
   MAILGUN_DOMAIN?: string;
   MAILGUN_BASE_URL?: string;
   MAILGUN_FROM?: string;
+  SQUARE_ACCESS_TOKEN?: string;
+  SQUARE_ENVIRONMENT?: string;
+  SQUARE_LOCATION_ID?: string;
+  SQUARE_APP_ID?: string;
+  SQUARE_WEBHOOK_SIGNATURE_KEY?: string;
 }
 
 /** Wrap an R2 binding as the runtime-neutral `BlobStore` port. */
@@ -53,5 +58,10 @@ export function buildCfBindings(cf: CfBindings): Env {
     MAILGUN_DOMAIN: cf.MAILGUN_DOMAIN,
     MAILGUN_BASE_URL: cf.MAILGUN_BASE_URL,
     MAILGUN_FROM: cf.MAILGUN_FROM,
+    SQUARE_ACCESS_TOKEN: cf.SQUARE_ACCESS_TOKEN,
+    SQUARE_ENVIRONMENT: cf.SQUARE_ENVIRONMENT,
+    SQUARE_LOCATION_ID: cf.SQUARE_LOCATION_ID,
+    SQUARE_APP_ID: cf.SQUARE_APP_ID,
+    SQUARE_WEBHOOK_SIGNATURE_KEY: cf.SQUARE_WEBHOOK_SIGNATURE_KEY,
   };
 }

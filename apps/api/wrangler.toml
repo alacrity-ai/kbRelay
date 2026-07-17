@@ -29,6 +29,14 @@ preview_urls = false
 [env.prod.vars]
 ALLOWED_ORIGINS = "https://kbrelay.com,https://www.kbrelay.com,https://kbrelay.lalalimited.com"
 PUBLIC_BASE_URL = "https://kbrelay.com"
+# Billing (v0.23.0, KBR-135). Enabled iff the SQUARE_ACCESS_TOKEN secret is set
+# (wrangler secret put --env prod), so these vars are inert until launch.
+# SQUARE_APP_ID / SQUARE_LOCATION_ID are set as vars at launch (P4, KBR-141).
+SQUARE_ENVIRONMENT = "production"
+
+# Daily billing sweep (renewals, dunning, trial expiry) — 06:17 UTC.
+[env.prod.triggers]
+crons = ["17 6 * * *"]
 
 [[env.prod.routes]]
 pattern = "kbrelay.com/api/*"

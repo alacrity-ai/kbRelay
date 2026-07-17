@@ -695,6 +695,48 @@ export const OPENAPI_SPEC = {
         responses: { 200: { description: 'ok' } },
       },
     },
+    '/api/v1/billing': {
+      get: { summary: 'Billing summary: status, plan, seats, next bill, card (admin; enabled:false on self-host)', responses: { 200: { description: 'ok' } } },
+    },
+    '/api/v1/billing/config': {
+      get: { summary: 'Web Payments SDK bootstrap (appId, locationId, environment)', responses: { 200: { description: 'ok' } } },
+    },
+    '/api/v1/billing/invoices': {
+      get: { summary: 'Invoice history (admin)', responses: { 200: { description: 'ok' } } },
+    },
+    '/api/v1/billing/subscribe': {
+      post: {
+        summary: 'Subscribe: store card (Web Payments token) + charge first period for current human seats (admin)',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['plan', 'sourceId'],
+                properties: {
+                  plan: { type: 'string', enum: ['monthly', 'annual'] },
+                  sourceId: { type: 'string', description: 'Web Payments SDK card token' },
+                },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'ok' }, 402: { description: 'card declined' } },
+      },
+    },
+    '/api/v1/billing/card': {
+      post: { summary: 'Replace the card on file; retries the open invoice when past_due (admin)', responses: { 200: { description: 'ok' } } },
+    },
+    '/api/v1/billing/plan': {
+      post: { summary: 'Queue a monthly/annual switch for the next renewal (admin)', responses: { 200: { description: 'ok' } } },
+    },
+    '/api/v1/billing/cancel': {
+      post: { summary: 'Cancel at period end (workspace stays active through paid_through) (admin)', responses: { 200: { description: 'ok' } } },
+    },
+    '/api/v1/billing/resume': {
+      post: { summary: 'Undo a pending cancellation (admin)', responses: { 200: { description: 'ok' } } },
+    },
     '/api/v1/webhooks': {
       get: { summary: 'List webhook subscriptions (admin)', responses: { 200: { description: 'ok' } } },
       post: { summary: 'Create a webhook subscription (admin) — returns the signing secret once', responses: { 201: { description: 'created' } } },

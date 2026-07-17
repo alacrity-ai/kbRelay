@@ -91,6 +91,17 @@ import {
   handleDeleteCardLink,
   handleFindCardLinks,
 } from './routes/card-links';
+import {
+  handleGetBilling,
+  handleGetBillingConfig,
+  handleSubscribe,
+  handleUpdateCard,
+  handleChangePlan,
+  handleCancelSubscription,
+  handleResumeSubscription,
+  handleListBillingInvoices,
+  handleSquareWebhook,
+} from './routes/billing';
 import type { AccessScope } from './auth/access';
 import { handleOpenApi } from './openapi';
 import { handleDocs } from './docs';
@@ -186,6 +197,19 @@ export const routes: Route[] = [
   { method: 'GET', pattern: '/api/v1/agents/:userId/tokens', handler: handleListAgentTokens },
   { method: 'POST', pattern: '/api/v1/agents/:userId/tokens', handler: handleCreateAgentToken },
   { method: 'DELETE', pattern: '/api/v1/agents/:userId/tokens/:tokenId', handler: handleRevokeAgentToken },
+
+  // ── Billing (v0.23.0, KBR-135) — admin-gated in-handler; hosted-only (409
+  // when unconfigured). The Square webhook is public (HMAC-verified) and lives
+  // outside /api/v1 (exempt from the OpenAPI parity test, like /docs).
+  { method: 'GET', pattern: '/api/v1/billing', handler: handleGetBilling },
+  { method: 'GET', pattern: '/api/v1/billing/config', handler: handleGetBillingConfig },
+  { method: 'GET', pattern: '/api/v1/billing/invoices', handler: handleListBillingInvoices },
+  { method: 'POST', pattern: '/api/v1/billing/subscribe', handler: handleSubscribe },
+  { method: 'POST', pattern: '/api/v1/billing/card', handler: handleUpdateCard },
+  { method: 'POST', pattern: '/api/v1/billing/plan', handler: handleChangePlan },
+  { method: 'POST', pattern: '/api/v1/billing/cancel', handler: handleCancelSubscription },
+  { method: 'POST', pattern: '/api/v1/billing/resume', handler: handleResumeSubscription },
+  { method: 'POST', pattern: '/api/square/webhook', public: true, handler: handleSquareWebhook },
 
   // ── Webhook subscriptions (v0.15.x) — admin-gated in-handler; not project-scoped ──
   { method: 'GET', pattern: '/api/v1/webhooks', handler: handleListWebhooks },
