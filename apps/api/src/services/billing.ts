@@ -120,7 +120,7 @@ export async function subscribe(
   const card = await createCard(env, {
     customerId,
     sourceId: args.sourceId,
-    idempotencyKey: `kbrelay-card-${args.tenantId}-${Date.now()}`,
+    idempotencyKey: `kb-card-${crypto.randomUUID().replace(/-/g, '').slice(0, 30)}`,
   });
   if (state.square_card_id) {
     await disableCard(env, state.square_card_id).catch(() => undefined);
@@ -176,7 +176,7 @@ export async function updateCard(
   const card = await createCard(env, {
     customerId: state.square_customer_id,
     sourceId: args.sourceId,
-    idempotencyKey: `kbrelay-card-${args.tenantId}-${Date.now()}`,
+    idempotencyKey: `kb-card-${crypto.randomUUID().replace(/-/g, '').slice(0, 30)}`,
   });
   if (state.square_card_id) {
     await disableCard(env, state.square_card_id).catch(() => undefined);

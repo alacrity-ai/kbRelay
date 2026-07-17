@@ -68,8 +68,11 @@ export async function createCustomer(
   env: Env,
   args: { email: string; name: string; tenantId: string },
 ): Promise<string> {
+  // Square caps idempotency keys at 45 chars — strip the `t_` prefix so the
+  // deterministic per-tenant key fits (8 + 32 = 40). Caught by the live
+  // sandbox E2E (billing.sandbox.test.ts).
   const json = await squareFetch<{ customer: { id: string } }>(env, 'POST', '/v2/customers', {
-    idempotency_key: `kbrelay-cust-${args.tenantId}`,
+    idempotency_key: `kb-cust-${args.tenantId.replace(/^t_/, '')}`.slice(0, 45),
     email_address: args.email,
     company_name: args.name,
     reference_id: args.tenantId,
