@@ -27,9 +27,13 @@ function requireBilling(ctx: RouteContext): void {
 }
 
 // ── GET /api/v1/billing ───────────────────────────────────────
+/** Member-readable so every human sees trial/lock banners; the stored-card
+ *  details are admin-only. Mutations + invoices stay requireAdmin. */
 export async function handleGetBilling(ctx: RouteContext): Promise<Response> {
-  const auth = requireAdmin(ctx.auth);
+  const { auth } = ctx;
+  if (!auth) return errorResponse(401, 'Authentication required', ctx.cors);
   const summary = await getBillingSummary(ctx.env, auth.tenantId);
+  if (auth.role !== 'admin') summary.card = null;
   return jsonResponse(200, summary, ctx.cors);
 }
 

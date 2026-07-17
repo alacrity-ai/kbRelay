@@ -7,6 +7,7 @@ import type {
   MembershipRole,
   AgentSummary,
   WebhookSubscriptionDto,
+  BillingSummary,
 } from '@kbrelay/shared';
 import { USER_PALETTE, MAX_PROJECT_LABELS_PER_TENANT } from '@kbrelay/shared';
 import * as api from '../lib/api';
@@ -46,6 +47,11 @@ export default function TenantSettings({
   const [inviteRole, setInviteRole] = useState<MembershipRole>('member');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Billing seat context (KBR-135): hosted-only; stays null on self-host.
+  const [billing, setBilling] = useState<BillingSummary | null>(null);
+  useEffect(() => {
+    void api.getBilling().then((s) => setBilling(s.enabled ? s : null)).catch(() => {});
+  }, []);
 
   async function loadTeam() {
     const t = await api.getTeam();
@@ -134,6 +140,18 @@ export default function TenantSettings({
 
           {tab === 'people' && (
             <>
+              {billing && (
+                <p className="muted-note billing-seats-line">
+                  <strong>{billing.seats}</strong> human seat{billing.seats === 1 ? '' : 's'} · agents are always free
+                  {(billing.status === 'active' || billing.status === 'canceling') && billing.paidThrough && (
+                    <> · next renewal <strong>${(billing.nextBillCents / 100).toFixed(2)}</strong> on {new Date(billing.paidThrough).toLocaleDateString()}</>
+                  )}
+                  {billing.status === 'trialing' && <> · free trial — inviting is unrestricted</>}
+                  {billing.status !== 'exempt' && billing.status !== 'trialing' && (
+                    <> · inviting a person changes the next renewal, nothing is charged today</>
+                  )}
+                </p>
+              )}
               <div className="field">
                 <label>Invite a person</label>
                 <div className="invite-row">

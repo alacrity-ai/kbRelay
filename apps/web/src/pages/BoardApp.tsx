@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { MeResponse, ProjectDto, UserDto, MentionDto, LabelDto, MembershipDto } from '@kbrelay/shared';
+import type { MeResponse, ProjectDto, UserDto, MentionDto, LabelDto, MembershipDto, BillingSummary } from '@kbrelay/shared';
 import * as api from '../lib/api';
 import { clearToken } from '../lib/auth';
 import { CardLinksContext, parseCardDeepLink, type CardLinks } from '../lib/cardLinks';
@@ -22,6 +22,8 @@ import ClaudeCodeGuide from '../components/ClaudeCodeGuide';
 import ProfileSettings from '../components/ProfileSettings';
 import TenantSettings from '../components/TenantSettings';
 import AgentsModal from '../components/AgentsModal';
+import BillingModal from '../components/BillingModal';
+import BillingBanner from '../components/BillingBanner';
 import BrandMark from '../components/BrandMark';
 
 const PROJECT_KEY = 'kbrelay.selectedProject';
@@ -123,6 +125,7 @@ const GLYPH_PATHS: Record<string, string> = {
   guide: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',
   docs: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6',
   signout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9',
+  billing: 'M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z M2 10h20 M6 15h4',
   workspace: 'M3 21h18 M5 21V7l7-4 7 4v14 M9 9h1 M9 13h1 M14 9h1 M14 13h1',
   bot: 'M12 2v4 M8 6h8a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M9 12h.01 M15 12h.01 M9.5 15.5h5',
 };
@@ -180,6 +183,14 @@ export default function BoardApp({
   const [profileOpen, setProfileOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   const [agentsOpen, setAgentsOpen] = useState(false);
+  // Billing (v0.23.0, KBR-135). Summary drives the banner for every human;
+  // the modal is admin-only. Stays null on self-host (enabled:false ⇒ no UI).
+  const [billingOpen, setBillingOpen] = useState(false);
+  const [billing, setBilling] = useState<BillingSummary | null>(null);
+  const refreshBilling = useCallback(() => {
+    void api.getBilling().then((s) => setBilling(s.enabled ? s : null)).catch(() => {});
+  }, []);
+  useEffect(() => { refreshBilling(); }, [refreshBilling]);
   const [mentionCount, setMentionCount] = useState(0);
   // "Needs me" total for the My Work badge (KBR-70 follow-up): queue + reviews.
   // Mentions are added at render time so a mark-read updates the badge instantly.
@@ -618,6 +629,13 @@ export default function BoardApp({
             <button className="menu-item" onClick={() => setApiKeysOpen(true)}>
               <Glyph name="key" color="#d97706" /> API keys
             </button>
+            {/* Billing (KBR-135): admin-only, and only where billing exists —
+                self-host deployments never see this item. */}
+            {me.user.role === 'admin' && billing?.enabled && (
+              <button className="menu-item" onClick={() => setBillingOpen(true)} data-testid="menu-billing">
+                <Glyph name="billing" color="#16a34a" /> Billing
+              </button>
+            )}
 
             <div className="menu-divider" />
             <span className="menu-section-label">Guides</span>
@@ -642,6 +660,12 @@ export default function BoardApp({
           </div>
         </Dropdown>
       </header>
+
+      <BillingBanner
+        summary={billing}
+        isAdmin={isAdmin}
+        onOpenBilling={() => setBillingOpen(true)}
+      />
 
       {loading ? (
         <div className="loading-wrap"><div className="spinner" /></div>
@@ -749,6 +773,7 @@ export default function BoardApp({
         <TenantSettings meId={me.user.id} projects={projects} onClose={() => setTeamOpen(false)} onChanged={() => void loadProjects(selected ?? undefined)} />
       )}
       {agentsOpen && <AgentsModal me={me} projects={projects} onClose={() => setAgentsOpen(false)} />}
+      {billingOpen && <BillingModal onClose={() => { setBillingOpen(false); refreshBilling(); }} />}
     </CardLinksContext.Provider>
   );
 }

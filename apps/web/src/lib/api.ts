@@ -34,6 +34,10 @@ import type {
   CreateCardLinkInput,
   ProjectAnalyticsResponse,
   TenantAnalyticsResponse,
+  BillingSummary,
+  BillingConfig,
+  BillingInvoice,
+  BillingPlan,
 } from '@kbrelay/shared';
 import { getToken } from './auth';
 
@@ -92,6 +96,22 @@ export const resetPassword = (token: string, password: string) =>
   request<{ ok: true }>('POST', '/v1/auth/reset-password', { token, password });
 export const acceptInvite = (token: string, body: { name?: string; password?: string }) =>
   request<AuthMeResponse>('POST', '/v1/auth/accept-invite', { token, ...body });
+
+// ── Billing (v0.23.0, KBR-135) ── hosted-only; `enabled:false` on self-host.
+export const getBilling = () => request<BillingSummary>('GET', '/v1/billing');
+export const getBillingConfig = () => request<BillingConfig>('GET', '/v1/billing/config');
+export const listBillingInvoices = () =>
+  request<{ invoices: BillingInvoice[] }>('GET', '/v1/billing/invoices');
+export const subscribeBilling = (plan: BillingPlan, sourceId: string) =>
+  request<BillingSummary>('POST', '/v1/billing/subscribe', { plan, sourceId });
+export const updateBillingCard = (sourceId: string) =>
+  request<BillingSummary & { retry?: { retried: boolean; recovered: boolean } }>(
+    'POST', '/v1/billing/card', { sourceId },
+  );
+export const changeBillingPlan = (plan: BillingPlan) =>
+  request<BillingSummary>('POST', '/v1/billing/plan', { plan });
+export const cancelBilling = () => request<BillingSummary>('POST', '/v1/billing/cancel');
+export const resumeBilling = () => request<BillingSummary>('POST', '/v1/billing/resume');
 
 // ── Team management & RBAC (v0.11.0) ──
 export const getTeam = () => request<TeamResponse>('GET', '/v1/team');

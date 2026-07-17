@@ -2070,3 +2070,56 @@ button.sm { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
   .anx-hbar-label { flex-basis: 45%; }
   .anx-projects { overflow-x: auto; }
 }
+
+/* ── Billing (v0.23.0, KBR-135) ─────────────────────────────── */
+
+.billing-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.82rem;
+  border-bottom: 1px solid var(--border);
+}
+.billing-banner.trial { background: rgba(79, 124, 255, 0.12); color: var(--text); }
+.billing-banner.past_due { background: rgba(217, 119, 6, 0.16); color: var(--text); }
+.billing-banner.locked { background: rgba(220, 38, 38, 0.14); color: var(--text); }
+.billing-banner-cta {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.25rem 0.8rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.billing-banner-cta:hover { filter: brightness(1.1); }
+
+.billing-status-row { display: flex; align-items: baseline; gap: 0.7rem; margin-bottom: 0.6rem; }
+.billing-status {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.15));
+}
+.billing-status.active, .billing-status.exempt { color: #16a34a; }
+.billing-status.trialing { color: var(--accent); }
+.billing-status.past_due, .billing-status.canceling { color: #d97706; }
+.billing-status.expired, .billing-status.delinquent, .billing-status.canceled { color: #dc2626; }
+
+.billing-seats-line { line-height: 1.6; }
+.billing-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.8rem 0; }
+.billing-card-entry { margin: 0.8rem 0; }
+.billing-plan-pick { display: flex; gap: 0.5rem; }
+#billing-card-input { min-height: 44px; }
+.billing-card-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.6rem; }
+.billing-invoices { margin-top: 1rem; }
+.billing-invoice-status { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.billing-invoice-status.paid { color: #16a34a; }
+.billing-invoice-status.failed { color: #dc2626; }
+.billing-invoice-status.refunded, .billing-invoice-status.pending { color: #d97706; }
+.billing-footer-note { font-size: 0.72rem; }

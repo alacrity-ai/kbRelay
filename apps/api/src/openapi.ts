@@ -696,7 +696,7 @@ export const OPENAPI_SPEC = {
       },
     },
     '/api/v1/billing': {
-      get: { summary: 'Billing summary: status, plan, seats, next bill, card (admin; enabled:false on self-host)', responses: { 200: { description: 'ok' } } },
+      get: { summary: 'Billing summary: status, plan, seats, next bill (member-readable; card details admin-only; enabled:false on self-host)', responses: { 200: { description: 'ok' } } },
     },
     '/api/v1/billing/config': {
       get: { summary: 'Web Payments SDK bootstrap (appId, locationId, environment)', responses: { 200: { description: 'ok' } } },
