@@ -358,7 +358,37 @@
         padding: 0.85rem 1rem;
         margin-bottom: 1.1rem;
       }
-      .modal-cmd code { font-family: var(--mono); font-size: 0.95rem; color: #6ee7b7; white-space: nowrap; overflow-x: auto; flex: 1; }
+      .modal-cmd code { font-family: var(--mono); font-size: 0.95rem; color: #6ee7b7; white-space: pre-wrap; word-break: break-word; flex: 1; }
+      .modal-cmd .copy-btn { align-self: flex-start; }
+      .modal-cmd code .flag { color: #93c5fd; }
+      .modal-cmd code .val { color: var(--text); }
+
+      /* Tuning knobs: the dropdown/input mutate the copyable command above. */
+      .modal-knobs { display: flex; flex-wrap: wrap; gap: 0.9rem; margin: 0 0 1.2rem; }
+      .knob { display: flex; flex-direction: column; gap: 0.3rem; }
+      .knob-dir { flex: 1; min-width: 11rem; }
+      .knob label {
+        font-family: var(--mono);
+        font-size: 0.64rem;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .knob select, .knob input {
+        font-family: var(--mono);
+        font-size: 0.82rem;
+        color: var(--text);
+        background: var(--surface-2);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--r-sm);
+        padding: 0.38rem 0.55rem;
+        transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+      }
+      .knob select { cursor: pointer; }
+      .knob select:hover, .knob input:hover { background: var(--surface-hover); }
+      .knob input { width: 100%; }
+      .knob input::placeholder { color: var(--muted); }
       .modal-tips { margin: 0 0 1.3rem; padding: 0; list-style: none; display: grid; gap: 0.5rem; font-size: 0.85rem; color: var(--text-dim); line-height: 1.55; }
       .modal-tips code { font-family: var(--mono); font-size: 0.85em; color: #93c5fd; background: var(--surface-2); padding: 0.1em 0.4em; border-radius: 4px; white-space: nowrap; }
       .modal-foot { display: flex; align-items: center; gap: 0.9rem; border-top: 1px solid var(--border); padding-top: 1.1rem; }
@@ -720,13 +750,30 @@
             </div>
             <p class="modal-sub">One command boots the whole app — API, web board, and an embedded SQLite database. No clone, no Docker, no config files.</p>
             <div class="modal-cmd">
-              <code id="selfhost-cmd">npx @alacrity-ai/kbrelay</code>
+              <code id="selfhost-cmd">npx @alacrity-ai/kbrelay<span id="cmd-port"></span><span id="cmd-dir"></span></code>
               <button class="copy-btn" type="button" data-copy-target="#selfhost-cmd" aria-label="Copy the self-host command to the clipboard"><span class="copy-label">Copy</span></button>
             </div>
+            <div class="modal-knobs">
+              <div class="knob">
+                <label for="knob-port">Port</label>
+                <select id="knob-port">
+                  <option value="8080" selected>8080 &middot; default</option>
+                  <option value="3000">3000</option>
+                  <option value="4000">4000</option>
+                  <option value="5000">5000</option>
+                  <option value="8000">8000</option>
+                  <option value="8081">8081</option>
+                  <option value="9000">9000</option>
+                </select>
+              </div>
+              <div class="knob knob-dir">
+                <label for="knob-dir">Data dir</label>
+                <input id="knob-dir" type="text" placeholder="~/.kbrelay" spellcheck="false" autocomplete="off" autocapitalize="off" />
+              </div>
+            </div>
             <ul class="modal-tips">
-              <li>Open the printed URL (default <code>localhost:8080</code>) and sign up — you're the admin.</li>
-              <li><code>--port &lt;n&gt;</code> picks a port &middot; <code>--data-dir &lt;dir&gt;</code> moves your data (default <code>~/.kbrelay</code>).</li>
-              <li>Upgrade in place with <code>@latest</code> — migrations apply automatically. Needs Node &ge; 22.</li>
+              <li>Open the printed URL — <code id="tip-url">localhost:8080</code> — and sign up; you're the admin. If the port's busy, it walks to the next free one.</li>
+              <li>Data persists in <code id="tip-dir">~/.kbrelay</code>; upgrade in place with <code>@latest</code> — migrations apply automatically. Needs Node &ge; 22.</li>
             </ul>
             <div class="modal-foot">
               <a class="btn" href="https://github.com/alacrity-ai/kbRelay#self-hosting-in-60-seconds-npm" rel="noopener">Docs on GitHub</a>
@@ -859,6 +906,45 @@
             dlg.addEventListener('click', function (e) {
               if (e.target === dlg) dlg.close();
             });
+          }
+
+          // Tuning knobs: non-default port / data-dir append flags to the
+          // copyable command; defaults keep it the pristine one-liner.
+          var portSel = document.getElementById('knob-port');
+          var dirIn = document.getElementById('knob-dir');
+          var portFrag = document.getElementById('cmd-port');
+          var dirFrag = document.getElementById('cmd-dir');
+          var tipUrl = document.getElementById('tip-url');
+          var tipDir = document.getElementById('tip-dir');
+          function flagFrag(flag, value) {
+            var f = document.createDocumentFragment();
+            f.appendChild(document.createTextNode(' '));
+            var s = document.createElement('span');
+            s.className = 'flag';
+            s.textContent = flag;
+            f.appendChild(s);
+            f.appendChild(document.createTextNode(' '));
+            var v = document.createElement('span');
+            v.className = 'val';
+            v.textContent = value;
+            f.appendChild(v);
+            return f;
+          }
+          function renderCmd() {
+            var port = portSel.value;
+            portFrag.textContent = '';
+            if (port !== '8080') portFrag.appendChild(flagFrag('--port', port));
+            var dir = dirIn.value.trim();
+            dirFrag.textContent = '';
+            if (dir && dir !== '~/.kbrelay') {
+              dirFrag.appendChild(flagFrag('--data-dir', /\s/.test(dir) ? '"' + dir + '"' : dir));
+            }
+            if (tipUrl) tipUrl.textContent = 'localhost:' + port;
+            if (tipDir) tipDir.textContent = dir || '~/.kbrelay';
+          }
+          if (portSel && dirIn && portFrag && dirFrag) {
+            portSel.addEventListener('change', renderCmd);
+            dirIn.addEventListener('input', renderCmd);
           }
         } catch (e) { /* enhancement only */ }
       })();
