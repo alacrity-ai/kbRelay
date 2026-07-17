@@ -15,6 +15,10 @@ export default defineConfig({
       // See docs/v0.20.0/2-IMPLEMENTATION_PLAN.md.
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        // Static legal pages (KBR-135) — Pages pretty-URLs serve them at
+        // /terms and /privacy; the SPA fallback never sees those paths.
+        terms: fileURLToPath(new URL('./terms.html', import.meta.url)),
+        privacy: fileURLToPath(new URL('./privacy.html', import.meta.url)),
         landing: fileURLToPath(new URL('./landing.html', import.meta.url)),
       },
     },

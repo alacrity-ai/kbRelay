@@ -76,3 +76,59 @@ describe('routing + crawl files', () => {
     expect(appShell).toContain('<meta name="robots" content="noindex"');
   });
 });
+
+// ── Pricing + legal pages (v0.23.0, KBR-135) ─────────────────
+
+const terms = read('../terms.html');
+const privacy = read('../privacy.html');
+
+describe('pricing section', () => {
+  it('exists with the three offerings and honest licensing language', () => {
+    expect(landing).toContain('id="pricing"');
+    expect(landing).toContain('$5');
+    expect(landing).toContain('per person/month');
+    expect(landing).toContain('$50 per person when billed annually');
+    expect(landing).toContain('Managed Private');
+    expect(landing).toContain('source-available');
+    // ELv2 is not OSI open source — the marketing copy must never claim it.
+    expect(landing.toLowerCase()).not.toContain('open source');
+  });
+
+  it('links the legal pages from the footer', () => {
+    expect(landing).toContain('href="/terms"');
+    expect(landing).toContain('href="/privacy"');
+  });
+});
+
+describe('legal pages', () => {
+  it.each([
+    ['terms', terms, 'https://kbrelay.com/terms', 'Terms of Service'],
+    ['privacy', privacy, 'https://kbrelay.com/privacy', 'Privacy Policy'],
+  ])('%s: canonical, robots, title, entity', (_name, html, canonical, title) => {
+    expect(html).toContain(`<link rel="canonical" href="${canonical}" />`);
+    expect(html).toContain('<meta name="robots" content="index,follow" />');
+    expect(html).toContain(title);
+    expect(html).toContain('LaLa Solutions LLC');
+    // Self-contained like the landing: no external scripts or stylesheets.
+    expect(html).not.toMatch(/<script/);
+    expect(html).not.toMatch(/<link[^>]*rel="stylesheet"/);
+  });
+
+  it('terms carry the refund + seat model commitments the UI advertises', () => {
+    expect(terms).toContain('14 days');
+    expect(terms).toContain('per human seat');
+    expect(terms).toContain('Agent identities are free and unmetered');
+    expect(terms).toContain('30-day full-featured trial');
+    expect(terms).toContain('Square');
+  });
+
+  it('privacy names the actual processors and the no-training promise', () => {
+    for (const vendor of ['Square', 'Cloudflare', 'Mailgun']) expect(privacy).toContain(vendor);
+    expect(privacy).toContain('train machine-learning models');
+  });
+
+  it('sitemap lists the legal pages', () => {
+    expect(sitemap).toContain('https://kbrelay.com/terms');
+    expect(sitemap).toContain('https://kbrelay.com/privacy');
+  });
+});
