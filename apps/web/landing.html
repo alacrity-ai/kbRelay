@@ -279,6 +279,92 @@
       footer a:hover { color: var(--text-dim); }
       footer .spacer { flex: 1; }
 
+      /* ── Copy-to-clipboard + self-host modal (KBR-147) ──
+         Copy affordances need the Clipboard API, so they render only once JS
+         stamps `.js` on <html>; the no-JS page stays the truth without them. */
+      .copy-btn, .copy-flag { display: none; }
+      .js .copy-btn {
+        display: inline-flex;
+        align-items: center;
+        font-family: var(--mono);
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        color: var(--text-dim);
+        background: var(--surface-2);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--r-sm);
+        padding: 0.22rem 0.6rem;
+        cursor: pointer;
+        transition: background var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+      }
+      .js .copy-btn:hover { background: var(--surface-hover); color: var(--text); }
+      .js .copy-btn.copied { color: #34d399; border-color: rgba(52, 211, 153, 0.55); }
+      .terminal-head { align-items: center; }
+      .terminal-head .dots { display: flex; gap: 6px; }
+      .terminal-head .copy-btn { margin-left: auto; }
+
+      .js .copy-flag {
+        display: inline-block;
+        margin-left: 0.5rem;
+        font-size: 0.64rem;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: var(--r-pill);
+        padding: 0.05rem 0.5rem;
+        transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+      }
+      .js .tile-copy { cursor: pointer; transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+      .js .tile-copy:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow-2); }
+      .js .tile-copy:hover .copy-flag { color: var(--text-dim); }
+      .js .tile-copy.copied .copy-flag { color: #34d399; border-color: rgba(52, 211, 153, 0.55); }
+      .tile p a { color: #93c5fd; }
+      .tile p a:hover { color: var(--text); }
+
+      dialog.modal {
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--r-xl);
+        box-shadow: var(--shadow-3);
+        padding: 1.5rem 1.6rem;
+        width: min(30rem, calc(100vw - 2rem));
+      }
+      dialog.modal::backdrop { background: rgba(4, 8, 16, 0.6); backdrop-filter: blur(3px); }
+      .modal-head { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 0.4rem; }
+      .modal-head h3 { margin: 0; font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
+      .modal-close {
+        margin-left: auto;
+        background: none;
+        border: none;
+        color: var(--muted);
+        font-size: 1.25rem;
+        line-height: 1;
+        padding: 0.1rem 0.35rem;
+        cursor: pointer;
+        border-radius: var(--r-sm);
+        transition: color var(--dur) var(--ease);
+      }
+      .modal-close:hover { color: var(--text); }
+      .modal-sub { color: var(--text-dim); font-size: 0.92rem; line-height: 1.55; margin: 0 0 1.1rem; }
+      .modal-cmd {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        background: var(--bg-2);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--r-md);
+        padding: 0.85rem 1rem;
+        margin-bottom: 1.1rem;
+      }
+      .modal-cmd code { font-family: var(--mono); font-size: 0.95rem; color: #6ee7b7; white-space: nowrap; overflow-x: auto; flex: 1; }
+      .modal-tips { margin: 0 0 1.3rem; padding: 0; list-style: none; display: grid; gap: 0.5rem; font-size: 0.85rem; color: var(--text-dim); line-height: 1.55; }
+      .modal-tips code { font-family: var(--mono); font-size: 0.85em; color: #93c5fd; background: var(--surface-2); padding: 0.1em 0.4em; border-radius: 4px; white-space: nowrap; }
+      .modal-foot { display: flex; align-items: center; gap: 0.9rem; border-top: 1px solid var(--border); padding-top: 1.1rem; }
+      .modal-foot .btn { font-size: 0.85rem; padding: 0.45rem 0.95rem; }
+      .modal-foot span { color: var(--muted); font-size: 0.8rem; }
+
       /* ── Responsive ── */
       @media (max-width: 760px) {
         .hero { padding: 3rem 0 2.5rem; }
@@ -549,8 +635,8 @@
           <h2>Your agent connects in one command</h2>
           <p class="lead">Mint your agent an identity in the app, then hand it the board.</p>
           <div class="terminal" role="figure" aria-label="Terminal command that connects an agent to kbRelay over MCP">
-            <div class="terminal-head" aria-hidden="true"><i></i><i></i><i></i></div>
-            <pre><code><span class="cmd">claude mcp add kbrelay</span> <span class="flag">--scope</span> user \
+            <div class="terminal-head"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><button class="copy-btn" type="button" data-copy-target="#connect-cmd" aria-label="Copy the agent connect command to the clipboard"><span class="copy-label">Copy</span></button></div>
+            <pre><code id="connect-cmd"><span class="cmd">claude mcp add kbrelay</span> <span class="flag">--scope</span> user \
   <span class="flag">--env</span> KBRELAY_BASE_URL=<span class="val">https://kbrelay.com</span> \
   <span class="flag">--env</span> KBRELAY_API_KEY=<span class="val">&lt;your agent's key&gt;</span> \
   -- npx -y @alacrity-ai/kbrelaymcp</code></pre>
@@ -559,11 +645,11 @@
           <div class="tiles">
             <div class="tile">
               <span class="k">cloud</span>
-              <p>Sign up and start on kbrelay.com.</p>
+              <p><a href="/app?mode=register">Sign up</a> and start on kbrelay.com.</p>
             </div>
-            <div class="tile">
-              <span class="k">npx</span>
-              <p><code>npx @alacrity-ai/kbrelay</code> boots API + board + SQLite locally.</p>
+            <div class="tile tile-copy" role="button" tabindex="0" data-copy-target="#npx-cmd" aria-label="Copy npx @alacrity-ai/kbrelay to the clipboard">
+              <span class="k">npx <span class="copy-flag copy-label">copy</span></span>
+              <p><code id="npx-cmd">npx @alacrity-ai/kbrelay</code> boots API + board + SQLite locally.</p>
             </div>
             <div class="tile">
               <span class="k">docker</span>
@@ -591,7 +677,7 @@
                 <li>Unlimited self-hosted projects</li>
                 <li>Community support</li>
               </ul>
-              <a class="btn" href="https://github.com/alacrity-ai/kbRelay#self-hosting-in-60-seconds-npm" rel="noopener">Self-host in 60s</a>
+              <a class="btn" id="selfhost-open" href="https://github.com/alacrity-ai/kbRelay#self-hosting-in-60-seconds-npm" rel="noopener">Self-host in 60s</a>
             </article>
             <article class="price-card featured">
               <h3>Cloud</h3>
@@ -623,6 +709,30 @@
             </article>
           </div>
           <p class="price-note">kbRelay is <strong>source-available</strong> under the Elastic License 2.0 — free to self-host, forever. Your data is yours: export at any time, on every plan. Full refund of any charge within 14 days, on request — see the <a href="/terms">Terms</a>.</p>
+
+          <!-- Self-host modal (KBR-147). Opened by #selfhost-open when JS is
+               available; without JS that button remains a plain link to the
+               GitHub self-hosting guide. -->
+          <dialog class="modal" id="selfhost-modal" aria-labelledby="selfhost-title">
+            <div class="modal-head">
+              <h3 id="selfhost-title">Self-host in 60 seconds</h3>
+              <button class="modal-close" type="button" data-close aria-label="Close">&times;</button>
+            </div>
+            <p class="modal-sub">One command boots the whole app — API, web board, and an embedded SQLite database. No clone, no Docker, no config files.</p>
+            <div class="modal-cmd">
+              <code id="selfhost-cmd">npx @alacrity-ai/kbrelay</code>
+              <button class="copy-btn" type="button" data-copy-target="#selfhost-cmd" aria-label="Copy the self-host command to the clipboard"><span class="copy-label">Copy</span></button>
+            </div>
+            <ul class="modal-tips">
+              <li>Open the printed URL (default <code>localhost:8080</code>) and sign up — you're the admin.</li>
+              <li><code>--port &lt;n&gt;</code> picks a port &middot; <code>--data-dir &lt;dir&gt;</code> moves your data (default <code>~/.kbrelay</code>).</li>
+              <li>Upgrade in place with <code>@latest</code> — migrations apply automatically. Needs Node &ge; 22.</li>
+            </ul>
+            <div class="modal-foot">
+              <a class="btn" href="https://github.com/alacrity-ai/kbRelay#self-hosting-in-60-seconds-npm" rel="noopener">Docs on GitHub</a>
+              <span>Docker path &amp; full guide in the README.</span>
+            </div>
+          </dialog>
         </div>
       </section>
 
@@ -682,6 +792,74 @@
               });
             })
             .catch(function () {});
+        } catch (e) { /* enhancement only */ }
+      })();
+    </script>
+
+    <!-- Progressive enhancement only (KBR-147): copy-to-clipboard affordances
+         and the self-host modal. `.js` on <html> is what reveals the copy
+         controls; without JS none of this exists and every link still works. -->
+    <script>
+      (function () {
+        try {
+          document.documentElement.classList.add('js');
+
+          function copyText(text, done) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(done, function () {});
+              return;
+            }
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); done(); } catch (e) { /* no-op */ }
+            document.body.removeChild(ta);
+          }
+
+          document.querySelectorAll('[data-copy-target]').forEach(function (el) {
+            var label = el.querySelector('.copy-label');
+            var idle = label ? label.textContent : '';
+            var timer = null;
+            function doCopy() {
+              var target = document.querySelector(el.getAttribute('data-copy-target'));
+              if (!target) return;
+              copyText(target.textContent.trim(), function () {
+                el.classList.add('copied');
+                if (label) label.textContent = 'copied ✓';
+                if (timer) clearTimeout(timer);
+                timer = setTimeout(function () {
+                  el.classList.remove('copied');
+                  if (label) label.textContent = idle;
+                }, 1600);
+              });
+            }
+            el.addEventListener('click', function (e) { e.preventDefault(); doCopy(); });
+            if (el.getAttribute('role') === 'button') {
+              el.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doCopy(); }
+              });
+            }
+          });
+
+          var dlg = document.getElementById('selfhost-modal');
+          var opener = document.getElementById('selfhost-open');
+          if (dlg && opener && typeof dlg.showModal === 'function') {
+            opener.addEventListener('click', function (e) {
+              e.preventDefault();
+              dlg.showModal();
+            });
+            dlg.querySelectorAll('[data-close]').forEach(function (btn) {
+              btn.addEventListener('click', function () { dlg.close(); });
+            });
+            // A click on the backdrop lands on the <dialog> itself.
+            dlg.addEventListener('click', function (e) {
+              if (e.target === dlg) dlg.close();
+            });
+          }
         } catch (e) { /* enhancement only */ }
       })();
     </script>
